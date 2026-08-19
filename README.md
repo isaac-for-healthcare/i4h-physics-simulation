@@ -132,4 +132,8 @@ This repository is under active development (experimental). For questions and su
 
 ## License
 
-Licensing varies by component. Cosmos-H-Dreams code is primarily Apache-2.0 with model weights under the NVIDIA Open Model License — see [physics_simulation/cosmos_h_dreams/LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Upstream omnisurg licenses apply until that package is ported and documented here.
+This repository's NVIDIA-authored code and documentation are licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE).
+
+Third-party and ported components (Isaac Lab BSD-3-Clause portions, Newton/OmniEndo Apache-2.0 portions, and the Cosmos-H-Dreams submodule) are listed in [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES). Cosmos-H-Dreams model weights use the NVIDIA Open Model License — see [physics_simulation/cosmos_h_dreams/LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Upstream omnisurg licenses apply until that package is ported and documented here.
+
+Contributions are accepted under the Developer Certificate of Origin (DCO). See [CONTRIBUTING.md](./CONTRIBUTING.md).

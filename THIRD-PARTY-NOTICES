@@ -1,0 +1,34 @@
+Third-Party Software Notices
+============================
+
+This repository includes or depends on third-party open-source software.
+The following notices are provided for attribution and license distribution
+(OSRB Apache 2.0 §5.4.4). License texts are not duplicated here; see the linked
+upstream projects / in-tree headers.
+
+-------------------------------------------------------------------------------
+Isaac Lab (portions of catheter-vasculature-solver)
+Copyright (c) 2022-2025, The Isaac Lab Project Developers
+https://github.com/isaac-sim/IsaacLab
+Licensed under BSD-3-Clause
+
+In-tree paths include (non-exhaustive):
+  physics_simulation/endoluminal/catheter-vasculature-solver/src/catheter_vasculature_solver/
+  (files carrying Isaac Lab Project Developers copyright / BSD-3-Clause SPDX)
+
+-------------------------------------------------------------------------------
+Newton Physics / OmniEndo contributors (portions of vessel deformation & rod solvers)
+Copyright (c) 2025 The Newton Developers / OmniEndo contributors
+https://github.com/newton-physics/newton
+Licensed under Apache-2.0
+
+In-tree paths include (non-exhaustive):
+  physics_simulation/endoluminal/catheter-vasculature-solver/src/catheter_vasculature_solver/vessel_deformation/
+  physics_simulation/endoluminal/catheter-vasculature-solver/src/catheter_vasculature_solver/cath_rod_solver.py
+
+-------------------------------------------------------------------------------
+Cosmos-H-Dreams (git submodule)
+Path: physics_simulation/cosmos_h_dreams
+URL: https://github.com/isaac-for-healthcare/Cosmos-H-Dreams
+Primary code license: Apache-2.0
+Model weights: NVIDIA Open Model License (see submodule LICENSE / notices)
