@@ -1,154 +1,135 @@
-# __NVIDIA_OSS__ Standard Repo Template
+# Isaac for Healthcare - Medical Physics Simulation
 
-This README file is from the NVIDIA_OSS standard repo template of [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file). It provides a list of files in the PLC-OSS-Template and guidelines on how to use (clone and customize) them.
+Isaac Sim–compatible simulation tools for modeling anatomy and healthcare robotics, powered by NVIDIA [Newton](https://github.com/newton-physics/newton), [Warp](https://github.com/NVIDIA/warp), and generative video models.
 
-**Upon completing the customization for the project repo, the repo admin should replace this README template with the project specific README file.**
+This repository aggregates physics and generative simulators under [`physics_simulation/`](./physics_simulation). Use them to prototype endoluminal and laparoscopic procedures, train robotics policies, and generate synthetic surgical video.
 
-- Files (org-wide templates in the NVIDIA .github org repo; per-repo overrides allowed) in [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file)
+## Available Components
 
-   - Root 
-     - README.md skeleton (CTA + Quickstart + Support/Security/Governance links) 
-     - LICENSE (Apache 2.0 by default)
-        - For other licenses, see the [Confluence page](https://confluence.nvidia.com/pages/viewpage.action?pageId=788418816) for other licenses
-        - CLA.md file (delete if not using MIT or BSD licenses)
-     - CODE_OF_CONDUCT.md 
-     - SECURITY.md (vuln reporting path) 
-     - CONTRIBUTING.md (base; repo can add specifics)
-     - SUPPORT.md (Support levels/channels)
-     - GOVERNANCE.md (baseline; repo may extend)
-     - CITATION.md (for projects that need citation)
+### Endoluminal Physics Simulator
 
-   - .github/ 
-     - ISSUE_TEMPLATE/ (<https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository>)
-       - bug.yml, feature.yml, task.yml, config.yml 
-     - PULL_REQUEST_TEMPLATE.md (<https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/creating-a-pull-request-template-for-your-repository>)
-     - workflows/
-     - Note: workflow-templates/ for starter workflows should live in the org-level .github repo, not per-repo
+**Status:** *Partially ported.* [`physics_simulation/endoluminal/catheter-vasculature-solver`](./physics_simulation/endoluminal/catheter-vasculature-solver) holds the catheter and vasculature solver. The wider interventions simulator is still being migrated.
 
-   - Repo-specific (not org-template, maintained by the team)
-     - CODEOWNERS (place at .github/CODEOWNERS or repo root)
-     - CHANGELOG.md (or RELEASE.md) 
-     - ROADMAP.md 
-     - MAINTAINERS.md 
-     - NOTICE or THIRD_PARTY_NOTICES / THIRD_PARTY_LICENSES (dependency specific)
-     - Build/package files (CMake, pyproject, Dockerfile, etc.)
+**What it provides:** A Newton-based endoluminal solver (catheter and related devices) using Cosserat rod / XPBD soft-body physics on NVIDIA Warp and Newton.
 
-   - Recommended structure and hygiene
-     - docs/
-     - examples/
-     - tests/
-     - scripts/
-     - Container/dev env: Dockerfile, docker/, .devcontainer/ (optional)
-     - Build/package (language-specific):
-       - Python: pyproject.toml, setup.cfg/setup.py, requirements.txt, environment.yml
-       - C++: CMakeLists.txt, cmake/, vcpkg.json
-     - Repo hygiene: .gitignore, .gitattributes, .editorconfig, .pre-commit-config.yaml, .clang-format
+Available in-tree today:
 
+- Cosserat / XPBD catheter insertion through static or deformable vessel walls
+- Track-guided insertion along a fixed guide axis
+- Vessel containment via SDF or mesh-edge collision paths
+- Bendable / steerable distal tip with configurable rest curvature
+- Deformable vessel walls via a branching centerline Cosserat tree with two-way contact and surface skinning
+- Optional Isaac Lab coupling that steps rigid tools and the catheter in one Newton substep
 
-## Usage of [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file) for NEW NVIDIA OSS repos
+Not ported yet:
 
-1. Clone the [PLC-OSS-Template](https://github.com/NVIDIA-GitHub-Management/PLC-OSS-Template?tab=readme-ov-file)
-2. Find/replace all in the clone of `___PROJECT___` and `__PROJECT_NAME__` with the name of the specific project.
-3. Inspect all files to make sure all replacements work and update text as needed
+- Endoscopic camera mode that follows the catheter tip
+- Packaged scenes such as aorta and airways (USD / mesh assets), and YAML scene authoring
+- Bronchoscope and other non-catheter devices
 
+Vessel geometry is authored outside this repository; see the [solver README](./physics_simulation/endoluminal/catheter-vasculature-solver/README.md) for how to feed it a vessel mesh and insertion track.
 
-**What you can reuse immediately**
-- CODE_OF_CONDUCT.md
-- SECURITY.md
-- CONTRIBUTING.md (base)
-- .github/ISSUE_TEMPLATE/.yml (bug/feature/task + config.yml)
-- .github/PULL_REQUEST_TEMPLATE.md
-- Reusable workflows 
+### Soft Tissue & Fluid Surgical Simulator
 
-**What you must customize per repo**
-- README.md: copy the skeleton and fill in product-specific details (Quickstart, Requirements, Usage, Support level, links)
-- LICENSE: check file is correct, update year, consult Confluence for alternatives https://confluence.nvidia.com/pages/viewpage.action?pageId=788418816, add CLA.md only if your license/process requires it
-- CODEOWNERS: replace <TEAM> with your GitHub team handle(s). Place at .github/CODEOWNERS (or repo root)
-- MAINTAINERS.md: list maintainers names/roles, escalation path
-- CHANGELOG.md (or RELEASE.md): track releases/changes
-- SUPPORT.md: Update for your project
-- ROADMAP.md (optional): upcoming milestones
-- NOTICE / THIRD_PARTY_NOTICES (if you ship third‑party content)
-- Build/package files (CMake/pyproject/Dockerfile/etc.), tests/, docs/, examples/, scripts/ as appropriate
-- Workflows: Edit if you need custom behavior 
+**Status:** *Not yet ported.* The [`physics_simulation/surgical`](./physics_simulation/surgical) folder is a placeholder. Source currently lives in [omnisurg](https://github.com/isaac-for-healthcare) and will be migrated here.
 
+**What it will provide:** A Newton-compatible soft-tissue and fluid simulator for laparoscopic / robotic surgery, including instrument–tissue interaction and optional haptic device output.
 
-4. Change git origin to point to new repo and push
-5. Remove the line break below and everything above it
+Planned capabilities (from the upstream omnisurg codebase):
 
-## Usage for existing NVIDIA OSS repos
+- Tetrahedral and hex soft-tissue bodies with XPBD deformation, grasp, contact, stretch/breaking, and thermal stages
+- Deformable organ surfaces and directed organ–organ contact
+- Procedure packages (for example cholecystectomy tet cases) with YAML-authored assets, instruments, and solvers
+- Particle-based fluids (PBF) and cloth demos
+- Optional haptic output (e.g. MiniMou) with force caps and calibration presets
+- Rendering backends including noop (headless) and RTX-oriented paths
 
-1. Follow the steps above, but add the files to your existing repo and merge
+Upstream quick reference (until the port lands):
 
-<!-- REMOVE THE LINE BELOW AND EVERYTHING ABOVE -->
------------------------------------------
-# [Project Title]
-One-sentence value proposition for users. Who is it for, and why it matters. 
-
-# Overview
-What the project does? Why the project is useful?
-Provide a brief overview, highlighting key features or problem-solving capabilities.
-
-# Getting Started
-Guide users on how they can get started with the project. This should include basic installation step, quick-start examples 
 ```bash
-# Option A: Package manager (pip/conda/npm/etc.)
-<copy-paste install>
-
-# Option B: Container
-docker run <image> <args>
-
-# Verify (hello world)
-<one-liner or ~10-line example>
+# From the omnisurg repository
+uv run omnisurg --config examples/minimal_case.yaml
+uv run omnisurg --config examples/chole_tet_case_med.yaml
 ```
-# Requirements
-Include a list of pre-requisites. 
-- OS/Arch: <summary or link to full matrix>
-- Runtime/Compiler: <versions>
-- GPU/Drivers (if applicable): CUDA <ver>, driver <ver>, etc.
 
-# Usage
+Haptic presets and hardware checklist: see omnisurg’s `HAPTICS.md`.
+
+### Generative Physics Simulation (Cosmos-H-Dreams)
+
+**Status:** Available as a git submodule at [`physics_simulation/cosmos_h_dreams`](./physics_simulation/cosmos_h_dreams).
+
+Real-time action-conditioned surgical video simulation via WebRTC, built on [FlashDreams](https://github.com/NVIDIA/flashdreams). Given a conditional first frame and a live stream of instrument action vectors, the model rolls forward generated frames and streams them to a browser or Meta Quest headset.
+
+Key features:
+
+- Offline batch inference from a JSON manifest
+- Interactive WebRTC control (keyboard browser or Meta Quest / WebXR)
+- Multiple runner configs (chunk size, 2- vs 4-step schedule, VAE vs light TAE decoder)
+
 ```bash
-# Minimal runnable snippet (≤20 lines)
-<code>
-```
-- More examples/tutorials: <link>
-- API reference: <link>
+git submodule update --init --recursive physics_simulation/cosmos_h_dreams
+cd physics_simulation/cosmos_h_dreams
 
-# Performance (Optional)
-Summary of benchmarks; link to detailed results and hardware used.
-
-## Releases & Roadmap 
-- Releases/Changelog: <link>
-- (Optional) Next milestones or link to `ROADMAP.md`.
-  
-# Contribution Guidelines
-- Start here: `CONTRIBUTING.md`
-- Code of Conduct: `CODE_OF_CONDUCT.md`
-- Development quickstart (build/test):
-```bash
-<clone> && <deps> && <build/test>
+# Build and run — see the submodule README for checkpoints and full flags
+docker build -t cosmos-h-dreams:latest docker/
+# Offline example:
+# uv run flashdreams-run cosmosHDreams-chunk3-vae-vae --input-json ...
 ```
-## Governance & Maintainers
-- Governance: `GOVERNANCE.md`
-- Maintainers: <team/handles>
-- Labeling/triage policy: <link>
+
+Full setup, configs, and system requirements: [Cosmos-H-Dreams README](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/README.md).
+
+## Repository Layout
+
+```text
+physics_simulation/
+├── endoluminal/          # Catheter + vasculature solver (Newton / Warp)
+├── surgical/             # Placeholder — port from omnisurg (pending)
+└── cosmos_h_dreams/      # Git submodule — generative surgical video sim
+```
+
+## Getting Started
+
+1. Clone this repository (with submodules for generative sim):
+
+   ```bash
+   git clone --recurse-submodules https://github.com/isaac-for-healthcare/i4h-physics-simulation.git
+   cd i4h-physics-simulation
+   ```
+
+   If you already cloned without submodules:
+
+   ```bash
+   git submodule update --init --recursive
+   ```
+
+2. Use the component that is available today:
+
+   - **Generative sim:** follow [physics_simulation/cosmos_h_dreams/README.md](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/README.md)
+   - **Endoluminal catheter sim:** follow [physics_simulation/endoluminal/catheter-vasculature-solver/README.md](./physics_simulation/endoluminal/catheter-vasculature-solver/README.md)
+   - **Surgical Newton sim:** not in-tree yet — use the upstream omnisurg repository until that folder is populated
+
+## Requirements
+
+Shared / typical prerequisites (exact versions depend on the component):
+
+| Requirement | Notes |
+| ----------- | ----- |
+| OS | Linux (x86_64) |
+| Python | 3.12+ (Cosmos-H-Dreams); the endoluminal solver supports 3.10+; omnisurg currently pins `3.12.12` |
+| GPU | NVIDIA GPU; Cosmos-H-Dreams recommends ≥12 GB VRAM |
+| Driver / CUDA | Cosmos-H-Dreams: driver **R580+** (CUDA 13.x). Newton / Warp stacks need a CUDA-capable driver matching the installed toolkit |
+| Container | Docker + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for the generative sim image |
+
+Newton-based endoluminal and surgical stacks additionally depend on NVIDIA Newton and Warp (see the in-tree `physics_simulation/endoluminal/catheter-vasculature-solver/pyproject.toml`, or the upstream omnisurg `pyproject.toml` for the surgical stack).
 
 ## Security
-- Vulnerability disclosure: `SECURITY.md`
-- Do not file public issues for security reports.
+
+See [SECURITY.md](./SECURITY.md). Do not report security vulnerabilities through public GitHub issues.
 
 ## Support
-- Level: <Experimental | Maintained | Stable>
-- How to get help: Issues/Discussions/<channel link>
-- Response expectations (if any).
 
-# Community
-Provide the channel for community communications.
+This repository is under active development (experimental). For questions and support, open an issue in the GitHub repository.
 
-# References
-Provide a list of related references
+## License
 
-# License
-This project is licensed under the [NAME HERE] License - see the LICENSE.md file for details
-- License: <link>
+Licensing varies by component. Cosmos-H-Dreams code is primarily Apache-2.0 with model weights under the NVIDIA Open Model License — see [physics_simulation/cosmos_h_dreams/LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Upstream omnisurg licenses apply until that package is ported and documented here.
