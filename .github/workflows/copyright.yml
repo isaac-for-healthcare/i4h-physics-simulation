@@ -1,0 +1,22 @@
+name: Copyright Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  copyright:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run copyright check
+        run: python .tools/ensure_license.py
