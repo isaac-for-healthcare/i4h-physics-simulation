@@ -114,7 +114,7 @@ Shared / typical prerequisites (exact versions depend on the component):
 
 | Requirement | Notes |
 | ----------- | ----- |
-| OS | Linux (x86_64) |
+| OS | Linux |
 | Python | 3.12+ (Cosmos-H-Dreams); the endoluminal solver supports 3.10+; omnisurg currently pins `3.12.12` |
 | GPU | NVIDIA GPU; Cosmos-H-Dreams recommends ≥12 GB VRAM |
 | Driver / CUDA | Cosmos-H-Dreams: driver **R580+** (CUDA 13.x). Newton / Warp stacks need a CUDA-capable driver matching the installed toolkit |
@@ -132,8 +132,4 @@ This repository is under active development (experimental). For questions and su
 
 ## License
 
-This repository's NVIDIA-authored code and documentation are licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE).
-
-Third-party and ported components (Isaac Lab BSD-3-Clause portions, Newton/OmniEndo Apache-2.0 portions, and the Cosmos-H-Dreams submodule) are listed in [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES). Cosmos-H-Dreams model weights use the NVIDIA Open Model License — see [physics_simulation/cosmos_h_dreams/LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Upstream omnisurg licenses apply until that package is ported and documented here.
-
-Contributions are accepted under the Developer Certificate of Origin (DCO). See [CONTRIBUTING.md](./CONTRIBUTING.md).
+Licensing varies by component. Cosmos-H-Dreams code is primarily Apache-2.0 with model weights under the NVIDIA Open Model License — see [physics_simulation/cosmos_h_dreams/LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Upstream omnisurg licenses apply until that package is ported and documented here.

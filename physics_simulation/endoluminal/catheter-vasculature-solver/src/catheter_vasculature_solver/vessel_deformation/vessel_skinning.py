@@ -1,8 +1,8 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers / OmniEndo contributors
+# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 #
-# Vendored/adapted from the OmniEndo upstream vessel skinning module. The debug-colormap
-# path (CenterlineDebugColorer) is app UI and intentionally left upstream.
+# Scope note: the debug-colormap path (CenterlineDebugColorer) is app UI and is
+# intentionally not part of this library.
 
 """Topology-smoothed GPU skinning driven by a PBD Cosserat centerline.
 

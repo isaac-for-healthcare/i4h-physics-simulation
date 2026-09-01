@@ -12,12 +12,15 @@ repos:
       - id: isort
         name: isort (python)
         args: [--check-only]
-        exclude: ^physics_simulation/endoluminal/catheter-vasculature-solver/src/catheter_vasculature_solver/(__init__|rod_solver)\.py$
+        exclude: ^physics_simulation/endoluminal/catheter-vasculature-solver/src/catheter_vasculature_solver/((__init__|rod_solver)\.py$|newton_xpbd_rod/)
   - repo: https://github.com/codespell-project/codespell
     rev: v2.2.6
     hooks:
       - id: codespell
         args: [--write-changes]
+        # Vendored solver: `te` is a variable name there, not a typo, and --write-changes
+        # would rewrite third-party source.
+        exclude: ^physics_simulation/endoluminal/catheter-vasculature-solver/src/catheter_vasculature_solver/newton_xpbd_rod/
         additional_dependencies:
           - tomli
   - repo: https://github.com/pre-commit/mirrors-clang-format

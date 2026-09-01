@@ -1,10 +1,9 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers / OmniEndo contributors
+# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 #
-# Vessel deformation backends vendored from OmniEndo.
 # Primary: centerline Cosserat tree + live tapered-tube containment.
 
-"""Deformable vessel backends (OmniEndo-sourced)."""
+"""Deformable vessel backends."""
 
 from .centerline_data import CenterlineData, VesselConfig, VesselTransform
 from .centerline_runtime import CenterlineDynamicsParams, CenterlineVesselRuntime

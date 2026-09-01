@@ -3,14 +3,13 @@
 
 """Vessel deformation configuration surface (scaffolding).
 
-Modes mirror OmniEndo capabilities. Primary path (per Przemek) is
-``centerline_cosserat``; cloth/tet remain opt-in.
+The primary path is ``centerline_cosserat``, which keeps the vessel
+differentiable; cloth/tet remain opt-in.
 
-Foundation modules are vendored from ``/omniendo`` under
-``catheter_vasculature_solver.vessel_deformation`` (``pbd_cosserat``,
-``centerline_tree``, ``vessel_skinning``). Live tapered-tube containment, two-way
-contact and step orchestration are available via ``CenterlineVesselRuntime``
-attached to ``CathRodSolver``. Cloth/tet remain gated.
+Foundation modules live under ``catheter_vasculature_solver.vessel_deformation``
+(``pbd_cosserat``, ``centerline_tree``, ``vessel_skinning``). Live tapered-tube
+containment, two-way contact and step orchestration are available via
+``CenterlineVesselRuntime`` attached to ``CathRodSolver``. Cloth/tet remain gated.
 """
 
 from __future__ import annotations

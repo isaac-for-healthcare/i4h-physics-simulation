@@ -365,7 +365,7 @@ class RodSolver:
     Example usage:
 
     ```python
-    from xray_simulator.catheter import RodSolver, RodConfig
+    from catheter_vasculature_solver import RodConfig, RodSolver
 
     # Create configuration
     config = RodConfig()

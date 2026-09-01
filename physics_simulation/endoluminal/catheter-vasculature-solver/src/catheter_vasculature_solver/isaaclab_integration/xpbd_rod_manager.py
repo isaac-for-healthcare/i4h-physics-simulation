@@ -17,13 +17,8 @@ if TYPE_CHECKING:
 
 
 def _load_solver_xpbd_rod():
-    try:
-        from newton.solvers import SolverXPBDRod
-    except ImportError as e:
-        raise ImportError(
-            "NewtonXPBDRodManager requires newton.solvers.SolverXPBDRod "
-            f"(PR #1981+). Original error: {e}"
-        ) from e
+    from ..newton_xpbd_rod import SolverXPBDRod
+
     return SolverXPBDRod
 
 

@@ -1,9 +1,8 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers / OmniEndo contributors
+# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 #
 # Centerline vessel runtime: Cosserat predict/project/finalize + tapered-tube
-# containment. Orchestration adapted from the OmniEndo upstream catheter solver
-# and its centerline dynamics reset, for the standalone XPBDRodSolver API.
+# containment, orchestrated for the standalone XPBDRodSolver API.
 
 """Runtime that owns a deforming Cosserat centerline vessel."""
 
@@ -45,7 +44,7 @@ class CenterlineDynamicsParams:
 class CenterlineVesselRuntime:
     """Deforming centerline vessel + live tapered-tube containment.
 
-    Step order (matches the OmniEndo upstream catheter solver step)::
+    Step order::
 
         snapshot → predict_cosserat → project/clamp iterations
         → (catheter XPBD substeps, with containment in post-constraint hook)

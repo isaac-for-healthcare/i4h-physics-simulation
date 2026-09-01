@@ -1,8 +1,7 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers / OmniEndo contributors
+# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 #
-# Vendored from OmniEndo: upstream centerline tree module.
-# Adapted to use vessel_deformation.centerline_data (no YAML scene schema).
+# Uses vessel_deformation.centerline_data (no YAML scene schema).
 
 """Reusable vascular centerline graph construction.
 

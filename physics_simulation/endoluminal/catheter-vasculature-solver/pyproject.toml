@@ -16,11 +16,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Newton is not a version pin: we track the newton-physics beta tags for
-# SolverXPBDRod (catheter rod) and SolverMuJoCo (coupled manager), e.g.
-#   pip install "newton @ git+https://github.com/newton-physics/newton.git@beta-0.2.1"
+# The rod solver itself is vendored under `catheter_vasculature_solver.newton_xpbd_rod`,
+# so this extra needs only a released newton for Model, State, Control, Contacts,
+# ModelBuilder and SolverBase. 1.2.1 already exports all six and its SolverBase
+# contract is identical to 1.5, so the floor stays at 1.2.1: isaacsim-core pins
+# newton[sim]==1.2.1, and a higher floor makes this uninstallable next to Isaac Sim.
+# Isaac Lab constrains it independently: isaaclab pins warp-lang==1.13.0 while
+# newton>=1.5 requires warp-lang>=1.16.0, so >=1.5 is unsatisfiable next to Isaac Lab
+# as well. Forcing newton 1.5 onto warp 1.13 does not even import -- SolverBase
+# annotates wp.array[wp.bool] | None, and warp 1.13 _ArrayAnnotation has no __or__.
+# 1.3.0 and 1.4.0 require warp-lang>=1.16.0 too, so 1.2.1 is the only release that
+# installs next to Isaac Lab and the bound has to close on both ends. A floor alone
+# leaves the documented install order broken: `pip install -e ".[newton]"` takes the
+# newest newton, and the later Isaac Lab install pulls warp back to 1.13.0 without
+# reconsidering it, so the environment lands on 1.5.1 + 1.13.0 and fails to import.
 newton = [
-  "newton",
+  "newton>=1.2.1,<1.3",
 ]
 # Isaac Lab and isaaclab_newton are a second, independent source install: the Isaac Lab
 # develop tree (./isaaclab.sh -i plus an editable install of source/isaaclab_newton),

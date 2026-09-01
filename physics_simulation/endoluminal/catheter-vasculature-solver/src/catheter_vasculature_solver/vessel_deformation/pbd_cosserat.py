@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 #
-# Vendored from OmniEndo: omniendo/xpbd_rod/pbd_cosserat.py
 # Primary vessel-deformation backend (branching iterative local Cosserat rods).
 
 """Iterative per-segment PBD Cosserat rod (Kugelstadt & Schoemer, SCA 2016).

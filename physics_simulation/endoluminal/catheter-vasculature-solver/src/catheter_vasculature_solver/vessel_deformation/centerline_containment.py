@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 #
-# Vendored/adapted from the OmniEndo upstream catheter solver.
-# (linear tapered-tube centerline containment; candidate cache / spline deferred).
+# Linear tapered-tube centerline containment; candidate cache / spline deferred.
 
 """Live tapered-tube containment against a deforming Cosserat centerline."""
 
@@ -68,8 +67,8 @@ def project_centerline_containment_kernel(
 ):
     """Project nodes and interior edge samples against a tapered-tube union.
 
-    Simplified from OmniEndo: always searches all centerline edges (no
-    candidate cache). ``two_way`` is ``1``/``0`` for Warp friendliness.
+    Always searches all centerline edges (no candidate cache). ``two_way`` is
+    ``1``/``0`` for Warp friendliness.
     """
     sample = wp.tid()
     ca = int(sample)
