@@ -23,7 +23,7 @@ The algorithm is a faithful port of Newton's ``SolverXPBDRod`` (block Thomas pat
 
 Usage::
 
-    from xray_simulator.catheter import XPBDRodSolver, RodConfig
+    from catheter_vasculature_solver import XPBDRodSolver, RodConfig
 
     cfg = RodConfig()
     solver = XPBDRodSolver(cfg)
@@ -2755,7 +2755,7 @@ class XPBDRodSolver:
     def _pre_constraints_hook(self, ws: "_Workspace", dt: float, dev: str) -> None:
         """Extension point called before XPBD constraint prepare + solve.
 
-        Override in a subclass (e.g. :class:`~xray_simulator.catheter.CathRodSolver`)
+        Override in a subclass (e.g. :class:`~catheter_vasculature_solver.CathRodSolver`)
         to inject custom predicted-position projections — such as vessel containment or
         track-guided insertion — *before* compliance is computed and the block-Thomas
         system is solved.  The base implementation is a no-op.

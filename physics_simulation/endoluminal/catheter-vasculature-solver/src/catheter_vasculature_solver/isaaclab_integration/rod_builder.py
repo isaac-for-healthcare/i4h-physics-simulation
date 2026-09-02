@@ -26,17 +26,11 @@ if TYPE_CHECKING:
 
 
 def _load_newton_xpbd_rod():
-    """Import Newton XPBD rod APIs (requires SolverXPBDRod build)."""
-    try:
-        from newton.solvers import SolverXPBDRod
-        from newton.solvers import xpbd_rod as newton_xpbd_rod
-    except ImportError as e:
-        raise ImportError(
-            "Path B requires a Newton build that exports SolverXPBDRod and "
-            "newton.solvers.xpbd_rod (see newton-physics/newton PR #1981). "
-            f"Original error: {e}"
-        ) from e
-    return SolverXPBDRod, newton_xpbd_rod
+    """Import the in-tree XPBD rod APIs (vendored; see ``newton_xpbd_rod``)."""
+    from .. import newton_xpbd_rod as vendored_xpbd_rod
+    from ..newton_xpbd_rod import SolverXPBDRod
+
+    return SolverXPBDRod, vendored_xpbd_rod
 
 
 def particle_mass_from_rod_config(config: RodConfig) -> float:

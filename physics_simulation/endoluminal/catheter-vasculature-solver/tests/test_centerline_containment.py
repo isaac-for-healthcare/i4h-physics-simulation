@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for the OmniEndo-sourced centerline Cosserat vessel + tube containment.
+"""Tests for the centerline Cosserat vessel + tube containment.
 
-These run on CPU so the vendored port is covered in CI, and additionally on
-CUDA when a device is present (those cases carry the ``gpu`` marker).
+These run on CPU so the solver is covered in CI, and additionally on CUDA when
+a device is present (those cases carry the ``gpu`` marker).
 """
 
 from __future__ import annotations

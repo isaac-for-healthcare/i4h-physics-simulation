@@ -155,7 +155,9 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         if hasattr(pipeline, "step"):
             return pipeline.step(state_0, state_1, control, contacts)
         if hasattr(pipeline, "collide"):
-            return pipeline.collide(NewtonManager._model, state_0, contacts)
+            # collide() fills the contacts buffer in place and returns nothing.
+            pipeline.collide(state_0, contacts)
+            return contacts
         return contacts
 
     @classmethod
@@ -193,7 +195,7 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         cls._vessel_mesh = vessel_mesh
 
     @classmethod
-    def _step_solver(cls, state_0, state_1, control, substep_dt: float) -> None:
+    def _step_solver(cls, state_0, state_1, control, contacts, substep_dt: float) -> None:
         """One coupled substep: contacts → rigid → rod (+ optional hooks)."""
         rigid = cls._rigid_solver or getattr(NewtonManager, "_rigid_solver", None)
         rod = cls._rod_solver or getattr(NewtonManager, "_rod_solver", None)
@@ -204,7 +206,8 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
             )
 
         mode = cls._coupling_mode
-        contacts = getattr(NewtonManager, "_contacts", None)
+        if contacts is None:
+            contacts = getattr(NewtonManager, "_contacts", None)
 
         # 1) Clear force accumulators on the input state.
         cls._clear_force_buffers(state_0)

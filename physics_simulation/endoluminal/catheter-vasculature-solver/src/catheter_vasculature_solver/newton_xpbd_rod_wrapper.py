@@ -13,15 +13,6 @@ This integrates the Newton physics library's direct block-tridiagonal XPBD rod s
 same :class:`RodConfig` / :class:`RodGeometryConfig` / :class:`RodMaterialConfig` /
 :class:`RodSolverConfig` dataclasses used by :class:`RodSolver`.
 
-**Dependency:** Your installed ``newton`` package must include ``SolverXPBDRod`` (not yet in
-all PyPI releases). Until merged to ``newton-physics/newton`` main, install from the PR
-branch, for example::
-
-    pip uninstall -y newton
-    pip install "newton @ git+https://github.com/newton-physics/newton.git@refs/pull/1981/head"
-
-Or clone the fork that contains ``xpbd_rod`` and ``pip install -e .`` from that tree.
-
 **Multi-env support:** When ``num_envs > 1``, one rod per environment is added to the same
 Newton :class:`ModelBuilder` in a single ``SolverXPBDRod`` instance.  Newton automatically
 activates ``_BatchedRodWorkspace`` (batched GPU kernels) when more than one rod is registered,
@@ -90,24 +81,29 @@ def orientations_xyzw_along_polyline(positions: torch.Tensor) -> torch.Tensor:
 
 
 def _load_newton_xpbd():
+    """Resolve the rod solver from the in-tree copy under ``newton_xpbd_rod``.
+
+    The solver is vendored rather than imported from ``newton.solvers`` because no
+    published newton release exports ``SolverXPBDRod``. Resolution is deliberately
+    not "newton first, vendored second": which implementation ran would then depend
+    on the host environment, and identical inputs could integrate differently.
+    """
     try:
         import newton
-        from newton.solvers import SolverXPBDRod
-        from newton.solvers import xpbd_rod as newton_xpbd_rod
     except ImportError as e:
         raise ImportError(
-            "Could not import Newton XPBD rod solver. Install a Newton build that exports "
-            "`newton.solvers.SolverXPBDRod` and `newton.solvers.xpbd_rod` (see PR #1981 on "
-            "newton-physics/newton), e.g.:\n"
-            '  pip install "newton @ git+https://github.com/newton-physics/newton.git@refs/pull/1981/head"\n'
+            "Could not import Newton. The vendored XPBD rod solver still needs Newton for "
+            "Model, State, Control, Contacts, ModelBuilder and SolverBase, which every "
+            "release provides:\n"
+            '  pip install "catheter-vasculature-solver[newton]"\n'
+            "Alternatively use the in-tree XPBDRodSolver, which needs no Newton at all.\n"
             f"Original error: {e}"
         ) from e
-    if not hasattr(newton.solvers, "SolverXPBDRod"):
-        raise ImportError(
-            "Installed `newton` does not expose SolverXPBDRod. Upgrade to a build that "
-            "includes `newton/_src/solvers/xpbd_rod` (Newton PR #1981 or later)."
-        )
-    return newton, SolverXPBDRod, newton_xpbd_rod
+
+    from . import newton_xpbd_rod as vendored_xpbd_rod
+    from .newton_xpbd_rod import SolverXPBDRod
+
+    return newton, SolverXPBDRod, vendored_xpbd_rod
 
 
 def _particle_mass_from_rod_config(config: RodConfig) -> float:

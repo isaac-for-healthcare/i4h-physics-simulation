@@ -8,7 +8,7 @@ This package is designed to run independently: it contains its own solver module
 
 - Provides GPU-accelerated XPBD/Cosserat rod simulation primitives.
 - Includes vessel-aware catheter extensions (track guidance + mesh containment).
-- Exposes an optional bridge to Newton's `SolverXPBDRod` backend.
+- Vendors the `SolverXPBDRod` rod solver in-tree and exposes an optional Newton bridge to it (see [Optional Newton bridge](#optional-newton-bridge)).
 - Keeps solver logic self-contained in package modules (no cross-package imports into `vasculature-digital-twin`).
 
 ## Package layout
@@ -24,8 +24,10 @@ This package is designed to run independently: it contains its own solver module
   - Self-contained XPBD direct solver implementation (embedded Warp kernels, no external Newton requirement).
 - `src/catheter_vasculature_solver/cath_rod_solver.py`
   - Catheter-in-vessel extensions: vessel containment paths and track-guided insertion behavior.
+- `src/catheter_vasculature_solver/newton_xpbd_rod/`
+  - Vendored `SolverXPBDRod` rod solver (Apache-2.0, from [newton-physics/newton#1981](https://github.com/newton-physics/newton/pull/1981)), kept in-tree because it ships in no Newton release.
 - `src/catheter_vasculature_solver/newton_xpbd_rod_wrapper.py`
-  - Optional wrapper around Newton's `SolverXPBDRod` when that runtime is available.
+  - Optional wrapper adapting `RodConfig` to the vendored `SolverXPBDRod`.
 - `src/catheter_vasculature_solver/isaaclab_integration/`
   - **Path B** Isaac Lab Newton Manager glue: coupled MJWarp (rigid) + `SolverXPBDRod` (catheter).
   - Configs: `XPBDRodSolverCfg`, `CoupledMJWarpXPBDRodSolverCfg`.
@@ -40,18 +42,26 @@ From this package directory:
 pip install -e .
 ```
 
-Optional Newton backend:
+That is all you need for `XPBDRodSolver` and `CathRodSolver`, which are the supported solvers.
+
+### Optional Newton bridge
+
+For `NewtonXPBDRodSolver` and the Path B managers:
 
 ```bash
 pip install -e ".[newton]"
 ```
 
-Isaac Lab Path B (coupled manager) needs Isaac Lab `develop` + Newton with `SolverXPBDRod` installed in that env (not pip-published as a simple extra). Builder helpers still import without Lab.
+That resolves from PyPI and needs no git references. The rod solver is vendored in-tree under `catheter_vasculature_solver.newton_xpbd_rod`, so the extra only supplies Newton's `Model`, `State`, `Control`, `Contacts`, `ModelBuilder` and `SolverBase` — all present since Newton 1.5.
+
+The solver is vendored rather than imported from `newton.solvers` because `SolverXPBDRod` ships in **no** Newton release: it exists only on the head of [newton-physics/newton#1981](https://github.com/newton-physics/newton/pull/1981), closed unmerged on 2026-05-25, and is absent from Newton `main`. Resolution is deliberately not "Newton first, vendored second" — which implementation ran would then depend on the host environment, and identical inputs could integrate differently.
+
+Path B additionally needs Isaac Lab `develop` plus an editable install of `source/isaaclab_newton` in the same environment. Builder helpers still import without Isaac Lab.
 
 ## Runtime dependencies
 
 - Required: `numpy`, `torch`, `warp-lang`
-- Optional: `newton` (only for `NewtonXPBDRodSolver` / builder spawn)
+- Optional: `newton>=1.5` via the `[newton]` extra (only for `NewtonXPBDRodSolver` / builder spawn)
 - Optional: `isaaclab` + `isaaclab_newton` (only for `isaaclab_integration` managers/configs)
 
 If you only use `XPBDRodSolver` / `CathRodSolver`, you do not need Newton or Isaac Lab installed.

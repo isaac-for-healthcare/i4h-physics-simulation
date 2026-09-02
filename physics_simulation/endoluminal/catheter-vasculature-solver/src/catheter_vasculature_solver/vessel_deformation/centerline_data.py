@@ -1,8 +1,8 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers / OmniEndo contributors
+# SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 #
-# Slim centerline IO types extracted from the OmniEndo scene config so the
-# library does not depend on the full YAML scene schema.
+# Slim centerline IO types, kept separate from any scene config so the library
+# does not depend on a full YAML scene schema.
 
 """Centerline data types for deformable vessel construction."""
 

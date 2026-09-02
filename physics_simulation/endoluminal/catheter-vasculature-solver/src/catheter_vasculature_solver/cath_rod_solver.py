@@ -13,7 +13,7 @@
 """XPBD rod solver with catheter-in-vessel mesh collision.
 
 This module provides :class:`CathRodSolver`, a subclass of
-:class:`~xray_simulator.catheter.XPBDRodSolver` that adds three capabilities
+:class:`~catheter_vasculature_solver.XPBDRodSolver` that adds three capabilities
 needed for realistic catheter-in-vessel simulation:
 
 **Vessel containment (two collision paths)**
@@ -46,7 +46,7 @@ Usage::
 
     import numpy as np
     import warp as wp
-    from xray_simulator.catheter import RodConfig, CathRodSolver
+    from catheter_vasculature_solver import CathRodSolver, RodConfig
 
     # Build a wp.Mesh from your vessel geometry
     verts = np.load("aorta_verts.npy")   # (N, 3) float32
@@ -65,7 +65,7 @@ Usage::
         track_length=0.5,
         tip_num_edges=10,
         particle_radius=0.002,
-        segment_length=cfg.rod.rest_length / (cfg.rod.num_links - 1),
+        segment_length=cfg.geometry.segment_length,
     )
     for _ in range(300):
         solver.step(cfg.solver.dt)
@@ -951,7 +951,7 @@ def _normalize_collision_projection_stage(stage: str) -> str:
 class CathRodSolver(XPBDRodSolver):
     """XPBD rod solver with track-guided insertion and vessel mesh containment.
 
-    Extends :class:`~xray_simulator.catheter.XPBDRodSolver` with three
+    Extends :class:`~catheter_vasculature_solver.XPBDRodSolver` with three
     sample-local projections:
 
     * **Track guidance** — non-tip particles slide along a linear axis.
@@ -1086,9 +1086,9 @@ class CathRodSolver(XPBDRodSolver):
             float(max_dist) if max_dist is not None else 2.0 * float(particle_radius) + float(segment_length)
         )
 
-        # OmniEndo-style centerline Cosserat vessel (optional). The centerline is
-        # its own collision path, so it carries its own stage rather than reusing
-        # the static-mesh ``collision_{pre,post}_constraints_enabled`` flags —
+        # Centerline Cosserat vessel (optional). The centerline is its own
+        # collision path, so it carries its own stage rather than reusing the
+        # static-mesh ``collision_{pre,post}_constraints_enabled`` flags —
         # those may both be set, which would double-apply the correction.
         self.centerline_runtime = centerline_runtime
         if centerline_containment_enabled is None:
@@ -1451,7 +1451,7 @@ class CathRodSolver(XPBDRodSolver):
 
         Wrapping the substep rather than :meth:`step` keeps substep counting,
         batched dispatch and CUDA-graph selection in the base class. With a
-        :class:`CenterlineVesselRuntime` attached the order matches OmniEndo::
+        :class:`CenterlineVesselRuntime` attached the order is::
 
             predict_cosserat → project/clamp → catheter XPBD → finalize_cosserat
 
