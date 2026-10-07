@@ -128,10 +128,20 @@ class NewtonSim:
 
     def _reset_selected(self) -> None:
         """The selected worlds' i4h state, and the coupling's reactions still pending for them (a new episode must not
-        push its holder with the last one's contact). The rigid solver's internals are Lab's (its lazy reset)."""
+        push its holder with the last one's contact). Mounted tools first read their holders' current poses: a host
+        resets or randomizes its bodies (joint state) before this reset, so forward kinematics brings ``body_q`` up to
+        date and the mounts are driven from it; the instrument reset then starts from the new pose. The rigid solver's
+        internals are Lab's (its lazy reset)."""
+        mounts = self.coupled.mounts if self.coupled is not None else None
+        if mounts is not None:
+            import newton
+
+            model = self.solver.model
+            newton.eval_fk(model, self.state.joint_q, self.state.joint_qd, self.state)
+            mounts.drive(self.state)
         self.solver.reset(self.state, self.world_mask)
-        if self.coupled is not None and self.coupled.mounts is not None:
-            self.coupled.mounts.reset(self.world_mask)
+        if mounts is not None:
+            mounts.reset(self.world_mask)
 
 
 class I4hNewtonManager(NewtonManager):

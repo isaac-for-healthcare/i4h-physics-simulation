@@ -1197,3 +1197,33 @@ def test_host_contact_sensor_works_in_the_coupled_step(make_env):
     assert int(NewtonManager._contacts.rigid_contact_count.numpy()[0]) > 0, "MuJoCo's contacts reach Lab's buffer"
     if force is not None:
         assert np.abs(force).max() > 1.0, "the ball's weight is reported"
+
+
+@pytest.mark.parametrize("backend", ["newton"])
+def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
+    """A host resets or randomizes its holder (joint state) before the component's reset: the reset instrument
+    starts at the holder's new pose (forward kinematics and the mount read in the reset itself, captured too); a
+    world that is not reset keeps its instrument."""
+    pytest.importorskip("mujoco_warp")
+    from isaaclab_newton.cloner import newton_builder_world_hook
+    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+
+    with newton_builder_world_hook(probe_holder):
+        env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg(), mounts={"probe": {"body": "holder"}})
+    env.reset()
+    for _ in range(10):
+        env.step(torch.zeros((2, 10), device=env.device))
+    sim = env.unwrapped.simulator
+    assert sim.reset_graph is not None
+    ic = next(s for s in sim.systems if type(s).__name__ == "InstrumentControl")
+    torch.cuda.synchronize()
+    before = ic.root.numpy()[:, 0].copy()
+    state = NewtonManager.get_state_0()
+    q = state.joint_q.numpy()
+    q[0] = q[0] - 0.04  # the host lowers world 0's holder on its slide (joint coordinates)
+    state.joint_q.assign(q)
+    sim.reset_physics(env_ids=[0])
+    wp.synchronize()
+    after = ic.root.numpy()[:, 0]
+    np.testing.assert_allclose(after[0, 2], before[0, 2] - 0.04, atol=1e-4)  # the reset world reads the new pose
+    np.testing.assert_array_equal(after[1], before[1])  # the other world keeps its instrument
