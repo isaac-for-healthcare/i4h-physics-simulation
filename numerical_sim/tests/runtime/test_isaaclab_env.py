@@ -1167,7 +1167,6 @@ def test_host_contact_sensor_works_in_the_coupled_step(make_env):
     """A workflow robot's Newton contact sensor keeps working when i4h is added: the coupled solver forwards
     update_contacts to MuJoCo-Warp and the manager allocates the solver's contact buffer (MuJoCo's own contacts)."""
     pytest.importorskip("mujoco_warp")
-    import newton
     from isaaclab_newton.cloner import newton_builder_world_hook
     from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
 

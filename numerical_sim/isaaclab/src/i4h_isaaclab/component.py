@@ -100,10 +100,9 @@ class I4hComponent:
         ``sim.gravity`` sets the host's (``gravity_from_case``, as ``I4hEnvCfg``); otherwise the two must agree."""
         if self.cfg is None:
             raise RuntimeError("this handle wraps a configured I4hSolverCfg; configure() needs an I4hComponentCfg")
+        from i4h_isaaclab.coupling import check_rigid_solver_cfg
         from i4h_isaaclab.newton_manager import I4hSolverCfg
         from isaaclab_newton.physics import NewtonCfg
-
-        from i4h_isaaclab.coupling import check_rigid_solver_cfg
 
         host = sim_cfg.physics
         newton_host = isinstance(host, NewtonCfg)
