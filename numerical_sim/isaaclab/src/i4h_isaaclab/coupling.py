@@ -161,6 +161,13 @@ class CoupledSolver(SolverBase):
         if self.mounts is not None:
             self.mounts.fill(self.ours.substeps, dt)
 
+    def update_contacts(self, contacts, state=None) -> None:
+        """The host's contact sensors: the rigid solver's contacts (MuJoCo's own); i4h's contacts are internal."""
+        self.rigid.update_contacts(contacts, state)
+
+    def get_max_contact_count(self) -> int:
+        return self.rigid.get_max_contact_count()
+
     def notify_model_changed(self, flags) -> None:
         self.rigid.notify_model_changed(flags)
         if int(flags) & int(ModelFlags.MODEL_PROPERTIES):  # gravity; body, joint and shape changes are the host's
