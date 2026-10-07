@@ -126,6 +126,9 @@ class CatheterControl(System):
 
 
     def prepare(self, scene):
+        super().prepare(scene)
+        if not self.enabled:  # step_start no longer clears them: the coupling must not read the last reaction again
+            self.zero(None, "impulse", "moment")
         self.controls.bend_offset.zero_()  # only the last ``tip_edges`` entries are written from here on (or none when disabled)
 
     def step_start(self, scene, dt):

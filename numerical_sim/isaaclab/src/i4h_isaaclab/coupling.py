@@ -121,6 +121,8 @@ class Mounts:
         sdt = dt / float(substeps)
         for g in self.groups:
             for s in g.sources:
+                if not s.enabled:  # structural: a change re-prepares and recaptures the step
+                    continue
                 wp.launch(fill_reaction, dim=(g.envs, g.count), inputs=[s.impulse, s.moment, g.instrument, 1.0 / (sdt * sdt * float(substeps))],
                           outputs=[g.force, g.torque], device=g.force.device)
 
