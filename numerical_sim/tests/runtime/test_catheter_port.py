@@ -21,11 +21,11 @@ SEG, R, N = 0.4 / 120, 5.0e-4, 121
 MASS = 7800.0 * math.pi * R * R * SEG  # the workflow's 0.5 mm steel-like wire, 2e-5 kg per node
 
 
-def case(inertia="unit", tip_mapping="per_edge", gravity=(0.0, 0.0, -9.81), tip_edges=8):
-    return {"sim": {"device": "cuda:0", "envs": 1, "dt": 1.0 / 120, "substeps": 1, "iterations": 1, "cuda_graph": False,
+def case(inertia="unit", tip_mapping="per_edge", gravity=(0.0, 0.0, -9.81), tip_edges=8, envs=1, mass=MASS):
+    return {"sim": {"device": "cuda:0", "envs": envs, "dt": 1.0 / 120, "substeps": 1, "iterations": 1, "cuda_graph": False,
                     "gravity": list(gravity)},
             "assets": {"catheter": {"type": "rod", "start": [0.0, 0.0, 0.5], "direction": [1.0, 0.0, 0.0], "count": N,
-                                    "segment_length": SEG, "radius": R, "mass": MASS}},
+                                    "segment_length": SEG, "radius": R, "mass": mass}},
             "systems": [{"type": "particles", "damping": 0.99},
                         {"type": "rod_direct", "id": "rod", "body": "catheter", "young": 1.0e9, "torsion": 3.846e8,
                          "bend": 4 * 0.1 * (math.pi * R**4 / 4) / SEG**2, "twist": 4 * 0.4 * (math.pi * R**4 / 2) / SEG**2,
@@ -125,3 +125,24 @@ def test_parity_tube_bend_keeps_ours_in_the_lumen():
     gap = np.linalg.norm(q[:, None] - (lumen[None, :-1] + t[..., None] * seg[None]), axis=-1).min(axis=1)
     assert gap.max() <= parity.TUBE_RADIUS - rod.radius + 2e-4, gap.max()
     assert q[-1, 1] > 0.05, "the tip turned into the +y leg"
+
+
+
+def test_physical_inertia_follows_each_envs_mass():
+    """Physical inertia is per environment: one geometry variant may carry different particle masses per env, and
+    each env's frames then rotate with its own nodes' inertia, like an independently built rod of that mass."""
+    batch = load_case(case("physical", envs=2))
+    body = batch.scene.body("catheter")
+    inv_mass = batch.scene.field("inv_mass", body)
+    rows = inv_mass.numpy()
+    rows[1] = rows[1] / 10.0  # env 1's nodes ten times heavier (the locked root stays at 0)
+    inv_mass.assign(rows)
+    batch.prepare()  # the physical inertia is recomputed from each env's rows
+    local = system(batch, "RodDirect").inertia_local.numpy().reshape(2, N, 3)
+    np.testing.assert_allclose(local[1, 1:], local[0, 1:] / 10.0, rtol=1e-5)
+    heavy = load_case(case("physical", mass=MASS * 10.0))
+    for _ in range(120):
+        batch.step()
+        heavy.step()
+    q = batch.scene.field("q", body).numpy()
+    np.testing.assert_allclose(q[1], heavy.scene.field("q", heavy.scene.body("catheter")).numpy()[0], atol=1e-5)
