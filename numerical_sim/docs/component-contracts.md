@@ -201,7 +201,6 @@ A 2-world model, each world with a revolute pendulum and 5 particles, 50 steps a
 - **Featherstone:** particles integrated (they fall under gravity); in-place and double-buffered `body_q` identical.
 - **Featherstone with `integrate_particles` disabled:** particles untouched; `body_q` identical to the default. It still evaluates particle contact forces into `particle_f`/`body_f` (`solver_featherstone.py:552-557`), which is why it is rejected.
 
-
 ## 7. Internal navigation commands (migration worktree)
 
 `catheter_control.root_mode` defaults to `track`. `external_pose` takes a full

@@ -4,10 +4,10 @@
 import numpy as np
 import pytest
 import warp as wp
+from i4h_endoluminal.loaders.centreline import add_centreline_tree
 from i4h_isaaclab.composition import load_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders.rod import add_rod, material_frames
-from i4h_endoluminal.loaders.centreline import add_centreline_tree
 from i4h_physics.systems.contact.graph_containment import GraphContainment
 from test_catheter_port import case, system
 
@@ -61,6 +61,7 @@ def test_pose_inputs_and_complete_batch(kind):
         pos, rot = wp.array(pos, dtype=wp.float32, device='cuda:0'), wp.array(rot, dtype=wp.float32, device='cuda:0')
     if kind == 'torch':
         import torch
+
         # Producer stream differs from Warp's; event ordering is part of the API.
         stream = torch.cuda.Stream()
         with torch.cuda.stream(stream):
