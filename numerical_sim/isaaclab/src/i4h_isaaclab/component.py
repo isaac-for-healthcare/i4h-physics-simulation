@@ -196,6 +196,18 @@ class I4hComponent:
         views.write_actions(views.action_views(sim), physical)
         self._order("in")
 
+    def write_root_poses(self, positions, rotations, *, control: str | None = None) -> None:
+        """Write complete-batch external root poses in component coordinates (xyzw).
+
+        Name the control when the component has more than one external root.
+        Workflow drive controllers own route arc and world-to-component conversion.
+        """
+        controls = [s for s in self.systems if getattr(s, "root_mode", None) == "external_pose"
+                    and (control is None or s.id == control)]
+        if len(controls) != 1:
+            raise ValueError("name exactly one external_pose catheter control")
+        controls[0].write_root_poses(positions, rotations)
+
     def reset(self, env_ids=None, *, mask=None) -> None:
         """The selected worlds' physical state, now (``env_ids`` or an ``(E,)`` bool ``mask``, host or device)."""
         self._order("in")

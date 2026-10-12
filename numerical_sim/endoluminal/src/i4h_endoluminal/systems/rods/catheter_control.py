@@ -62,10 +62,14 @@ class CatheterControl(System):
     tip_mapping: str = "per_edge"  # structural: per_edge (omniendo: angle / tip_edges per edge) or polyline (the tip
     # polyline turns by the angle: sin(angle / (2 tip_edges - 1)) per edge, the workflow's tip_bend_rest_component)
 
+    root_mode: str = "track"  # structural: track or externally commanded component-frame pose
+    track_path: object = None  # immutable component-frame polyline; None retains the straight guide
+    distal_free_nodes: int | None = None  # independent of tip steering; None retains tip_edges default
+
     is_control = True
 
     refs = ("rod",)
-    structural = System.structural + ("tip_edges", "tip_axis", "tip_mapping")
+    structural = System.structural + ("tip_edges", "tip_axis", "tip_mapping", "root_mode", "track_path", "distal_free_nodes")
 
     def __post_init__(self):
         scene = self.scene
@@ -87,6 +91,22 @@ class CatheterControl(System):
             raise ValueError("catheter_control.tip_axis is a 3-vector")
         if self.tip_mapping not in ("per_edge", "polyline"):
             raise ValueError(f"catheter_control.tip_mapping must be 'per_edge' or 'polyline', got {self.tip_mapping!r}")
+        if self.root_mode not in ("track", "external_pose"):
+            raise ValueError("catheter_control.root_mode must be 'track' or 'external_pose'")
+        if self.distal_free_nodes is not None:
+            self.distal_free_nodes = check_int("catheter_control.distal_free_nodes", self.distal_free_nodes)
+            if not 0 <= self.distal_free_nodes < self.P:
+                raise ValueError("catheter_control.distal_free_nodes must be in [0, node count)")
+        path = np.empty((0, 3), np.float32)
+        if self.track_path is not None:
+            path = np.asarray(self.track_path, np.float32)
+            if path.ndim != 2 or path.shape[1] != 3 or len(path) < 2 or not np.isfinite(path).all():
+                raise ValueError("catheter_control.track_path must have finite shape (N>=2, 3)")
+            if np.any(np.linalg.norm(np.diff(path, axis=0), axis=1) <= 1.0e-9):
+                raise ValueError("catheter_control.track_path has coincident consecutive points")
+            self.track_path = tuple(tuple(float(x) for x in row) for row in path)
+        self._path = wp.array(path, dtype=wp.vec3, device=dev)
+        self.freeze("root_mode", "track_path", "distal_free_nodes")
         self._live("track_length", "track_stiffness", "max_delta", "rates", "lower", "upper")
         for name in ("rates", "lower", "upper"):
             if getattr(self, name).shape != (E, 3):
@@ -102,6 +122,12 @@ class CatheterControl(System):
         v = rod.variant.numpy()
         self.mount_pose = wp.array(np.concatenate([m.start[v], m.frames[v, 0]], axis=1).reshape(E, 1, 7).astype(np.float32),
                                    dtype=wp.transform, device=dev)
+        self.root_positions = wp.array(m.start[v], dtype=wp.vec3, device=dev)
+        self.root_rotations = wp.array(np.ascontiguousarray(m.frames[v, 0]), dtype=wp.quat, device=dev)
+        self._root_start_positions = wp.clone(self.root_positions)
+        self._root_start_rotations = wp.clone(self.root_rotations)
+        self.register_live("root_positions", "root_rotations")
+        self._command_sources = None
         self.root = wp.array(m.start[v].reshape(E, 1, 3).astype(np.float32), dtype=wp.vec3, device=dev)
         self.impulse = wp.zeros((E, 1), dtype=wp.vec3, device=dev)  # product: sum of m * dx the driver imposed this step
         self.moment = wp.zeros((E, 1), dtype=wp.vec3, device=dev)  # product: its moment about the root
@@ -115,9 +141,50 @@ class CatheterControl(System):
 
     def mount(self, k: int = 0) -> None:
         """A host body holds the driver from the next step on, through ``mount_pose`` (a device flag: no recapture)."""
+        if self.root_mode == "external_pose":
+            raise ValueError("external_pose root and rigid mount cannot both own a catheter")
         if k != 0:
             raise IndexError(f"catheter_control: the mount index is 0, got {k}")
         self.mounted.fill_(1)
+
+    def write_root_poses(self, positions, rotations) -> None:
+        """Copy complete (E,3)/(E,4) component-frame poses, xyzw, into persistent buffers.
+
+        Torch producers use their current stream; Warp producers use the current
+        Warp stream on this device. Callers using other Warp streams must order
+        them before this call. Device inputs must be float32 on the scene device.
+        The quaternion must be finite and nonzero; the kernel normalizes it.
+        """
+        if self.root_mode != "external_pose":
+            raise ValueError("write_root_poses requires root_mode='external_pose'")
+        sources = []
+        for value, target, width, dtype in ((positions, self.root_positions, 3, wp.vec3),
+                                            (rotations, self.root_rotations, 4, wp.quat)):
+            if type(value).__module__.split(".")[0] == "torch":
+                from i4h_physics.stepper import _warp_after_torch
+                if tuple(value.shape) != (self.scene.envs, width):
+                    raise ValueError(f"root pose must have shape ({self.scene.envs}, {width})")
+                _warp_after_torch(value, self.scene.device)
+                source = wp.from_torch(value, dtype=dtype)
+            elif isinstance(value, wp.array):
+                source = value
+                if source.dtype == wp.float32 and source.shape == (self.scene.envs, width):
+                    source = source.view(dtype)
+                elif dtype == wp.quat and source.dtype == wp.vec4:
+                    source = source.view(wp.quat)
+            else:
+                array = np.asarray(value, np.float32)
+                if array.shape != (self.scene.envs, width) or not np.isfinite(array).all():
+                    raise ValueError(f"root pose must have finite shape ({self.scene.envs}, {width})")
+                if width == 4 and np.any(np.linalg.norm(array, axis=1) <= 1.0e-12):
+                    raise ValueError("root rotations must be nonzero xyzw quaternions")
+                source = wp.array(array, dtype=dtype, device=self.scene.device)
+            if source.shape != target.shape or source.dtype != dtype or source.device != target.device:
+                raise ValueError("root pose device, shape and float32 vector dtype must match the component")
+            sources.append(source)
+        for source, target in zip(sources, (self.root_positions, self.root_rotations)):
+            wp.copy(target, source)
+        self._command_sources = sources  # keep asynchronous copy sources alive
 
     @property
     def root_reaction(self) -> bool:
@@ -126,6 +193,7 @@ class CatheterControl(System):
 
 
     def prepare(self, scene):
+        super().prepare(scene)
         self.controls.bend_offset.zero_()  # only the last ``tip_edges`` entries are written from here on (or none when disabled)
 
     def step_start(self, scene, dt):
@@ -133,14 +201,15 @@ class CatheterControl(System):
         self.moment.zero_()
         wp.launch(advance_targets, dim=scene.envs,
                   inputs=[self.actions, self.rates, self.lower, self.upper, dt, wp.vec3(*self.tip_axis), self.tip_edges, self.B,
-                          int(self.tip_mapping == "polyline")],
+                          int(self.tip_mapping == "polyline"), int(self.root_mode == "external_pose")],
                   outputs=[self.targets, self.controls.bend_offset], device=scene.device)
 
     def substep_start(self, scene, dt, s, substeps):
         b, rod = self.body, self.rod
         wp.launch(root_controls, dim=scene.envs,
                   inputs=[self.targets, self.track_start, self.track_direction, self.base_orientation, rod.variant,
-                          scene.field("flags", b), self.max_delta, self.F, self.mounted, self.mount_pose],
+                          scene.field("flags", b), self.max_delta, self.F, self.mounted, self.mount_pose,
+                          int(self.root_mode == "external_pose"), self.root_positions, self.root_rotations],
                   outputs=[scene.field("q", b), scene.field("q_prev", b), rod.frame, rod.frame_pred, self.root],
                   device=scene.device)
 
@@ -148,8 +217,8 @@ class CatheterControl(System):
         b = self.body
         wp.launch(track_guidance, dim=(scene.envs, self.P),
                   inputs=[scene.field("inv_mass", b), scene.field("flags", b), self.track_start, self.track_direction,
-                          self.base_orientation, self.rod.variant, self.track_length, self.track_stiffness, self.tip_edges,
-                          self.P, self.mounted, self.mount_pose, self.root],
+                          self.base_orientation, self.rod.variant, self.track_length, self.track_stiffness,
+                          self.tip_edges if self.distal_free_nodes is None else self.distal_free_nodes, self.P, self.mounted, self.mount_pose, self.root, self._path, self._path.shape[0]],
                   outputs=[scene.field("q", b), self.impulse, self.moment], device=scene.device)
 
     def substep_end(self, scene, dt):
@@ -163,6 +232,9 @@ class CatheterControl(System):
         self.clear(mask, (self.actions, wp.float32(0.0)))
         self.clear(mask, (self.targets, wp.vec3(0.0, 0.0, 0.0)))
         self.zero(mask, "impulse", "moment")
+        wp.launch(reset_root_commands, dim=scene.envs,
+                  inputs=[mask, self._root_start_positions, self._root_start_rotations],
+                  outputs=[self.root_positions, self.root_rotations, self.root], device=scene.device)
 
 
 # --- kernels -----------------------------------------------------------------------------------------
@@ -183,6 +255,7 @@ def advance_targets(
     tip_edges: wp.int32,
     B: wp.int32,
     polyline: wp.int32,
+    external_pose: wp.int32,
     targets: wp.array(dtype=wp.vec3),
     bend_offset: wp.array2d(dtype=wp.vec3),
 ):
@@ -191,8 +264,11 @@ def advance_targets(
     out = wp.vec3(0.0, 0.0, 0.0)
     for k in range(3):
         a = wp.clamp(actions[env, k], -1.0, 1.0)
-        out[k] = wp.clamp(t[k] + a * rates[env, k] * dt, lower[env, k], upper[env, k])
+        if external_pose == 0 or k == 2:
+            out[k] = wp.clamp(t[k] + a * rates[env, k] * dt, lower[env, k], upper[env, k])
     targets[env] = out
+    if tip_edges == 0:
+        return
     per_edge = out[2] / wp.float32(tip_edges)
     if polyline != 0:  # rest Darboux turns frames, the polyline follows midpoints: 2n - 1 half-turns (newton_catheter_physics.py:157-176)
         per_edge = wp.sin(out[2] / wp.float32(2 * tip_edges - 1))
@@ -216,6 +292,9 @@ def root_controls(
     F: wp.int32,
     mounted: wp.array(dtype=wp.int32),
     mount_pose: wp.array2d(dtype=wp.transform),
+    external_pose: wp.int32,
+    root_positions: wp.array(dtype=wp.vec3),
+    root_rotations: wp.array(dtype=wp.quat),
     q: wp.array2d(dtype=wp.vec3),
     q_prev: wp.array2d(dtype=wp.vec3),
     frame: wp.array(dtype=wp.quat),
@@ -229,10 +308,12 @@ def root_controls(
         return
     start, direction, base = track_frame(track_start[v], track_direction[v], base_orientation[v], mounted[0], mount_pose[env, 0])
     target = start + direction * targets[env][0]
+    if external_pose != 0:
+        target = root_positions[env]
     delta = target - q[env, root]
     length = wp.length(delta)
     limit = max_delta[env]
-    if length > limit and length > 1.0e-12:
+    if external_pose == 0 and length > limit and length > 1.0e-12:
         target = q[env, root] + delta * (limit / length)
     q[env, root] = target
     q_prev[env, root] = target
@@ -240,6 +321,8 @@ def root_controls(
 
     twist = wp.quat_from_axis_angle(wp.vec3(0.0, 0.0, 1.0), targets[env][1])
     orientation = base * twist
+    if external_pose != 0:
+        orientation = wp.normalize(root_rotations[env])
     frame[env * F] = orientation
     frame_pred[env * F] = orientation
 
@@ -263,6 +346,8 @@ def track_guidance(
     mounted: wp.array(dtype=wp.int32),
     mount_pose: wp.array2d(dtype=wp.transform),
     root_target: wp.array2d(dtype=wp.vec3),
+    path: wp.array(dtype=wp.vec3),
+    path_count: wp.int32,
     q: wp.array2d(dtype=wp.vec3),
     impulse: wp.array2d(dtype=wp.vec3),
     moment: wp.array2d(dtype=wp.vec3),
@@ -277,9 +362,23 @@ def track_guidance(
     position = q[env, particle]
     start, direction, base = track_frame(track_start[v], track_direction[v], base_orientation[v], mounted[0], mount_pose[env, 0])
     t = wp.dot(position - start, direction)
-    if t < 0.0 or t > track_length[env]:
-        return
     closest = start + direction * t
+    if path_count >= 2:
+        # Same closest-point algorithm as CathRodSolver._track_polyline_kernel.
+        # Path lives in component coordinates, independently of root ownership.
+        closest = path[0]
+        best = wp.length_sq(position - closest)
+        for segment in range(path_count - 1):
+            a = path[segment]
+            ab = path[segment + 1] - a
+            u = wp.clamp(wp.dot(position - a, ab) / wp.dot(ab, ab), 0.0, 1.0)
+            candidate = a + ab * u
+            distance = wp.length_sq(position - candidate)
+            if distance < best:
+                closest = candidate
+                best = distance
+    elif t < 0.0 or t > track_length[env]:
+        return
     dx = (closest - position) * track_stiffness[env]
     q[env, particle] = position + dx
     snap = dx / inv_mass[env, particle]  # m * dx the guide imposed (the coupling's products)
@@ -316,3 +415,14 @@ def root_hold(lambda_sum: wp.array(dtype=wp.float32), jacobian_rot: wp.array(dty
             value += jacobian_rot[edge * 36 + row * 6 + axis] * lambda_sum[base + row]
         turn[axis] = value
     moment[env, 0] = moment[env, 0] - turn
+
+
+@wp.kernel
+def reset_root_commands(mask: wp.array(dtype=wp.bool), positions: wp.array(dtype=wp.vec3),
+                        rotations: wp.array(dtype=wp.quat), root_positions: wp.array(dtype=wp.vec3),
+                        root_rotations: wp.array(dtype=wp.quat), root: wp.array2d(dtype=wp.vec3)):
+    env = wp.tid()
+    if mask[env]:
+        root_positions[env] = positions[env]
+        root_rotations[env] = rotations[env]
+        root[env, 0] = positions[env]
