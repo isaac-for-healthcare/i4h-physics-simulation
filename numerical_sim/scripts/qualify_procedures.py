@@ -14,9 +14,10 @@ from i4h_isaaclab.composition import build_procedure, load_case, read_case
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.volumetric_grasp import VolumetricGrasp
 
-NAVIGATION = {
+NAVIGATION = {  # case: (insertion steps at 0.5, rotation, tip bend for the first 30 steps)
     "aorta_static_reach": (60, 0.0, 0.0),
     "aorta_shell_reach": (250, 0.15, 0.05),
+    "aorta_centreline_reach": (250, -0.3, -0.3),  # a straight insertion passes 0.104 from the target
 }
 
 
