@@ -245,11 +245,11 @@ def open_end_caps(points: np.ndarray, tris: np.ndarray, lines=(), keep=None, lum
 
     - ``keep`` None: for each of the ``lines`` (segments ``(start, end)``: an insertion path), the open end it first
       crosses into the lumen, if it crosses no wall before. A line that starts in the lumen (its first crossing leaves
-      it) or reaches the vessel through its wall keeps none (a warning for the wall);
+      it) or enters it through the wall keeps none (a warning);
     - ``keep`` a list of points: the open ends whose centroids are nearest them, each within that end's radius.
 
     ``lumen_front``: the lumen is on the side the face normals point to (an inward-facing mesh). Raises ValueError when
-    one of the ``lines`` passes within ``clearance`` of a capped end before it enters the vessel: a containment with
+    one of the ``lines`` passes within ``clearance`` of a capped end before it enters the lumen: a containment with
     that search radius would push a node coming along it through the cap, a one-way valve."""
     loops = classify_boundary(points, tris, seam_tolerance)
     ends = [loop for loop in loops if loop.kind == "open"]
@@ -265,11 +265,11 @@ def open_end_caps(points: np.ndarray, tris: np.ndarray, lines=(), keep=None, lum
     owner = np.concatenate([np.full(len(tris), -1)] + [np.full(len(c), k) for k, c in enumerate(caps)])
     corners = pts[closed]
     normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
-    approaches, crossed = [], set()  # each line's stretch outside the vessel; the open ends lines enter by
+    approaches, crossed = [], set()  # each line's stretch outside the lumen; the open ends lines enter by
     for start, end in lines:
         p, q = np.asarray(start, np.float64), np.asarray(end, np.float64)
         face, t = _first_crossing(p, q, corners)
-        if face < 0:  # never reaches the vessel
+        if face < 0:  # never reaches the mesh
             approaches.append((p, q))
             continue
         if (float(np.dot(q - p, normals[face])) > 0.0) != lumen_front:
@@ -279,7 +279,7 @@ def open_end_caps(points: np.ndarray, tris: np.ndarray, lines=(), keep=None, lum
         if owner[face] >= 0:
             crossed.add(int(owner[face]))
         else:
-            warnings.warn(f"the insertion line from {np.round(p, 3).tolist()} reaches the vessel through its wall at "
+            warnings.warn(f"the insertion line from {np.round(p, 3).tolist()} enters the lumen through the wall at "
                           f"{np.round(hit, 3).tolist()}, not through an open end: no entry is left open", RuntimeWarning, stacklevel=3)
     entries = crossed
     if keep is not None:
@@ -307,7 +307,7 @@ def open_end_caps(points: np.ndarray, tris: np.ndarray, lines=(), keep=None, lum
                     end = ends[cap_owner[f]]
                     raise ValueError(f"the insertion line from {np.round(p, 3).tolist()} passes {d[s, f]:.4f} from the capped "
                                      f"open end at {np.round(end.centroid, 3).tolist()} at {np.round(x[s], 3).tolist()}, before "
-                                     f"it enters the vessel (within {clearance}): a node there would be pushed in through the cap")
+                                     f"it enters the lumen (within {clearance}): a node there would be pushed in through the cap")
     out_points, out_tris = [], []
     for k in capped:  # the entries' caps dropped, the new points renumbered
         out_tris.append(np.where(caps[k] >= base, caps[k] - offsets[k] + base + len(out_points), caps[k]))

@@ -190,11 +190,11 @@ def test_open_end_caps_keep_the_entry_of_the_insertion_line():
     with pytest.raises(ValueError, match=r"passes 0.0000 from the capped open end at \[0.0, "):
         open_end_caps(points, tris, lines=[OUTSIDE], keep=far, clearance=0.09)  # OUTSIDE crosses the x = 0 cap
     beside = ((-0.7, 0.15, 0.0), (3.0, 0.15, 0.0))  # past the tube, 0.05 from its rims
-    with pytest.raises(ValueError, match="before it enters the vessel"):
+    with pytest.raises(ValueError, match="before it enters the lumen"):
         open_end_caps(points, tris, lines=[beside], clearance=0.09)
     with pytest.raises(ValueError, match="keep_open"):
         open_end_caps(points, tris, keep=[(0.5, 0.0, 0.0)])
-    with pytest.warns(RuntimeWarning, match="through its wall"):
+    with pytest.warns(RuntimeWarning, match="through the wall"):
         open_end_caps(points, tris, lines=[((0.5, 0.3, 0.0), (0.5, -3.0, 0.0))])  # straight through the wall
 
 
