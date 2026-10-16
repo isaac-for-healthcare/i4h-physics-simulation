@@ -455,6 +455,33 @@ def test_tree_case_system_order_and_batching():
     assert len(rows) == 3  # contact_depth, contact_count, overflow of the containment (targets is (E, 3))
 
 
+@needs_vessels
+def test_tree_case_wall_returns_to_rest_after_retraction():
+    """NVBug 6940614: the case used aorta_static's 9.55 catheter, 3.2 of which lies in the lumen even when retracted, so
+    it pushed the deformable tree from the first step and, after an insert and retract cycle, held it in a new shape
+    (0.24 max node displacement 3 s after retracting). The retracted catheter now lies on its track outside the vessel:
+    the tree is untouched at rest, deforms under insertion and relaxes once the catheter is out."""
+    sim = load_case("aorta_centreline", envs=2)
+    scene, tree = sim.scene, sim.scene.body("aorta")
+    lc, ctl = find(sim, GraphContainment), find(sim, CatheterControl)
+    rest = scene.view(scene.q0, tree).numpy()
+
+    def displacement():
+        return np.linalg.norm(scene.view(scene.q, tree).numpy() - rest, axis=2).max(axis=1)
+
+    run_rates(sim, 30, np.zeros((2, 3), np.float32))
+    assert (lc.contact_count.numpy() == 0).all() and displacement().max() < 1e-4  # nothing touches the wall at rest
+    peak = np.zeros(2)
+    for _ in range(10):  # 10 s: 5 and 2.5 into the vessel
+        run_rates(sim, 60, np.float32([[1.0, 0.0, 0.0], [0.5, 0.3, 0.0]]))
+        peak = np.maximum(peak, displacement())
+    assert (peak > 0.1).all(), peak  # the catheter still deforms the wall
+    run_rates(sim, 660, np.float32([[-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]))
+    assert not ctl.targets.numpy()[:, 0].any()  # fully retracted
+    run_rates(sim, 180, np.zeros((2, 3), np.float32))  # 3 s
+    assert (lc.contact_count.numpy() == 0).all() and (displacement() < 0.01).all(), displacement()
+
+
 # --- skinning ------------------------------------------------------------------------------------------------------
 
 from i4h_endoluminal.loaders.centreline import bind_skin  # noqa: E402
