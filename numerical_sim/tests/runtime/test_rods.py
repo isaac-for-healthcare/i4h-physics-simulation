@@ -350,16 +350,22 @@ def test_tip_bend_curls_the_tip():
     assert segment_error(sim, body) < 1e-3
 
 
-def test_a_tip_on_the_track_stays_straight_until_it_leaves_it():
-    """NVBug 6940614: a tip bent while it is still on the guide (the 1.6 rod on a 2.0 track) stays on the line, like a
-    steerable tip inside its introducer, and curls once inserted past the track's end."""
-    sim, rod, ctl = free_rod()
+@pytest.mark.parametrize("guide_tip", [True, False])
+def test_a_tip_on_the_track_stays_straight_until_it_leaves_it(guide_tip):
+    """``guide_tip`` (NVBug 6940614): a tip bent while it is still on the guide (the 1.6 rod on a 2.0 track) stays on the
+    line, like a steerable tip inside its introducer, and curls once inserted past the track's end. Without it
+    (omniendo's default) the tip curls on the track."""
+    sim, rod, ctl = free_rod(guide_tip=guide_tip)
     ctl.track_length.fill_(2.0)  # live
     scene, body = sim.scene, rod.body
     run_rates(sim, 60, np.float32([[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]))  # 1 rad in both envs
     run_rates(sim, 60, np.zeros((2, 3), np.float32))
     q = scene.view(scene.q, body).numpy()
-    assert np.linalg.norm(q[:, -1, 1:] - [0.0, 1.0], axis=1).max() < 1e-3  # the guide holds the bent tip on the line
+    off_line = np.linalg.norm(q[:, -1, 1:] - [0.0, 1.0], axis=1)
+    if not guide_tip:
+        assert (off_line > 0.2).all(), off_line
+        return
+    assert off_line.max() < 1e-3  # the guide holds the bent tip on the line
     run_rates(sim, 120, np.float32([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]]))  # env 0: 1.0 in, the tip 0.6 past the end
     run_rates(sim, 120, np.zeros((2, 3), np.float32))
     q = scene.view(scene.q, body).numpy()

@@ -55,6 +55,7 @@ systems:
     rod: rod
     track_length: 6.35
     tip_edges: 16
+    guide_tip: true               # the track holds a bent tip straight until it leaves the track at the entry
     upper: [6.35, 1.0e9, 1.5]     # insertion stops at the end of the track
   - type: rod_pbd                 # the vessel tree, porcine_cta_centerline settings
     id: tree

@@ -15,16 +15,18 @@ clamped to ``[lower, upper]``. Isaac Lab writes ``actions`` in ``_apply_action``
 Per substep, after the rod predicted its frames, the root node is teleported to
 ``track_start + direction * insertion`` (slewed by ``max_delta`` per substep) with its frame set to
 the rest frame twisted about the local tangent by the rotation angle: insertion drags the whole
-rod, nothing is fed or activated. After the rod's constraint projection every iteration, the
+rod, nothing is fed or activated. After the rod's constraint projection every iteration, the shaft
 nodes whose axial coordinate is inside ``[0, track_length]`` are snapped onto the track line
-(``track_stiffness`` 1 = hard), except the root. The tip is guided too while it is on the track, like a
-steerable tip inside its introducer: it bends once it has left the guide (omniendo never guided the last
-``tip_edges`` nodes; a catheter that starts on its track outside a deformable vessel could then be bent at
-rest and miss the vessel's entry when inserted, NVBug 6940614). The tip bend is written once per step into
-the rod's live ``bend_offset``: ``tip_axis * angle / tip_edges`` on the last ``tip_edges`` bend constraints.
-The track starts at the rod's rest root along its rest tangent; ``rod_containment`` must be listed after this
-system so the vessel projection sees the track result (omniendo POST hook order). An env whose root node is
-inactive (``scene.flags``) is not driven.
+(``track_stiffness`` 1 = hard), except the root and the last ``tip_edges`` nodes. The tip bend is
+written once per step into the rod's live ``bend_offset``: ``tip_axis * angle / tip_edges`` on the
+last ``tip_edges`` bend constraints. The track starts at the rod's rest root along its rest tangent;
+``rod_containment`` must be listed after this system so the vessel projection sees the track
+result (omniendo POST hook order). An env whose root node is inactive (``scene.flags``) is not driven.
+
+``guide_tip`` (opt-in, not omniendo's): the last ``tip_edges`` nodes are snapped onto the track too while they are on
+it, like a steerable tip inside its introducer: the tip bends once it has left the guide. Without it a tip bent while
+the catheter still lies on its track outside a deformable vessel curls before the vessel's entry, misses it and drags
+the wall when inserted (``aorta_centreline``, NVBug 6940614).
 
 Mounted (``mount(0)``, a host body holds the catheter's driver, i4h_isaaclab.coupling): the track's start and the root's
 rest frame come from ``mount_pose (E, 1)`` (component frame, written by the host before each step) instead of the rest
@@ -43,7 +45,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import warp as wp
-from i4h_physics.checks import check_int
+from i4h_physics.checks import check_bool, check_int
 from i4h_physics.scene import ACTIVE
 from i4h_physics.systems.base import System
 from i4h_physics.systems.rods.rod_direct import RodDirect
@@ -55,8 +57,9 @@ class CatheterControl(System):
     state_products = ("targets",)  # per-env products a host observes (System.state_products)
     rod: object  # rod_direct or rod_pbd system id in YAML; the instance after construction
     track_length: float  # live, per env: the guide ends here (from the rod's rest root along its direction)
-    tip_edges: int = 0  # structural: distal bend constraints that carry the tip angle
+    tip_edges: int = 0  # structural: distal bend constraints that carry the tip angle (off the track unless guide_tip)
     tip_axis: tuple = (1.0, 0.0, 0.0)  # structural: material-frame axis the tip bends about
+    guide_tip: bool = False  # structural: the track guides the tip nodes too while they are on it (not omniendo's)
     track_stiffness: float = 1.0  # live, per env: fraction of the snap onto the track per iteration
     rates: tuple = (0.5, 1.5, 1.0)  # live (E, 3): m/s, rad/s, rad/s at action 1 (omniendo XCathVelocityActionCfg)
     lower: tuple = (0.0, -1.0e9, -1.5)  # live (E, 3): target bounds (insertion >= 0, tip in [-1.5, 1.5] as xcath.py)
@@ -68,7 +71,7 @@ class CatheterControl(System):
     is_control = True
 
     refs = ("rod",)
-    structural = System.structural + ("tip_edges", "tip_axis", "tip_mapping")
+    structural = System.structural + ("tip_edges", "tip_axis", "tip_mapping", "guide_tip")
 
     def __post_init__(self):
         scene = self.scene
@@ -83,6 +86,7 @@ class CatheterControl(System):
         E, dev = scene.envs, scene.device
         self.P, self.F, self.B = b.count, rod.frame_count, rod.bend_count
         self.tip_edges = check_int("catheter_control.tip_edges", self.tip_edges)
+        self.guide_tip = check_bool("catheter_control.guide_tip", self.guide_tip)
         self.tip_axis = tuple(float(x) for x in self.tip_axis)
         if not 0 <= self.tip_edges < self.B:
             raise ValueError(f"catheter_control.tip_edges must be in [0, {self.B}) for this rod, got {self.tip_edges}")
@@ -152,7 +156,7 @@ class CatheterControl(System):
         wp.launch(track_guidance, dim=(scene.envs, self.P),
                   inputs=[scene.field("inv_mass", b), scene.field("flags", b), self.track_start, self.track_direction,
                           self.base_orientation, self.rod.variant, self.track_length, self.track_stiffness,
-                          self.mounted, self.mount_pose, self.root],
+                          0 if self.guide_tip else self.tip_edges, self.P, self.mounted, self.mount_pose, self.root],
                   outputs=[scene.field("q", b), self.impulse, self.moment], device=scene.device)
 
     def substep_end(self, scene, dt):
@@ -249,8 +253,8 @@ def root_controls(
 
 # Ported from batched_xcath.py:116-146 (_project_track_guidance). Edits: (env, node) prologue; predicted
 # positions are the body's (E, P) view of scene.q; track_enabled dropped (disable the system instead);
-# the last tip_edge_count nodes are guided as well while on the track (see the module docstring); track per
-# variant, length and stiffness live per env; inactive nodes skipped.
+# tip_edge_count is a structural scalar (0 with guide_tip); track per variant, length and stiffness live per env;
+# inactive nodes skipped.
 @wp.kernel
 def track_guidance(
     inv_mass: wp.array2d(dtype=wp.float32),
@@ -261,6 +265,8 @@ def track_guidance(
     variant: wp.array(dtype=wp.int32),
     track_length: wp.array(dtype=wp.float32),
     track_stiffness: wp.array(dtype=wp.float32),
+    tip_edges: wp.int32,
+    P: wp.int32,
     mounted: wp.array(dtype=wp.int32),
     mount_pose: wp.array2d(dtype=wp.transform),
     root_target: wp.array2d(dtype=wp.vec3),
@@ -269,7 +275,7 @@ def track_guidance(
     moment: wp.array2d(dtype=wp.vec3),
 ):
     env, local = wp.tid()
-    if local == 0:
+    if local == 0 or local >= P - tip_edges:
         return
     particle = local
     if inv_mass[env, particle] <= 0.0 or (flags[env, particle] & ACTIVE) == 0:

@@ -87,12 +87,12 @@ def run_rates(sim, steps, rates):
         sim.step()
 
 
-def free_rod(envs=2, backend=RodDirect, tip_edges=8):
+def free_rod(envs=2, backend=RodDirect, tip_edges=8, **control):
     scene = Scene("cuda:0", envs, (0.0, 0.0, 0.0))
     add_rod(scene, "rod", [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], 33, 0.05, 0.02, mass=1.0)
     scene.allocate()
     rod = backend(scene, body="rod") if backend is RodPbd else backend(scene, body="rod", torsion=1.0e9, bend=0.1)
-    ctl = CatheterControl(scene, rod=rod, track_length=1.0, tip_edges=tip_edges)
+    ctl = CatheterControl(scene, rod=rod, track_length=1.0, tip_edges=tip_edges, **control)
     return Stepper.create(scene, [Particles(scene, damping=0.99), rod, ctl], dt=1 / 60, substeps=8, iterations=1), rod, ctl
 
 
