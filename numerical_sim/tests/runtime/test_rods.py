@@ -13,6 +13,8 @@ from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
 from i4h_isaaclab.composition import load_case, read_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_rod
+from i4h_physics.mesh_utils import boundary_loops, open_end_caps
+from i4h_physics.scene import StaticMesh
 from i4h_physics.systems.contact.rod_containment import RodContainment
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.rod_direct import RodDirect
@@ -78,6 +80,59 @@ def test_rod_loader():
         add_rod(scene, "short", [0, 0, 0], [1, 0, 0], 2, 0.02, 0.004)
     with pytest.raises(ValueError, match="non-zero"):
         add_rod(scene, "flat", [0, 0, 0], [0, 0, 0], 5, 0.02, 0.004)
+
+
+# open ends of a static mesh ---------------------------------------------------------------------------------
+
+
+def tube(x0, x1, ring=16, rings=6, radius=0.1, phase=0.0):
+    """An open cylinder along x, wound inward (face normals towards the axis) like a vessel mesh."""
+    angles = phase + 2.0 * np.pi * np.arange(ring) / ring
+    points = np.float32([[x, radius * np.cos(a), radius * np.sin(a)] for x in np.linspace(x0, x1, rings) for a in angles])
+    tris = []
+    for i in range(rings - 1):
+        for j in range(ring):
+            a, b = i * ring + j, i * ring + (j + 1) % ring
+            tris += [(a, a + ring, b), (b, a + ring, b + ring)]
+    return points, np.int32(tris)
+
+
+def test_open_end_caps_close_the_far_end_but_not_the_entry_or_a_seam():
+    a_points, a_tris = tube(0.0, 1.0)
+    b_points, b_tris = tube(1.0, 2.0, ring=15, phase=0.1)  # a second piece meeting the first rim to rim, unwelded
+    points, tris = np.concatenate([a_points, b_points]), np.concatenate([a_tris, b_tris + len(a_points)])
+    rod = np.float32([[-0.5, 0.01, 0.0], [0.5, 0.01, 0.0]])  # passes through the x = 0 opening
+    assert len(boundary_loops(points, tris)) == 4
+    cap_points, cap_tris, capped = open_end_caps(points, tris, through=[rod])
+    assert len(capped) == 1 and np.allclose(points[capped[0], 0], 2.0)  # the entry and the seam stay open
+    closed_points, closed_tris = np.concatenate([points, cap_points]), np.concatenate([tris, cap_tris])
+    assert len(boundary_loops(closed_points, closed_tris)) == 3
+    p0, p1, p2 = (closed_points[cap_tris[:, k]] for k in range(3))
+    assert (np.cross(p1 - p0, p2 - p0)[:, 0] < 0.0).all()  # wound like the wall: the cap faces into the lumen (-x)
+    assert len(open_end_caps(points, tris)[2]) == 2  # without a rod through it, the entry is an open end too
+
+
+@pytest.mark.parametrize("cap", [True, False])
+def test_rod_containment_holds_a_node_at_an_open_end(cap):
+    """A node pushed out past the far rim of an open tube: with no surface within ``search`` the query found nothing
+    and the node stayed outside (NVBug 6940633's mechanism); the cap brings it back inside by its radius."""
+    scene = Scene("cuda:0", 1, (0.0, 0.0, 0.0))
+    body = add_rod(scene, "rod", [-0.5, 0.0, 0.0], [1.0, 0.0, 0.0], 14, 0.1, 0.02)  # x -0.5 .. 0.8, through x = 0
+    points, tris = tube(0.0, 1.0)
+    scene.static_meshes.append(StaticMesh("tube", points, tris, None, np.zeros_like(points), None))
+    scene.allocate()
+    cont = RodContainment(scene, body="rod", mesh="tube", search=0.09, cap_open_ends=cap)
+    assert len(cont.capped_ends) == int(cap)
+    q = scene.field("q", body)
+    host = q.numpy()
+    host[0, -1] = (1.05, 0.02, 0.0)  # past the x = 1 rim, more than search from it
+    q.assign(host)
+    cont.iteration(scene, 1.0 / 480.0, 0, 1)
+    tip = q.numpy()[0, -1]
+    if cap:
+        assert tip[0] == pytest.approx(1.0 - 0.02, abs=1e-5) and int(cont.contact_count.numpy()[0]) == 1
+    else:
+        assert tip[0] == pytest.approx(1.05) and int(cont.contact_count.numpy()[0]) == 0
 
 
 # two_worlds cantilever ------------------------------------------------------------------------------------
@@ -282,6 +337,32 @@ def test_aorta_envs_insert_differently_and_stay_inside():
     assert segment_error(sim, body) < 5e-4  # the direct backend's stretch is near-rigid (compliance 1e-10)
     cont = find(sim, RodContainment)
     assert (cont.contact_count.numpy() > 0).all() and cont.contact_depth.numpy().max() < 0.01
+
+
+@needs_vessels
+def test_aorta_catheter_stops_at_a_cut_off_branch():
+    """NVBug 6940633: inserted at full speed the catheter turned into the lower arch branch at about 10 s and left
+    the model through that branch's cut-off end (2.1 units out at 24 s). The containment closes the open ends except
+    the catheter's entry; seams between mesh pieces and slit-like cracks stay as authored."""
+    sim = load_case("aorta_static", envs=2)
+    scene, body, cont = sim.scene, sim.scene.body("catheter"), find(sim, RodContainment)
+    mesh = scene.static_meshes[0]
+    ends = [mesh.points[i].astype(np.float64) for i in cont.capped_ends]
+    centroids = np.array([end.mean(axis=0) for end in ends])
+    assert len(ends) == 7  # the centreline's 8 open ends, less the right femoral one the catheter enters through
+    assert np.linalg.norm(centroids - [6.443, 0.012, 1.006], axis=1).min() > 0.5
+    assert np.linalg.norm(centroids - [12.931, -0.158, 0.359], axis=1).min() < 0.01  # the branch QA saw it leave by
+    run_rates(sim, 960, np.float32([[1.0, 0.0, 0.0], [0.85, 0.0, 0.0]]))  # both at the end of the track by 16 s
+    q = scene.view(scene.q, body).numpy().astype(np.float64)
+    assert np.isfinite(q).all()
+    for end, c in zip(ends, centroids):
+        normal = np.cross(end - c, np.roll(end, -1, axis=0) - c).sum(axis=0)
+        normal /= np.linalg.norm(normal)  # the rim's winding: out of the lumen
+        past = (q - c) @ normal
+        lateral = np.linalg.norm(q - c - past[..., None] * normal, axis=2)
+        near = lateral < 2.0 * np.linalg.norm(end - c, axis=1).max() + np.maximum(past, 0.0)  # a 45 degree cone past it
+        assert not near.any() or past[near].max() < 0.0, (c, past[near].max())
+    assert (inside_vessel(sim, body, 6.35) < -0.01).all(), "a node left the aorta"  # the tip sits in the cap's corner
 
 
 @needs_vessels
