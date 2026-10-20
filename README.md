@@ -35,12 +35,11 @@ Not available yet:
 - Bronchoscope and other non-catheter endoluminal devices
 - Airway and colon cases
 
-Production assets (meshes, textures, centrelines and USD) are not stored in Git. `scripts/fetch_assets.py` installs them from a copy you supply and checks each file against [`docs/asset-manifest.json`](./numerical_sim/docs/asset-manifest.json); see [numerical_sim/data/README.md](./numerical_sim/data/README.md).
+Production assets (meshes, textures, centrelines and USD) are included under `numerical_sim/data/` and licensed under Apache-2.0. `scripts/fetch_assets.py` can also install them from a copy you supply and checks each file against [`docs/asset-manifest.json`](./numerical_sim/docs/asset-manifest.json); see [numerical_sim/data/README.md](./numerical_sim/data/README.md).
 
 ```bash
 cd numerical_sim
 uv sync --locked --extra render --extra gl --group dev
-uv run python scripts/fetch_assets.py --source PATH_OR_URL
 uv run i4h-sim chole_tet_med --data ./data
 ```
 
@@ -92,7 +91,7 @@ numerical_sim/            # Six Warp / Newton packages and the i4h-sim app
 ├── physics/  surgical/  endoluminal/  assessment/  isaaclab/  standalone/
 ├── docs/                 # Architecture, component contracts, XR, performance, examples
 ├── examples/  scripts/  tests/
-└── data/                 # Production assets, fetched separately (not in Git)
+└── data/                 # Apache-2.0 production assets
 neural_sim/
 └── cosmos_h_dreams/      # Git submodule — generative surgical video sim
 physics_simulation/
@@ -146,4 +145,4 @@ This repository is under active development (experimental). For questions and su
 
 ## License
 
-The root [LICENSE](./LICENSE) (Apache-2.0) applies except where a part carries its own terms; [NOTICE](./NOTICE) lists each part. The `numerical_sim` packages each carry their own Apache-2.0 `LICENSE` and `NOTICE`. Production assets are not stored in Git and are not covered by these licenses. Cosmos-H-Dreams code is primarily Apache-2.0 with model weights under the NVIDIA Open Model License — see [its LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Third-party notices are in [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES), and contributions follow [CONTRIBUTING.md](./CONTRIBUTING.md).
+The root [LICENSE](./LICENSE) (Apache-2.0) applies except where a part carries its own terms; [NOTICE](./NOTICE) lists each part. The `numerical_sim` packages and original production assets in `numerical_sim/data/` are licensed under Apache-2.0. Cosmos-H-Dreams code is primarily Apache-2.0 with model weights under the NVIDIA Open Model License — see [its LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Third-party notices are in [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES), and contributions follow [CONTRIBUTING.md](./CONTRIBUTING.md).

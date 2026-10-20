@@ -23,7 +23,7 @@ I4H_DATA="$PWD/data" uv run pytest tests/runtime -q
 
 The window uses Tab to select a tool, IJKL/UO to move it, Space to grip, Shift for energy, F to fire, P to pause, N to step, Backspace to reset and F1 for panels. XR uses `--extra xr` instead of `--extra render`; these extras are mutually exclusive. Device and haptic support is optional and physical devices require separate qualification.
 
-Production assets are not stored in Git: `uv run python scripts/fetch_assets.py --source PATH_OR_URL` fills `data/` (or `$I4H_DATA`) and checks each file against `docs/asset-manifest.json` (SHA-256 and size); see `data/README.md`. They are excluded from wheels and source distributions. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; the packages ship no case assets. Installed packages do not search for a checkout or download assets. Production cases require their original external assets; missing files produce an explicit setup error. Headless runs do not load unused textures. The data tree retains its existing licenses and relative paths.
+Production assets are included in `data/` and licensed under Apache-2.0; `docs/asset-manifest.json` records each file's SHA-256, size and license. See `data/README.md`. They are excluded from wheels and source distributions. `scripts/fetch_assets.py --source PATH_OR_URL` can copy a matching asset tree into `data/` (or `$I4H_DATA`) and verifies every file. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; installed packages do not search for a checkout or download assets. Headless runs do not load unused textures.
 
 Use each domain directly:
 

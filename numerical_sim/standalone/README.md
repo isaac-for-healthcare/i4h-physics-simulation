@@ -8,8 +8,9 @@ or use the workspace lockfile for development.
 uv run i4h-sim two_worlds --data /path/to/data --render noop --steps 20
 ```
 
-Production assets are supplied separately with `--data` or `I4H_DATA`; missing assets
-fail explicitly. No production geometry or native device binaries are packaged.
+Production assets are included in the repository under `numerical_sim/data/` and are
+licensed under Apache-2.0. Pass that directory with `--data` or set `I4H_DATA`;
+missing assets fail explicitly. No production geometry or native device binaries are packaged.
 See the numerical workspace README and architecture document for setup and package boundaries.
 Licensed under Apache-2.0; see this package's LICENSE and NOTICE.
 

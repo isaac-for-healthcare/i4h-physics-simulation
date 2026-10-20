@@ -1,14 +1,17 @@
 # Production assets
 
-The meshes, textures, centrelines and USD files the cases use are not stored in Git. `docs/asset-manifest.json` lists
-each file with its SHA-256 and size; `scripts/fetch_assets.py` fills this folder (or `$I4H_DATA`) and checks every
-file against it:
+The meshes, textures, centrelines and USD files in this directory were created by
+Przemyslaw Korzeniowski and are licensed under the Apache License, Version 2.0.
+They may be used, modified and redistributed under the terms of the repository's
+root `LICENSE`. The asset manifest records each file's SHA-256, size, creator and
+license.
+
+The assets are included in this repository and can be passed directly to cases:
 
 ```bash
-uv run python scripts/fetch_assets.py --source /path/to/numerical_sim_data   # a local copy of the tree, or a base URL
-uv run python scripts/fetch_assets.py --check                                  # verify what is here
+uv run i4h-sim chole_tet_med --data ./data
+uv run python scripts/fetch_assets.py --check
 ```
 
-Publication is pending: the assets are to be released through the Isaac for Healthcare asset catalog
-(`omniverse-content-production` S3, `Assets/Isaac/Healthcare/<version>/<id>/`), once each manifest entry has an
-approved source, owner and license. Until then, `--source` is a local copy from the maintainers.
+`scripts/fetch_assets.py --source PATH_OR_URL` can also copy a verified asset tree
+to `data/` or `$I4H_DATA` for installations that keep assets separately.

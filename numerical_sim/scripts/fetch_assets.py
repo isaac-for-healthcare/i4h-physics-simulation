@@ -1,11 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fetch the production assets listed in ``docs/asset-manifest.json`` into a data directory, checking each file's
-SHA-256 and size.
+"""Copy or verify the production assets listed in ``docs/asset-manifest.json``, checking each file's SHA-256 and size.
 
-The assets are not in Git. ``--source`` is a local folder holding the data tree, or a base URL. Once the assets are
-published through the Isaac for Healthcare asset catalog, that is the catalog's
+The assets are included in Git. ``--source`` optionally points to a local folder holding the data tree, or an asset
+catalog base URL such as
 ``https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/Healthcare/<version>/<id>/...``
 folder for this tree. Files already present with the right hash are kept. A missing or mismatching file fails.
 

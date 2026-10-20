@@ -3,1067 +3,984 @@
     "path": "numerical_sim/data/choly-mid/centrelines/cystic_artery.cntr",
     "sha256": "b923f11b9f5d32ec43dd96ca3eaad7a8ebf0037fe8f0e0fac525accf885ae0fd",
     "size": 6905,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/centrelines/cystic_artery.cntr",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/centrelines/cystic_duct.cntr",
     "sha256": "9ec6802391a3adbf3f36c1b9ef46488b845dad8ed0e35725ade825cbb3f1cf7a",
     "size": 5349,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/centrelines/cystic_duct.cntr",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/fat-liver.connector",
     "sha256": "e2aa540e5f3e1b043436fab638a1aedb1be82ab33d3975e8984a342c07431ac4",
     "size": 43914,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/fat-liver.connector",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/fat/model.edges",
     "sha256": "4cae6d5229328fe56c1b8a4a5680a7111e2b8bdbb7692d0e52903165ca214a43",
     "size": 131832,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/fat/model.edges",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/fat/model.tetras",
     "sha256": "087e35fce01167bc76c505076387f8fbff00316ce38f786d04bf1f8ade4a8d63",
     "size": 165080,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/fat/model.tetras",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/fat/model.tris",
     "sha256": "42f3735353275f973e06ca600a55b846e92289b664348cddf17d9f9b756d5fed",
     "size": 73924,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/fat/model.tris",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/fat/model.uvs",
     "sha256": "6e15056877c8fa5a6c554b72ba358adf4039ad90b00a6a05cb6b21f2461eee88",
     "size": 53663,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/fat/model.uvs",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/fat/model.vertices",
     "sha256": "b15f5ad531192ad4a3a8fbd53578424b666d397c4ac3cdd128d5795d9e7e0b62",
     "size": 77066,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/fat/model.vertices",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/gallbladder-fat.connector",
     "sha256": "fbe197307b4d809a936dc306ab78953aa2703f873aa99c541c7143b941abfebd",
     "size": 45623,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/gallbladder-fat.connector",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/gallbladder/model.edges",
     "sha256": "c2bb8b9d8d43b916c620e8a3c45fa6693f86d61ecd7123b6154b5f082aceb760",
     "size": 38638,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/gallbladder/model.edges",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/gallbladder/model.tetras",
     "sha256": "2d1eb67efd85744a63ced6493423c1f107422e53059c8aa7b6b1d86e99309ab1",
     "size": 47968,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/gallbladder/model.tetras",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/gallbladder/model.tris",
     "sha256": "8664b75ae406a62c5351011b67b4dba84f6d0a4bf7b07c463f00eefb10a20c28",
     "size": 22024,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/gallbladder/model.tris",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/gallbladder/model.uvs",
     "sha256": "be34875140f3bf8486932a6a280f51a451cffaeaae0624a3cbffc1db96154fc6",
     "size": 18639,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/gallbladder/model.uvs",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/gallbladder/model.vertices",
     "sha256": "cf99fd7c4eab3323e04a1fd5c752c6dd4f7ef79b206f421b9d128631f7752a5a",
     "size": 26877,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/gallbladder/model.vertices",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/liver/model.edges",
     "sha256": "fba4d3521c39187b827bebde4e333d32faa96d30827fbb0569e4c608a48f6d8b",
     "size": 95763,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/liver/model.edges",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/liver/model.tetras",
     "sha256": "8388f6545b97ebfa7d9b812c9c223c31ae12bf3eadbda28890a12d097ca3e139",
     "size": 121012,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/liver/model.tetras",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/liver/model.tris",
     "sha256": "b3da0a3ed21acef5b7969fa3830391d89f30b1584d7f84bb9273cb501e1ed37a",
     "size": 52874,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/liver/model.tris",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/liver/model.uvs",
     "sha256": "d19956445f3f9533704c59f35f96b49850a508b42f78776882bfa2f55a5f2964",
     "size": 27391,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/liver/model.uvs",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly-mid/liver/model.vertices",
     "sha256": "69a776346d19767bb757ccb939ce1c37307a665dce167b6fb722249d23e5a18b",
     "size": 58176,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly-mid/liver/model.vertices",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly/cavity/cavity.tris",
     "sha256": "f3d1019575ba5d720d255255df102054a266de169b45ecf4e613533e21a34afb",
     "size": 288666,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly/cavity/cavity.tris",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly/cavity/cavity.uvs",
     "sha256": "3e498083929c69e4429bac96021b8a23067c21a9a37926a6264f7d7e83ba7fea",
     "size": 246237,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly/cavity/cavity.uvs",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly/cavity/cavity.vertices",
     "sha256": "53f833e6b4530ea58a4fd5b551cd2d705ca9ab4176b2dbc36a2900f304152d30",
     "size": 365241,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly/cavity/cavity.vertices",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly/cavity/cavity_diffuse.tga",
     "sha256": "1c0ea26d95fffe68adafd1060a43beb7423dca909c1ec1bc189173da0faa579a",
     "size": 12582956,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly/cavity/cavity_diffuse.tga",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly/cavity/cavity_normals.tga",
     "sha256": "710cfe93bba11f074cb0fb0046c229234528ac8997a0620464d0a52090256754",
     "size": 12582956,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly/cavity/cavity_normals.tga",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/choly/cavity/cavity_spec.png",
     "sha256": "03e794826001c1834d86cbb19c0d288db4e88198118298381b69faac30c1b72e",
     "size": 2376314,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/choly/cavity/cavity_spec.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/environments/abdomen.hdr",
     "sha256": "1ce237ef34024bb49dfb64cd394149fb96886b903baee453398d8fb2740fcaeb",
     "size": 6333957,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/environments/abdomen.hdr",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/instruments/hook.usdc",
     "sha256": "0d6724bb7ec833a3dde23bfc938cfc899957e8a6eb99760437b686261f78beed",
     "size": 14675811,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/instruments/hook.usdc",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/instruments/pgrasp.usdc",
     "sha256": "3c426d5de35256730b48da0fd97b37a982b6fc2677102d43c71c6df15381d187",
     "size": 18368594,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/instruments/pgrasp.usdc",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/instruments/rts.usdc",
     "sha256": "263cddb163e2e7f523dbf75d0d2f92e43726bdce10112639662c8783c247acb0",
     "size": 25136929,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/instruments/rts.usdc",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/instruments/suction_irrigation.usdc",
     "sha256": "031143f84f36378887a15894a6774d77c62245c4726720190555b402026685f5",
     "size": 111584,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/instruments/suction_irrigation.usdc",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/liver/liver.vtu",
     "sha256": "cb89fb6d4f1bd3e92e4eab85ac5b96ad508bdefabc12a0023ee0c71b234f9deb",
     "size": 132074,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/liver/liver.vtu",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/liver/liver_h12.vtu",
     "sha256": "a542820a3726d4f67d1f64317712309247b299226a53f36423e3cf11720f0970",
     "size": 334823,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/liver/liver_h12.vtu",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/diffuse-base.png",
     "sha256": "ec43ba89c6b244b54df1f5be867ee9313459847c699a79ae91cb0945ef1aa714",
     "size": 3427823,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/diffuse-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/diffuse-blood.png",
     "sha256": "c1ae2e44eb44adcf8c11a7829ef0c89529d56ec884c30eacd08e9203285bc465",
     "size": 112476,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/diffuse-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/diffuse-coag.png",
     "sha256": "10cd35ac41a9d3533f820b342b53d80c50f68c3766036fb283afbee10be939ac",
     "size": 3263809,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/diffuse-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/diffuse-damage.png",
     "sha256": "c2b52595c49fe51c73bc454b459dd8d2f3738591bbc88d08d91d0fa6122f7eeb",
     "size": 18806824,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/diffuse-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/normal-base.png",
     "sha256": "a00734e9affbed71483e82c499d0fd262f0f499930464626dcb1d612011a087e",
     "size": 1004882,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/normal-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/normal-blood.png",
     "sha256": "fe7d530dcef44fc4e06f6d6d78bcff2da66f629c86a047ac1947dcbeb9c3067d",
     "size": 16902,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/normal-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/normal-coag.png",
     "sha256": "2483e0f2284b6c3b6e16c6e2c19e676130fa6e27709e090e43c551f4b6ed2d9c",
     "size": 1391344,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/normal-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/normal-damage.png",
     "sha256": "cb66f4c73ab7f358e73998324c872107feaeecfdbd83b4e2578f2ff63c69f6ce",
     "size": 17277331,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/normal-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/spec-base.png",
     "sha256": "875172bd7af17f5e9522f2cdcff0cd04a3bfa1fe8cd89106d9152c1b5bef1ea3",
     "size": 450259,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/spec-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/spec-blood.png",
     "sha256": "e49706c17ad1b6282e6c10b55d9ee45333e5e28eb0f740c728f4e9b40efbd65a",
     "size": 16904,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/spec-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/spec-coag.png",
     "sha256": "0369a7057f8be2e039f02742bf8f00698bef6c57631a31c50d0107671ecbd50c",
     "size": 1212485,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/spec-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/fat/spec-damage.png",
     "sha256": "e83ed793bacba94ccc823fc41f708574f9358b6d6711a334ee5d7d7f84838250",
     "size": 11870328,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/fat/spec-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/diffuse-base.png",
     "sha256": "2aba3b422f6fe1e3a5bf77d7c8e7619eea9d32c04fd76c9c21a458e332d69623",
     "size": 5098093,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/diffuse-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/diffuse-blood.png",
     "sha256": "e7a9aa35b55e92d3ea677fa3803212361d1a8f5c038356d095bee0b7b60885e0",
     "size": 5408268,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/diffuse-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/diffuse-coag.png",
     "sha256": "10cd35ac41a9d3533f820b342b53d80c50f68c3766036fb283afbee10be939ac",
     "size": 3263809,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/diffuse-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/diffuse-damage.png",
     "sha256": "9b216734f4820f20f0018df4836df7171470f2df67eb5f8fec440e341a50b83c",
     "size": 3762784,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/diffuse-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/normal-base.png",
     "sha256": "4270d697ab75b9a234635d94c4f8f9d046baa334d2a95ea6cbdd75d19091b51f",
     "size": 4634800,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/normal-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/normal-blood.png",
     "sha256": "15c81f589ea6fd5b0cdd27349faae59c614282e2ae279485fafd7a8bfb11a704",
     "size": 8105876,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/normal-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/normal-coag.png",
     "sha256": "2483e0f2284b6c3b6e16c6e2c19e676130fa6e27709e090e43c551f4b6ed2d9c",
     "size": 1391344,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/normal-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/normal-damage.png",
     "sha256": "92107b8118de98123fa6209e70ec9f06acacc088f1f84749a0391e42354c7350",
     "size": 3834551,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/normal-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/spec-base.png",
     "sha256": "9035619beb383b3ecf28d6d232c5e2250ffb96b077bcd6e02eb4737c4819b0c0",
     "size": 2499734,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/spec-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/spec-blood.png",
     "sha256": "03e794826001c1834d86cbb19c0d288db4e88198118298381b69faac30c1b72e",
     "size": 2376314,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/spec-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/spec-coag.png",
     "sha256": "0369a7057f8be2e039f02742bf8f00698bef6c57631a31c50d0107671ecbd50c",
     "size": 1212485,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/spec-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/gallbladder/spec-damage.png",
     "sha256": "4ae1191a584f7fb6f25967f9a286ff325e782cfef17aacfb4b6518133d37df7a",
     "size": 1214378,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/gallbladder/spec-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/diffuse-base.png",
     "sha256": "0dfd6735f9436a169b050b581b6a81d67d1fb266675f693963a179a1ec72061b",
     "size": 16763521,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/diffuse-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/diffuse-blood.png",
     "sha256": "e7a9aa35b55e92d3ea677fa3803212361d1a8f5c038356d095bee0b7b60885e0",
     "size": 5408268,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/diffuse-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/diffuse-coag.png",
     "sha256": "10cd35ac41a9d3533f820b342b53d80c50f68c3766036fb283afbee10be939ac",
     "size": 3263809,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/diffuse-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/diffuse-damage.png",
     "sha256": "c2b52595c49fe51c73bc454b459dd8d2f3738591bbc88d08d91d0fa6122f7eeb",
     "size": 18806824,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/diffuse-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/normal-base.png",
     "sha256": "68eb9d88f02ffbc606fa02403a200de6a8208319f8f7cfb3cfc12a02b6b01888",
     "size": 11852347,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/normal-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/normal-blood.png",
     "sha256": "15c81f589ea6fd5b0cdd27349faae59c614282e2ae279485fafd7a8bfb11a704",
     "size": 8105876,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/normal-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/normal-coag.png",
     "sha256": "2483e0f2284b6c3b6e16c6e2c19e676130fa6e27709e090e43c551f4b6ed2d9c",
     "size": 1391344,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/normal-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/normal-damage.png",
     "sha256": "cb66f4c73ab7f358e73998324c872107feaeecfdbd83b4e2578f2ff63c69f6ce",
     "size": 17277331,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/normal-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/spec-base.png",
     "sha256": "1a1b53f74027f8b3672ace46429d76a90f1c78b6aa33398c24d4bc9bac7560e3",
     "size": 1662384,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/spec-base.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/spec-blood.png",
     "sha256": "03e794826001c1834d86cbb19c0d288db4e88198118298381b69faac30c1b72e",
     "size": 2376314,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/spec-blood.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/spec-coag.png",
     "sha256": "0369a7057f8be2e039f02742bf8f00698bef6c57631a31c50d0107671ecbd50c",
     "size": 1212485,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/spec-coag.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/liver/spec-damage.png",
     "sha256": "e83ed793bacba94ccc823fc41f708574f9358b6d6711a334ee5d7d7f84838250",
     "size": 11870328,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/liver/spec-damage.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/textures/smoke1.png",
     "sha256": "ebf570d0b0466290fef450ecc6e927aa2b4416a48fdc01da69d3bff77e775183",
     "size": 167394,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/textures/smoke1.png",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/source/model.edges",
     "sha256": "b68fb7de3d4c450107307a6d055e1d97e292335557965c26edfc710d3104e6dd",
     "size": 24,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/source/model.edges",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/source/model.tetras",
     "sha256": "3f31bc2191b8b55d447838e14cbce78ca44feba5b46c902ade4cc2eb7b68a041",
     "size": 8,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/source/model.tetras",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/source/model.tris",
     "sha256": "594b5843071d1c8c035c6feb6a2130c7ac7900d4dcbdcf8e441bb4671c694dc6",
     "size": 24,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/source/model.tris",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/source/model.vertices",
     "sha256": "4b3f66ab9775e749863eb89764ea09ade9918194cad61d80bcad6ecc77334228",
     "size": 108,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/source/model.vertices",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/target/model.edges",
     "sha256": "b56124127f9b6a83ae09afb095dd50edcf52984b680ac510cb9b3ecf26066483",
     "size": 24,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/target/model.edges",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/target/model.tetras",
     "sha256": "c74deeafd643e3db3cad52bbcb9cdb5022358be4593a7f7896ccdf2fd55504df",
     "size": 8,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/target/model.tetras",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/target/model.tris",
     "sha256": "5f844094c49c4330a2ca81e99b292eee9379ef8adf565aa6dfe4359ae8069333",
     "size": 24,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/target/model.tris",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/tissue_contact/target/model.vertices",
     "sha256": "a8a959e699c9ba4e0299603c3b893b41fbf092862f079ec5422757415980f1a3",
     "size": 112,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/tissue_contact/target/model.vertices",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/vessels/AortaWithVesselsStatic.usdc",
     "sha256": "b9eeaa91038c261ad10364e522837be3225c9432ad3740b45941f0676abde91c",
     "size": 6776203,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/vessels/AortaWithVesselsStatic.usdc",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/vessels/DynamicAorta.usdc",
     "sha256": "51974f8259452e7edcaf0758d92fc6268699a6f02ece490ef8782fd55311c639",
     "size": 959868,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/vessels/DynamicAorta.usdc",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/vessels/aorta_centerline.json",
     "sha256": "0202791ac7a5170cbf77e0f7d859c659274c4b29c3a8d1cfff3c802bbe3f320b",
     "size": 63571,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/vessels/aorta_centerline.json",
-      "upstream provenance and owner decision pending",
-      "source.mesh personal path redacted to mesh filename; original retained privately"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/vessels/instrument_regions.yaml",
     "sha256": "a08ca3690e75a8b118331d0449c5b58541397695bd3324969392a618da15d8b6",
     "size": 170,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/vessels/instrument_regions.yaml",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
     "path": "numerical_sim/data/vessels/vascular_templates.yaml",
     "sha256": "d3597e90133f1be0960f64b8ef7b12ee752355d8e5a9f5ce96350f9072b51d99",
     "size": 299,
-    "source": null,
-    "owner": null,
-    "license": null,
-    "redistribution_status": "unapproved",
+    "source": "Created by Przemyslaw Korzeniowski",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
     "evidence": [
-      "git:f8b5b89:numerical_sim/data/vessels/vascular_templates.yaml",
-      "upstream provenance and owner decision pending"
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
     ]
   },
   {
