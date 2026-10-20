@@ -1,0 +1,36 @@
+name: i4h-sim
+
+on:
+  pull_request:
+    paths:
+      - "numerical_sim/**"
+      - ".github/workflows/**"
+      - "*"
+  push:
+    paths:
+      - "numerical_sim/**"
+      - ".github/workflows/**"
+      - "*"
+
+# The runtime suite steps CUDA graphs and needs an NVIDIA GPU (run `uv run pytest tests/runtime -q` locally);
+# this job checks that the locked environment resolves, the packages import, ruff's F rules hold, the package
+# tests pass, a generated case steps on CPU and the built archives keep their boundaries.
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: numerical_sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: numerical_sim/uv.lock
+      - run: uv sync --locked --group dev
+      - run: uv run --locked python -c "import i4h_physics, i4h_assessment, i4h_endoluminal, i4h_surgical, i4h_isaaclab, i4h_standalone.app.cli; from i4h_surgical.config import read_case; read_case('two_worlds')"
+      - run: uv run --locked ruff check physics/src assessment/src endoluminal/src surgical/src isaaclab/src standalone/src --select F
+      - run: uv run --locked pytest tests/packages -q
+      - run: uv run --locked python examples/core_synthetic.py --device cpu  # steps rod/tet/fluid/contact and resets on CPU
+      - run: uv build --all-packages
+      - run: uv run --locked python scripts/check_artifacts.py dist  # package isolation, no data/, no file over 5 MB

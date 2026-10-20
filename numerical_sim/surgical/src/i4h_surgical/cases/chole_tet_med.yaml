@@ -1,0 +1,280 @@
+# Cholecystectomy tissue (choly-mid bundle): liver, fat and gallbladder as one tet body,
+# hanging from a pin sphere on the liver's posterior rim inside the bounds box, seen from
+# an endoscope camera inside the static abdominal cavity.
+# Values reproduce omnisurg examples/chole_tet_case_med*.yaml (Y-up, ~7x life size, metres).
+sim:
+  device: cuda:0
+  dt: 0.016666667
+  substeps: 8
+  iterations: 8
+  envs: 1
+  gravity: [0.0, -9.81, 0.0]
+
+assets:
+  tissue:
+    type: tet_bundle
+    path: "${DATA}/choly-mid"
+    translation: [0.0, -3.0, 0.0]
+    parts:                      # order is the memory layout; connector files index into it
+      liver:
+        spring: 1.0
+        volume: 1.0
+        visual: {set: "${DATA}/textures/liver"}   # base, damage, coag and blood texture sets
+      fat:
+        spring: 0.1
+        volume: 0.1
+        heat: true                # conducts and burns under the hook's cautery
+        deletable: true           # burnt or cut tets are removed; cut_faces slots default to the authored count
+        visual: {set: "${DATA}/textures/fat"}   # base, damage, coag and blood texture sets
+      gallbladder:
+        spring: 0.8
+        volume: 0.1
+        deletable: true           # the cystic artery and duct run through it: cutting them severs their centrelines
+        visual: {set: "${DATA}/textures/gallbladder"}   # base, damage, coag and blood texture sets
+    connectors:
+      - {path: fat-liver.connector,       particle_part: fat,         triangle_part: liver, stiffness: 0.05, weight_ratio: 0.99}
+      - {path: gallbladder-fat.connector, particle_part: gallbladder, triangle_part: fat,   stiffness: 0.05, weight_ratio: 0.8}
+    pin:
+      center: [0.5, 1.5, -5.0]
+      radius: 1.0
+    centrelines:                # vessel centrelines (.cntr rows: the gallbladder particles of each cross-section)
+      - {name: cystic_artery, path: centrelines/cystic_artery.cntr, part: gallbladder}
+      - {name: cystic_duct,   path: centrelines/cystic_duct.cntr,   part: gallbladder}
+  cavity:                       # drawn by the renderer; contact geometry for the static_contact systems below
+    type: static_mesh
+    path: "${DATA}/choly/cavity"
+    translation: [0.8, -3.3, -0.4]
+    visual: {diffuse: "${DATA}/choly/cavity/cavity_diffuse.tga", normal: "${DATA}/choly/cavity/cavity_normals.tga", specular: "${DATA}/choly/cavity/cavity_spec.png"}
+  blood:                        # fluid pools (M6): omnisurg examples/ chole fluid.pbf values, capacities per env
+    type: fluid
+    count: 4096
+    mass: 0.02
+    radius: 0.005               # collision radius
+    interaction_radius: 0.03
+    rest_distance: 0.01
+    iterations: 4
+    max_neighbors: 128
+    relaxation: 0.1
+    viscosity: 0.001
+    cohesion: 0.001
+    visual: {color: [0.32, 0.015, 0.02], render_radius: 0.01}
+  irrigation:
+    type: fluid
+    count: 8192                 # omnisurg had 65536 for one env; the ring overwrites the oldest when full
+    mass: 0.02
+    radius: 0.005               # omnisurg's 0.03 kept the jet 3 cm off the tissue and made every contact query 6 cm wide
+    interaction_radius: 0.01
+    rest_distance: 0.004
+    iterations: 8
+    max_neighbors: 128
+    relaxation: 0.1
+    viscosity: 0.001
+    visual: {color: [0.35, 0.35, 0.65], render_radius: 0.01}
+
+instruments:                    # laparoscopic tools through trocars; actions[env, k] = [position, quaternion, grip]
+  grasper:
+    kind: grasper
+    mesh: "${DATA}/instruments/pgrasp.usdc"
+    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
+    scale: 0.0075
+    trocar: [-1.0, 5.0, 3.0]
+    initial: {position: [0.3, 1.2, -3.0]}
+    input: primary
+    jaw_spheres: {distance: 0.015, offset: [0.0, -0.015, 0.0]}   # 13 spheres of radius 0.015 (the defaults)
+  hook:
+    kind: hook
+    mesh: "${DATA}/instruments/hook.usdc"
+    prims: {shaft: /root/shaft_color_001/shaft_color_001, body: /root/logobody_color_002/logobody_color_002, hook: /root/hook/Mesh_001}
+    scale: 0.0075
+    trocar: [5.5, 5.0, 5.0]
+    initial: {position: [0.7, 1.2, -3.0]}
+    input: secondary
+    jaw_spheres:
+      count: 5
+      distance: 0.01
+      chains: {jaw_left: {offset: [0.0, 0.0, 0.1], euler: [-20.0, 0.0, 0.0]}, jaw_right: {offset: [0.0, 0.02, 0.15], euler: [80.0, 0.0, 0.0]}}
+    wrist_end: [0.0, 0.0, 0.06]
+  clip_applier:                 # the grasper mesh in its own colours: never grasps, F (fire) clips the duct or artery node in reach
+    kind: clip_applier          # (ours: omnisurg had no clip kind; the commented secondary grasper's trocar)
+    mesh: "${DATA}/instruments/pgrasp.usdc"
+    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
+    scale: 0.0075
+    trocar: [3.0, 5.0, 3.0]
+    initial: {position: [1.1, 1.2, -3.0]}
+    jaw_spheres: {distance: 0.015, offset: [0.0, -0.015, 0.0]}
+  scissors:                     # omnisurg rts.usdc as authored (commented out in the source case): 5 collision spheres per jaw and
+    kind: scissors              # 8 finer cutting spheres per jaw (the `cutting` defaults); closing the jaw cuts fat
+    mesh: "${DATA}/instruments/rts.usdc"
+    prims: {shaft: /root/shaft_color_001/shaft_color_003, body: /root/logobody_color_001/logobody_color_004, jaw_left: /root/jawLeft_color_001/jawLeft_color_003, jaw_right: /root/jawRight_color_001/jawRight_color_003}
+    scale: 0.0075
+    trocar: [0.0, 1.7, -2.0]
+    initial: {position: [0.3, 1.2, -3.0]}   # as authored: the grasper's rest pose too (tools do not collide with each other)
+    jaw_spheres: {count: 5, distance: 0.015, offset: [0.0, -0.015, 0.0]}
+  suction:                      # irrigation and suction tube (omnisurg irrigation_suction): grip irrigates, energy sucks
+    kind: suction
+    mesh: "${DATA}/instruments/suction_irrigation.usdc"
+    prims: {tool: /root/root/tool/tool}
+    scale: 0.0075
+    trocar: [3.5, 5.0, 5.0]
+    initial: {position: [-0.5, 1.2, -3.0]}
+
+
+inputs:                         # devices for --input devices (MiniMou); keyboard and scripted need no devices
+  pickup: {distance: 0.15, proxy_radius: 0.05, keys: {primary: "1", secondary: "2"}}   # a press puts the held tool down or takes the nearest (omnisurg instrument_control)
+  # Force-feedback handles through the instrument box (input/avatar.py): a pose device mounts a box channel with handle: {box, channel};
+  # its grip and pedals come from the box (the MiniMou's own handle port is bypassed) and the jaw load goes to the handle
+  # (haptics.handles). The desk's box: the left handle on channel 1 (MiniMou 0), the right on channel 3 (MiniMou 1). The box is
+  # optional: without it (entry removed or not plugged in) the MiniMous read their own handles (handle_readout).
+  # The 4-DOF Avatar is backend `avatar` with the trocar as position_offset:
+  # {backend: avatar, settings: {device_index: 0, position_offset: [3.0, 5.0, 3.0], handle: {box: box, channel: 1}}}
+  box:       {backend: ibcontroller, settings: {device_index: 0, channels: 6}}
+  primary:   {backend: minimou, scale: [0.005, 0.005, 0.005], settings: {device_index: 0, handle_readout: raw, position_offset: [0.0, 1.2, -4.0], handle: {box: box, channel: 1}}}
+  secondary: {backend: minimou, scale: [0.005, 0.005, 0.005], settings: {device_index: 1, handle_readout: raw, position_offset: [1.2, 1.2, -4.0], handle: {box: box, channel: 3}}}
+
+systems:
+  - type: particles
+    max_velocity: 5.0
+  - type: tet
+    body: tissue
+  - type: surface                # live per-env triangles, support counts, visual (damage/coag/blood)
+    tet: tet
+  - type: attachments
+    body: tissue
+    stiffness: 0.0005
+  - type: connectors
+    body: tissue
+  - type: instrument_control
+  - type: instrument_contact
+    instruments: instrument_control
+    surface: surface
+    front_side_only: [liver]
+  - type: contact_paint         # debug paint: M/V/B held in the window tint what the tools touch (damage, coagulation, blood)
+    contacts: instrument_contact
+    surface: surface
+  - type: grasp
+    instruments: instrument_control
+    contacts: instrument_contact
+  - type: volumetric_grasp      # the particles inside the closed jaws (omnisurg max_grasp_particles 64), beside the surface grasp
+    instruments: instrument_control
+    body: tissue
+  - type: hook
+    instruments: instrument_control
+    contacts: instrument_contact
+    instrument: hook
+    part: fat
+  - type: tool_force            # per-tool reaction from contact, both grasps and the hook (M11 haptics): what a device renders
+    instruments: instrument_control
+    contacts: instrument_contact
+    grasp: grasp
+    volumetric_grasp: volumetric_grasp
+    hook: hook
+  - type: static_contact        # the liver is authored through the cavity wall (up to 13 cm), so only the free parts
+    body: tissue
+    mesh: cavity
+    parts: [fat, gallbladder]
+  - type: thermal               # cautery: the hook's energy (Shift) heats the fat it touches or has pierced; burnt tets go
+    surface: surface
+    contacts: instrument_contact
+    instruments: instrument_control
+    hook: hook
+    instrument: hook
+  - type: cutting               # the scissors cut the fat tets between their closing blades (Space) and paint the cut faces
+    surface: surface
+    instruments: instrument_control
+    instrument: scissors
+    trigger: closing
+    blood: 1.0                  # omnisurg scissors cutting.blood_amount as authored
+  - type: stretch_breaking      # over-stretched fat tears (M9b; omnisurg shipped it disabled with 6.0 / 4.0 / 5.5, never run live):
+    surface: surface            # measured: the fat settles at stretch 2.4 (2.7 transient), a jaw pressed hard into it reaches 6 to 8,
+    parts: [fat]                # a grasp and pull passes 12 within 60 steps; damage shows from 4, saturates at 8, the tet goes at 12
+    threshold: 12.0
+    damage_start: 4.0
+    damage_full: 8.0
+  - type: centreline            # cystic artery and duct nodes follow their cross-sections
+    body: tissue
+  - type: clipping              # the clip applier's fire (F) clips the nearest duct or artery node within reach; the clip pinches it
+    centreline: centreline
+    instruments: instrument_control
+    instrument: clip_applier
+    reach: 0.2                  # omnisurg centreline_clip_radius default; the scripted applier stops 20% short of the duct node
+    line: [cystic_duct, cystic_artery]
+  - type: fluid                 # position-based fluid over both pools (one grouped grid)
+  - type: fluid_contact         # blood and irrigation stay outside the tissue skin
+    fluid: fluid
+    surface: surface
+  - type: static_contact        # and inside the cavity
+    id: blood_cavity
+    body: blood
+    mesh: cavity
+    margin: 0.002
+  - type: static_contact
+    id: irrigation_cavity
+    body: irrigation
+    mesh: cavity
+    margin: 0.002
+  - type: bleeding              # the scissors sever artery nodes between their blades (or a ring torn away); the cut ends bleed until clipped on both sides
+    fluid: fluid
+    body: blood
+    centreline: centreline
+    instruments: instrument_control
+    clipping: clipping
+    cutting: cutting
+    line: cystic_artery
+  - type: emitter               # irrigation jet from the suction tube while its handle (Space) is squeezed
+    fluid: fluid
+    body: irrigation
+    instruments: instrument_control
+    instrument: suction
+    rate: 4096.0
+    speed: 5.0
+    spawn_radius: 0.02
+  - type: suction               # the tube's energy (Shift) swallows blood and irrigation within reach
+    fluid: fluid
+    instruments: instrument_control
+    instrument: suction
+  - type: smoke                 # cautery smoke where the energised hook touches fat at coagulation heat
+    instruments: instrument_control
+    contacts: instrument_contact
+    thermal: thermal
+    instrument: hook
+    texture: "${DATA}/textures/smoke1.png"
+  - type: tissue_contact
+    id: liver_gallbladder_contact
+    enabled: false
+    surface: surface
+    surface_part: liver
+    particle_parts: [gallbladder]
+  - type: bounds                # last: the final positional projection of tissue and fluids
+    lower: [-2.0, 0.0, -8.0]
+    upper: [2.0, 10.0, -3.0]
+
+haptics:                        # read by the app only (M11): force feedback on the inputs: devices from the tool_force system, --haptics turns it on
+  enabled: false
+  newtons_per_unit: 0.01        # sim force units -> N at the handle; judged about right on the MiniMou (2026-09-23); the Haptics window (F1) retunes live
+  max_force_n: 0.5              # norm cap after the filter (0 = no output); keep the bench tests at or below 0.5 N
+  handles: {max_force_n: 30.0}  # the jaw load -> the instrument-box handles' force (inherits the rest); 30 N is the strongest safe force on the handle (owner, 2026-09-28)
+
+render:                         # read by the app only; Isaac Lab and headless runs ignore it
+  backend: slang                # noop | slang | gl
+  size: [1920, 1080]
+  env: 0
+  vsync: false
+  exposure: 0.972               # omnisurg examples/chole_tet_case.postprocessing.yaml (authored there, shipped disabled)
+  tonemap: aces                 # none | aces | reinhard
+  post: {ao_enabled: true, ao_intensity: 1.637, ao_radius: 0.013, ao_bias: 0.015, ao_power: 1.608,   # the rest of that file;
+         bloom_enabled: true, bloom_threshold: 0.5, bloom_intensity: 1.783, bloom_radius: 6.182, fxaa_enabled: true}  # render/post.py Post
+  camera: {position: [0.469625, 1.20226, -2.45614], fov: 45.0, pitch: 6.8, yaw: 4.3, up: [0.0, 1.0, 0.0], near: 0.01, far: 100.0}
+  environment: {path: "${DATA}/environments/abdomen.hdr", intensity: 0.84, pitch_degrees: -90.0, rotation_degrees: 0.0, lighting: true}
+  headlight: {color: [1.0, 0.92, 0.78], intensity: 0.59}
+  debug_spheres: false          # collision spheres of the drawn env (toggle with X)
+  tip: {instrument: grasper, distance: 0.0}   # C: a laparoscope view along the grasper's shaft
+  xr:                           # --render xr: the scene in a headset (render/xr.py, docs/xr.md); the camera above anchors the head
+    world_units_per_meter: 1.0  # as omnisurg's chole XR examples
+    runtime: {mode: managed, host_client: true}   # managed: CloudXR started here (isaacteleop) | external: runtime.directory or I4H_CLOUDXR_DIR | system
+                                # host_client: the web client served from this machine (https://<host>:48322/client/); host: the LAN IP the Quest uses (default guessed)
+    mirror: left                # left | right | off: a desktop window showing one eye (and taking the command keys)
+    inputs:                     # the Quest controllers under --render xr (instead of inputs: above): trigger = jaw, A/X = energy,
+      pickup: {distance: 0.15, proxy_radius: 0.05, keys: {primary: "1", secondary: "2"},   # B/Y = fire, thumbstick click = take / put down
+               start: {primary: hook, secondary: grasper}}   # held at the start: right hand the hook, left the grasper
+      primary:   {backend: openxr, settings: {hand: right}}
+      secondary: {backend: openxr, settings: {hand: left}}

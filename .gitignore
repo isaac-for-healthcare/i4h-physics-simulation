@@ -1,0 +1,15 @@
+# Python-generated files and local environments/caches throughout the repo.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.warp_cache/
+.tmp_tests/
+
+# Generated files left at the old simulator path after the move to numerical_sim/.
+/physics_simulation/i4h-sim/build/
+/physics_simulation/i4h-sim/dist/
+/physics_simulation/i4h-sim/wheels/
+/physics_simulation/i4h-sim/FollouDeviceLogs/

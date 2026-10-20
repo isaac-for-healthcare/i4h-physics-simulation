@@ -1,0 +1,54 @@
+# Catheter insertion into a static aorta (omniendo xcath/scenes/aorta.yaml). A 9.55 m Cosserat rod
+# (192 nodes, 5 cm apart) lies along +x from the origin; its root is dragged along that line by the
+# insertion target while the shaft is held on the 6.35 m guide, and the distal part is kept inside the
+# vessel by the mesh containment. Actions (E, 3) are normalised insertion, rotation and tip-bend rates.
+# Z-up, metres; omniendo ran one projection per substep, so substeps 8 and iterations 1 reproduce it.
+sim:
+  device: cuda:0
+  dt: 0.016666667
+  substeps: 8
+  iterations: 1
+  envs: 1
+  gravity: [0.0, 0.0, 0.0]      # omniendo gravity_enabled: false
+
+assets:
+  catheter:
+    type: rod
+    start: [0.0, 0.0, 1.0]
+    direction: [1.0, 0.0, 0.0]
+    count: 192
+    segment_length: 0.05
+    radius: 0.02
+    mass: 1.0                     # per node
+    visual: {color: [0.9, 0.3, 0.2]}
+  aorta:
+    type: vessel_mesh
+    path: "${DATA}/vessels/AortaWithVesselsStatic.usdc"
+    prim: /root/Mesh/Mesh_004
+    scale: 0.01
+    translation: [9.833, 0.111, 0.503]
+    rotation_euler_degrees: [-76.375273, 78.437867, 0.0]
+    visual: {color: [0.6, 0.6, 0.6], cull: back}   # inward-facing: culling the back hides the outside (hide_external_faces)
+
+systems:
+  - type: particles
+    damping: 0.99                 # omniendo linear_damping 0.01 per substep
+  - type: rod_direct              # block-Thomas XPBD Cosserat rod (omniendo solver_backend: block_thomas)
+    id: rod
+    body: catheter
+    torsion: 1.0e9
+    bend: 0.1
+  - type: catheter_control        # root + track + tip_bend constraints of the omniendo scene
+    rod: rod
+    track_length: 6.35
+    tip_edges: 16
+    upper: [6.35, 1.0e9, 1.5]     # insertion stops at the end of the track
+  - type: rod_containment         # after catheter_control: the vessel projection sees the track result
+    body: catheter
+    mesh: aorta
+    search: 0.09                  # omniendo containment.max_distance
+
+render:                           # noop by default; --render slang or gl shows env 0 (Z-up)
+  backend: noop
+  env: 0
+  camera: {position: [9.8, -9.0, 3.0], pitch: -14.8, yaw: 0.0, up: [0.0, 0.0, 1.0], near: 0.05, far: 100.0}   # looks at the aorta from -y

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "i4h-endoluminal"
+version = "0.9.0"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.12,<3.13"
+dependencies = ["i4h-physics[vtu]==0.9.0"]
+
+[project.optional-dependencies]
+assessment = ["i4h-assessment==0.9.0"]  # procedure cases and their measurements
+usd = ["usd-core>=26.3; platform_machine != 'aarch64'",
+                "usd-exchange>=3.0; platform_machine == 'aarch64'"]  # pxr for USD assets outside Isaac Lab; Lab provides its own (usd-exchange), which overlaps
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["i4h_endoluminal*"]
+
+[tool.setuptools.package-data]
+"i4h_endoluminal" = [ "cases/aorta_static.yaml", "cases/aorta_centreline.yaml", "cases/aorta_centreline_reach.yaml", "cases/aorta_shell.yaml", "cases/aorta_shell_reach.yaml", "cases/aorta_static_reach.yaml", "data/instrument_regions.yaml", "data/vascular_templates.yaml"]

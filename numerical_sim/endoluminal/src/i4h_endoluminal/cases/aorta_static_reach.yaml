@@ -1,0 +1,8 @@
+case: aorta_static.yaml
+procedure:
+  type: reach_target
+  tool: catheter
+  target: {position: [9.69, 0.18, 0.38]}
+  radius: 0.1
+  hold: 0.5
+  timeout: 120

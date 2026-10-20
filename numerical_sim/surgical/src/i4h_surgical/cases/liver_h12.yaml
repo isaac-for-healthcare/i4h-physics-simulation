@@ -1,0 +1,52 @@
+# liver.yaml on the TetGen-filled liver (12 mm, 3842 particles: the same surface plus interior nodes;
+# i4h-validation/scripts/refine_liver.py). Best match to converged FEM at the default gains (rel 0.19, E_eff 5.7 kPa).
+# Liver alone at real scale for deformation validation against FEM (FEBio, SOFA; i4h-validation/).
+# The choly-mid liver (the chole_tet_med tet mesh, same tets and edges) scaled by 0.1386 to 1.5 L
+# (25 x 15.5 x 17 cm), centred, Y-up, metres. Hard-pinned (inv_mass 0) by the chole pin sphere mapped
+# into this frame, mass lumped from 1060 kg/m^3, the chole 8 x 8 loop, and one free sphere to push it.
+sim:
+  device: cuda:0
+  dt: 0.016666667
+  substeps: 8
+  iterations: 8
+  envs: 1
+  gravity: [0.0, -9.81, 0.0]
+
+assets:
+  liver:
+    type: tet_vtu
+    path: "${DATA}/liver/liver_h12.vtu"   # i4h-validation/scripts/refine_liver.py
+    density: 1060.0                   # kg/m^3 (Gao et al. 2010)
+    pins:                             # chole_tet_med pin (centre [0.5, 1.5, -5], radius 1) in this frame: 391 particles
+      - {type: sphere, center: [0.043204, 0.049667, -0.161994], radius: 0.138611}
+    parts:
+      liver: {spring: 1.0, volume: 1.0, visual: {set: "${DATA}/textures/liver"}}
+
+instruments:
+  probe:
+    kind: sphere                # one free collision sphere driven by actions[env, 0, :3]
+    radius: 0.00475             # the 9.5 mm hemispherical indenter of Lister et al. 2011
+    initial: {position: [0.0, 0.02, 0.12]}   # in front of the liver (front face z = 0.086); I/K push it in and out
+
+systems:
+  - type: particles
+    max_velocity: 5.0
+  - type: tet
+    body: liver
+  - type: surface
+    tet: tet
+  - type: instrument_control
+  - type: instrument_contact
+    instruments: instrument_control
+    surface: surface
+  - type: tool_force
+    instruments: instrument_control
+    contacts: instrument_contact
+
+render:
+  backend: slang
+  size: [1920, 1080]
+  env: 0
+  camera: {position: [0.0, 0.03, 0.45], fov: 45.0, pitch: -5.0, yaw: 0.0, up: [0.0, 1.0, 0.0], near: 0.005, far: 10.0}
+  environment: {path: "${DATA}/environments/abdomen.hdr", intensity: 0.84, pitch_degrees: -90.0, rotation_degrees: 0.0, lighting: true}
+  headlight: {color: [1.0, 0.92, 0.78], intensity: 0.59}

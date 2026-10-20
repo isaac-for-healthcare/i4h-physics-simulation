@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "i4h-surgical"
+version = "0.9.0"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.12,<3.13"
+dependencies = ["i4h-physics[vtu]==0.9.0"]
+
+[project.optional-dependencies]
+assessment = ["i4h-assessment==0.9.0"]  # procedure cases and their measurements
+usd = ["usd-core>=26.3; platform_machine != 'aarch64'",
+                "usd-exchange>=3.0; platform_machine == 'aarch64'"]  # pxr for USD assets outside Isaac Lab; Lab provides its own (usd-exchange), which overlaps
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["i4h_surgical*"]
+
+[tool.setuptools.package-data]
+"i4h_surgical" = ["cases/chole_grasp.yaml", "cases/chole_tet_med.yaml", "cases/liver.yaml", "cases/liver_h12.yaml", "cases/tissue_contact.yaml", "cases/two_worlds.yaml"]

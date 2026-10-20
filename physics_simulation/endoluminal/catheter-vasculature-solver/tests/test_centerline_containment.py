@@ -3,8 +3,8 @@
 
 """Tests for the centerline Cosserat vessel + tube containment.
 
-These run on CPU so the solver is covered in CI, and additionally on CUDA when
-a device is present (those cases carry the ``gpu`` marker).
+These run on CPU so the containment kernels are covered in CI, and additionally
+on CUDA when a device is present (those cases carry the ``gpu`` marker).
 """
 
 from __future__ import annotations
@@ -321,6 +321,113 @@ def test_locked_vessel_nodes_absorb_no_correction(device):
     _contain(runtime, samples, device)
 
     assert np.allclose(_wall_displacement(runtime)[locked], 0.0, atol=1.0e-9)
+
+
+# ────────────────────────────────────────────────────────── contact diagnostics
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_interior_sample_reports_no_contact(device):
+    """A sample inside the lumen leaves both accumulators at zero."""
+    tree = _chain_tree(radii=0.02)
+    runtime = _runtime(tree, device, collision_iterations=1)
+
+    mid_x = float(tree.positions[len(tree.positions) // 2, 0])
+    _contain(runtime, np.array([[mid_x, 0.001, 0.0]], dtype=np.float32), device)
+
+    assert runtime.contact_depth == 0.0
+    assert runtime.contact_count == 0
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_contact_depth_matches_analytic_penetration(device):
+    """Depth is the tool surface's overshoot past the wall, not axis distance."""
+    radius, catheter_radius, offset = 0.02, 0.002, 0.05
+    tree = _chain_tree(radii=radius)
+    runtime = _runtime(
+        tree, device, catheter_radius=catheter_radius, collision_iterations=1, two_way=False
+    )
+
+    mid_x = float(tree.positions[len(tree.positions) // 2, 0])
+    _contain(runtime, np.array([[mid_x, offset, 0.0]], dtype=np.float32), device)
+
+    expected = offset - (radius - catheter_radius)
+    assert runtime.contact_depth == pytest.approx(expected, abs=1.0e-6)
+    assert runtime.contact_count == 1
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_deeper_penetration_reports_greater_depth(device):
+    tree = _chain_tree(radii=0.02)
+    mid_x = float(tree.positions[len(tree.positions) // 2, 0])
+
+    depths = []
+    for offset in (0.03, 0.06):
+        runtime = _runtime(tree, device, collision_iterations=1)
+        _contain(runtime, np.array([[mid_x, offset, 0.0]], dtype=np.float32), device)
+        depths.append(runtime.contact_depth)
+
+    assert depths[1] > depths[0] > 0.0
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_contact_depth_is_the_maximum_over_samples(device):
+    """Two samples at different depths: the deeper one sets the reported value."""
+    tree = _chain_tree(radii=0.02)
+    runtime = _runtime(tree, device, collision_iterations=1)
+
+    shallow_x = float(tree.positions[2, 0])
+    deep_x = float(tree.positions[5, 0])
+    samples = np.array([[shallow_x, 0.03, 0.0], [deep_x, 0.07, 0.0]], dtype=np.float32)
+    _contain(runtime, samples, device)
+
+    deepest = _runtime(tree, device, collision_iterations=1)
+    _contain(deepest, samples[1:], device)
+
+    assert runtime.contact_depth == pytest.approx(deepest.contact_depth, abs=1.0e-6)
+    assert runtime.contact_count >= 2
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_contact_metrics_reset_between_calls(device):
+    """Metrics describe the latest call, so contact must not leak forward."""
+    tree = _chain_tree(radii=0.02)
+    runtime = _runtime(tree, device, collision_iterations=1)
+    mid_x = float(tree.positions[len(tree.positions) // 2, 0])
+
+    _contain(runtime, np.array([[mid_x, 0.08, 0.0]], dtype=np.float32), device)
+    assert runtime.contact_depth > 0.0
+
+    _contain(runtime, np.array([[mid_x, 0.001, 0.0]], dtype=np.float32), device)
+    assert runtime.contact_depth == 0.0
+    assert runtime.contact_count == 0
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_contact_count_scales_with_collision_iterations(device):
+    """Samples are counted per iteration, which the docstring commits to."""
+    tree = _chain_tree(radii=0.02)
+    mid_x = float(tree.positions[len(tree.positions) // 2, 0])
+    outside = np.array([[mid_x, 0.08, 0.0]], dtype=np.float32)
+
+    single = _runtime(tree, device, collision_iterations=1, catheter_max_delta=1.0e-9)
+    _contain(single, outside, device)
+    triple = _runtime(tree, device, collision_iterations=3, catheter_max_delta=1.0e-9)
+    _contain(triple, outside, device)
+
+    assert single.contact_count == 1
+    assert triple.contact_count == 3
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_contact_buffers_are_single_element_device_arrays(device):
+    """The buffer shape is the contract a batched port would widen."""
+    tree = _chain_tree(radii=0.02)
+    runtime = _runtime(tree, device)
+
+    depth, count = runtime.contact_buffers
+    assert depth.shape == (1,) and count.shape == (1,)
+    assert str(depth.device) == str(runtime.rod.device)
 
 
 @pytest.mark.parametrize("device", DEVICES)

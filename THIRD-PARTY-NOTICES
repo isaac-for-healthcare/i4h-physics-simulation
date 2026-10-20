@@ -28,7 +28,7 @@ In-tree paths include (non-exhaustive):
 
 -------------------------------------------------------------------------------
 Cosmos-H-Dreams (git submodule)
-Path: physics_simulation/cosmos_h_dreams
+Path: neural_sim/cosmos_h_dreams
 URL: https://github.com/isaac-for-healthcare/Cosmos-H-Dreams
 Primary code license: Apache-2.0
 Model weights: NVIDIA Open Model License (see submodule LICENSE / notices)

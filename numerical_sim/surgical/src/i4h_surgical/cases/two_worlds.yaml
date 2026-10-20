@@ -1,0 +1,108 @@
+# Two independent envs with different mesh variants: an elastic tet block hanging from
+# its pinned top layer above a floor, and one kinematic sphere per env driven from the
+# actions array. The env-isolation case for every milestone. Env 0 gets the 4x4x4 grid,
+# env 1 the 3x3x3 grid (padded). Hanging (not resting) keeps every mode restored, so
+# run-to-run atomic noise stays small instead of random-walking along the floor.
+sim:
+  device: cuda:0
+  dt: 0.016666667
+  substeps: 4
+  iterations: 8
+  envs: 2
+  gravity: [0.0, 0.0, -9.81]
+
+assets:
+  block:
+    type: tet_grid
+    dim: [[4, 4, 4], [3, 3, 3]]
+    cell: 0.02
+    origin: [-0.03, -0.03, 0.05]   # the 3x3x3 variant is centred on the probe; the 4x4x4 extends to +0.05
+    fix_top: true
+    parts:
+      block: {spring: 1.0, volume: 1.0, heat: true, deletable: true}   # burnable and cuttable (M4)
+  rod:                          # a short cantilever beside the block (M5): root locked, droops under gravity
+    type: rod
+    start: [0.2, 0.0, 0.2]
+    direction: [1.0, 0.0, 0.0]
+    count: 9
+    segment_length: 0.02
+    radius: 0.004
+    mass: 0.01
+  water:                        # fluid pool (M6): parked particles per env that the emitter brings to life
+    type: fluid
+    count: 256
+    mass: 0.001
+    radius: 0.003               # collision radius (contact shell)
+    interaction_radius: 0.012   # smoothing length
+    rest_distance: 0.006
+    iterations: 4
+    relaxation: 0.5
+    viscosity: 0.01
+    cohesion: 0.03              # holds a dropped blob together on the frictionless floor (0.2 blows it apart)
+    visual: {color: [0.35, 0.35, 0.65], render_radius: 0.006}   # sprite colour and radius (screen-space render)
+
+instruments:
+  probe:
+    kind: sphere                # one free collision sphere driven by actions[env, 0, :3]
+    radius: 0.015               # thinner than the block: a tool wider than the tissue piece it pushes cannot settle
+    initial: {position: [0.0, 0.0, -0.1]}  # parked below the block; scripts raise it into the bottom face from below
+
+systems:
+  - type: particles
+    max_velocity: 5.0           # per-substep motion bound; keeps contact corrections near fixed vertices finite
+  - type: tet
+    body: block
+  - type: surface                # live per-env triangles and the deletion bookkeeping
+    tet: tet
+  - type: rod_pbd                # the cantilever's Cosserat solve (Jacobi PBD; rod_direct's serial sweep costs 2.4 ms here at 32 iterations)
+    body: rod
+  - type: instrument_control
+  - type: instrument_contact
+    instruments: instrument_control
+    surface: surface
+  - type: tool_force             # the reaction the probe feels from the block (M11 haptics): force[env, probe], contact count
+    instruments: instrument_control
+    contacts: instrument_contact
+  - type: cutting                # the probe removes the block tets it touches while actions[env, probe, 9] (fire) is on
+    surface: surface
+    instruments: instrument_control
+    instrument: probe
+  - type: thermal                # the probe's energy (actions[env, probe, 8]) heats the tets it touches; they burn away
+    surface: surface
+    contacts: instrument_contact
+    instruments: instrument_control
+    instrument: probe
+  - type: stretch_breaking       # tets and edges stretched past `threshold` (6x rest) break; tests lower it
+    surface: surface
+  - type: fluid                  # position-based fluid over every fluid pool (water)
+    max_velocity: 1.0            # a substep of travel (4 mm) stays inside the contact shell, so drops do not tunnel
+  - type: emitter                # drips water onto the block from above; rate is per env
+    fluid: fluid
+    body: water
+    position: [0.0, 0.0, 0.25]
+    rate: 200.0
+    speed: 0.0
+  - type: fluid_contact          # water stays outside the block's live skin (one way; a grouped Bvh per env)
+    fluid: fluid
+    surface: surface
+    margin: 0.004                # shell = radius + margin = 7 mm
+  - type: suction                # the probe's energy (actions[env, probe, 8]) pulls water within radius and swallows it within removal_radius
+    fluid: fluid
+    instruments: instrument_control
+    instrument: probe
+    radius: 0.05
+    removal_radius: 0.02
+  - type: smoke                  # cautery smoke where the energised probe touches tissue at coagulation heat
+    instruments: instrument_control
+    contacts: instrument_contact
+    thermal: thermal
+    instrument: probe
+    texture: "${DATA}/textures/smoke1.png"
+  - type: bounds                 # last: the final positional projection of tissue and water (the floor at z 0)
+    lower: [-0.5, -0.5, 0.0]
+    upper: [0.5, 0.5, 1.0]
+
+render:                         # noop by default; --render slang or gl shows env 0 (Z-up)
+  backend: noop
+  env: 0
+  camera: {position: [0.15, -0.2, 0.17], pitch: -18.0, yaw: -37.0, up: [0.0, 0.0, 1.0]}
