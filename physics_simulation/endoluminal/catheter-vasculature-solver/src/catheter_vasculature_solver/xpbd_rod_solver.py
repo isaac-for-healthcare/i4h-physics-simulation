@@ -35,12 +35,15 @@ Usage::
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import numpy as np
 import torch
 import warp as wp
 
+from .host_arrays import to_host, to_host_ids
 from .rod_data import RodConfig
+from .rod_linear_system import RodLinearSystem
 
 __all__ = [
     "XPBDRodSolver",
@@ -672,16 +675,15 @@ def _xr_prepare_compliance(
     i = wp.tid()
     L = rest_lengths[i]
     dt2 = dt * dt
-    eps = 1.0e-10
     bs = bend_stiff[i]
     base = i * 6
     sc = 1.0e-10
     compliance[base + 0] = sc
     compliance[base + 1] = sc
     compliance[base + 2] = sc
-    compliance[base + 3] = 1.0 / (young_mod * bs.x * L * dt2 + eps)
-    compliance[base + 4] = 1.0 / (young_mod * bs.y * L * dt2 + eps)
-    compliance[base + 5] = 1.0 / (torsion_mod * bs.z * L * dt2 + eps)
+    compliance[base + 3] = L / wp.max(4.0 * young_mod * bs.x * dt2, 1.0e-30)
+    compliance[base + 4] = L / wp.max(4.0 * young_mod * bs.y * dt2, 1.0e-30)
+    compliance[base + 5] = L / wp.max(4.0 * torsion_mod * bs.z * dt2, 1.0e-30)
 
 
 @wp.kernel
@@ -1103,6 +1105,19 @@ def _xr_solve_blocks_jacobi(
 
 
 @wp.kernel
+def _xr_select_edge_color(
+    delta_lambda: wp.array(dtype=wp.float32),
+    edges_per_rod: int,
+    color: int,
+):
+    """Keep disjoint edge blocks, with parity restarting for each rod."""
+    dof = wp.tid()
+    local_edge = (dof // 6) % edges_per_rod
+    if local_edge % 2 != color:
+        delta_lambda[dof] = 0.0
+
+
+@wp.kernel
 def _xr_cholesky_solve_tile(
     A: wp.array2d(dtype=wp.float32),
     b: wp.array(dtype=wp.float32),
@@ -1518,6 +1533,51 @@ def _xr_zero_v3(arr: wp.array(dtype=wp.vec3)):
 
 
 @wp.kernel
+def _xr_proximal_reaction(
+    lambda_sum: wp.array(dtype=wp.float32),
+    edges_per_rod: int,
+    inv_dt_sq: float,
+    out_force: wp.array(dtype=wp.vec3),
+):
+    """Reduce edge 0's stretch multipliers into the force the rod transmits proximally.
+
+    The stretch/shear residual is ``(p0 + r0) - (p1 + r1)``, so its Jacobian
+    with respect to ``p0`` is the identity (``jpos`` holds ``+1`` on the first
+    particle and ``-1`` on the second). The constraint force pulling on the
+    proximal particle is therefore ``lambda / dt^2`` with no further
+    contraction. The holder cancels it to keep the particle on its rail, so by
+    Newton's third law the rod loads the holder with that same force, which is
+    what this writes out.
+    """
+    env = wp.tid()
+    base = (env * edges_per_rod) * 6
+    out_force[env] = (
+        wp.vec3(lambda_sum[base + 0], lambda_sum[base + 1], lambda_sum[base + 2]) * inv_dt_sq
+    )
+
+
+@wp.kernel
+def _xr_proximal_wrench(
+    lambda_sum: wp.array(dtype=wp.float32),
+    jacobian_rot: wp.array(dtype=wp.float32),
+    edges_per_rod: int,
+    inv_dt_sq: float,
+    out: wp.array(dtype=wp.spatial_vector),
+):
+    env = wp.tid()
+    edge = env * edges_per_rod
+    moment = wp.vec3(0.0)
+    for axis in range(3):
+        value = float(0.0)
+        for row in range(6):
+            value += jacobian_rot[_xr_jidx(edge, row, axis)] * lambda_sum[edge * 6 + row]
+        moment[axis] = value * inv_dt_sq
+    base = edge * 6
+    force = wp.vec3(lambda_sum[base], lambda_sum[base + 1], lambda_sum[base + 2]) * inv_dt_sq
+    out[env] = wp.spatial_vector(force, moment)
+
+
+@wp.kernel
 def _xr_floor_collision(
     pos: wp.array(dtype=wp.vec3),
     pred: wp.array(dtype=wp.vec3),
@@ -1571,6 +1631,63 @@ def _xr_set_root_orientation_kernel(
 
 
 @wp.kernel
+def _xr_set_root_pose_kernel(
+    pos: wp.array(dtype=wp.vec3),
+    ori: wp.array(dtype=wp.quat),
+    pred_ori: wp.array(dtype=wp.quat),
+    prev_ori: wp.array(dtype=wp.quat),
+    target_pos: wp.array(dtype=wp.vec3),
+    target_ori: wp.array(dtype=wp.quat),
+    active: wp.array(dtype=wp.int32),
+    orient_roots: int,
+    points_per_rod: int,
+    n_envs: int,
+):
+    """Place every rod's root particle on a caller-supplied pose.
+
+    Where ``_xr_proximal_push_kernel`` advances the root along the wire's own
+    tangent by a rate, this puts it somewhere absolutely. That is the
+    difference between a rod fed along a rail and a rod held by something: a
+    rate integrates its own drift, so a root driven by a mount has to be told
+    where the mount actually is on every step.
+
+    Writing the position is the whole of moving it. The root carries zero
+    inverse mass, and ``_xr_predict_pos`` gives every such particle
+    ``vel = 0`` and ``pred = pos`` at the top of each substep, so it teleports
+    rather than travelling: no constraint argues with the new position, and
+    nothing downstream reads a velocity for it. Setting one here would be
+    overwritten before it was read. The rod therefore learns about the mount's
+    motion through the first stretch constraint alone.
+
+    Args:
+        pos: Concatenated particle positions; written at each root.
+        ori: Concatenated orientations, written when *orient_roots* is set.
+        pred_ori: Predicted orientations, likewise.
+        prev_ori: Previous orientations, likewise.
+        target_pos: Per-env target position for the root.
+        target_ori: Per-env target orientation. Read only when *orient_roots*
+            is set; pass any correctly typed array otherwise.
+        active: Per-env command mask; reset environments are skipped.
+        orient_roots: Non-zero to adopt *target_ori*, leaving the root's
+            twist alone when zero.
+        points_per_rod: Particle stride between consecutive rods.
+        n_envs: Number of rods to place.
+    """
+    e = wp.tid()
+    if e >= n_envs or active[e] == 0:
+        return
+
+    r = e * points_per_rod
+    pos[r] = target_pos[e]
+
+    if orient_roots != 0:
+        q = target_ori[e]
+        ori[r] = q
+        pred_ori[r] = q
+        prev_ori[r] = q
+
+
+@wp.kernel
 def _xr_proximal_push_kernel(
     pos: wp.array(dtype=wp.vec3),
     ori: wp.array(dtype=wp.quat),
@@ -1578,15 +1695,21 @@ def _xr_proximal_push_kernel(
     rotate_velocities: wp.array(dtype=wp.float32),
     root_idx: wp.array(dtype=wp.int32),
     next_idx: wp.array(dtype=wp.int32),
+    active: wp.array(dtype=wp.int32),
     dt: float,
     n_envs: int,
 ):
     """GPU proximal push/rotate for one or many environments.
 
     Applies an axial push and an axial twist to each environment's root
-    particle. The axial direction is taken from ``pos[next_idx] - pos[root_idx]``
-    (the first segment tangent), so the controller follows the catheter's
-    current insertion direction.
+    particle. The axial direction is taken from ``pos[next_idx] - pos[root_idx]``,
+    so the controller follows the catheter's current insertion direction.
+
+    How far ahead ``next_idx`` sits decides whether that direction is a local
+    reading or an averaged one. Adjacent, it is the first segment's tangent,
+    which turns with any fold at the root -- and since the push then drives
+    further into the fold, the fold deepens itself. Further along the shaft the
+    same direction is insensitive to that fold. See ``proximal_feed_span``.
 
     Args:
         pos: Concatenated particle positions for all envs (in-place write at root).
@@ -1595,11 +1718,12 @@ def _xr_proximal_push_kernel(
         rotate_velocities: Per-env axial rotation velocity in rad / second.
         root_idx: Per-env global index of the root particle (size n_envs).
         next_idx: Per-env global index of the second particle (size n_envs).
+        active: Per-env command mask; reset environments are skipped.
         dt: Control time step.
         n_envs: Number of environments to update.
     """
     e = wp.tid()
-    if e >= n_envs:
+    if e >= n_envs or active[e] == 0:
         return
 
     r = root_idx[e]
@@ -1814,7 +1938,6 @@ def _xr_prepare_compliance_batched(
     i = wp.tid()
     L = rest_lengths[i]
     dt2 = dt * dt
-    eps = 1.0e-10
     bs = bend_stiff[i]
     rod = edge_rod_id[i]
     E = young_mod[rod]
@@ -1824,9 +1947,9 @@ def _xr_prepare_compliance_batched(
     compliance[base + 0] = sc
     compliance[base + 1] = sc
     compliance[base + 2] = sc
-    compliance[base + 3] = 1.0 / (E * bs.x * L * dt2 + eps)
-    compliance[base + 4] = 1.0 / (E * bs.y * L * dt2 + eps)
-    compliance[base + 5] = 1.0 / (G * bs.z * L * dt2 + eps)
+    compliance[base + 3] = L / wp.max(4.0 * E * bs.x * dt2, 1.0e-30)
+    compliance[base + 4] = L / wp.max(4.0 * E * bs.y * dt2, 1.0e-30)
+    compliance[base + 5] = L / wp.max(4.0 * G * bs.z * dt2, 1.0e-30)
 
 
 @wp.kernel
@@ -2206,7 +2329,9 @@ def _xr_compute_corrections_batched(
         wp.max(wp.max(wp.abs(d0), wp.abs(d1)), wp.max(wp.abs(d2), wp.abs(d3))),
         wp.max(wp.abs(d4), wp.abs(d5)),
     )
-    wp.atomic_max(max_delta_out, 0, local_max)
+    # Per-env slot: a batch-wide maximum cannot say which env diverged, which is
+    # what an RL trainer needs in order to drop or reset just that env.
+    wp.atomic_max(max_delta_out, rod, local_max)
 
     local_max_corr = float(0.0)
 
@@ -2248,7 +2373,96 @@ def _xr_compute_corrections_batched(
         local_max_corr = wp.max(local_max_corr, wp.length(dtheta1))
         wp.atomic_add(rcorr, p1_idx, dtheta1)
 
-    wp.atomic_max(max_correction, 0, local_max_corr)
+    wp.atomic_max(max_correction, rod, local_max_corr)
+
+
+# ============================================================================
+# Selective per-env reset
+# ============================================================================
+#
+# RL resets only the envs that terminated, while the rest keep stepping. These
+# kernels write in place and are driven by a device-resident env-id list, so a
+# reset neither reallocates nor invalidates a captured CUDA graph. The same
+# kernels serve the single-env path, whose workspace exposes the same field
+# names with ``num_envs == 1``.
+
+
+@wp.kernel
+def _xr_reset_particles(
+    env_ids: wp.array(dtype=wp.int32),
+    num_points: int,
+    rest_positions: wp.array(dtype=wp.vec3),
+    rest_orientations: wp.array(dtype=wp.quat),
+    positions: wp.array(dtype=wp.vec3),
+    predicted_positions: wp.array(dtype=wp.vec3),
+    orientations: wp.array(dtype=wp.quat),
+    predicted_orientations: wp.array(dtype=wp.quat),
+    prev_orientations: wp.array(dtype=wp.quat),
+    velocities: wp.array(dtype=wp.vec3),
+    angular_velocities: wp.array(dtype=wp.vec3),
+    forces: wp.array(dtype=wp.vec3),
+    torques: wp.array(dtype=wp.vec3),
+):
+    """Restore rest pose and clear all momentum for the listed envs."""
+    slot, local = wp.tid()
+    i = env_ids[slot] * num_points + local
+    rest_p = rest_positions[i]
+    rest_q = rest_orientations[i]
+    positions[i] = rest_p
+    predicted_positions[i] = rest_p
+    orientations[i] = rest_q
+    predicted_orientations[i] = rest_q
+    prev_orientations[i] = rest_q
+    zero = wp.vec3(0.0, 0.0, 0.0)
+    velocities[i] = zero
+    angular_velocities[i] = zero
+    forces[i] = zero
+    torques[i] = zero
+
+
+@wp.kernel
+def _xr_reset_edges(
+    env_ids: wp.array(dtype=wp.int32),
+    num_edges: int,
+    lambda_sum: wp.array(dtype=wp.float32),
+):
+    """Clear accumulated XPBD multipliers so a reset env does not warm-start."""
+    slot, local = wp.tid()
+    base = (env_ids[slot] * num_edges + local) * 6
+    for k in range(6):
+        lambda_sum[base + k] = 0.0
+
+
+@wp.kernel
+def _xr_reset_controls(
+    env_ids: wp.array(dtype=wp.int32),
+    push_velocities: wp.array(dtype=wp.float32),
+    rotate_velocities: wp.array(dtype=wp.float32),
+    pending_control_mask: wp.array(dtype=wp.int32),
+):
+    """Zero standing proximal actuation for the listed envs."""
+    env = env_ids[wp.tid()]
+    push_velocities[env] = 0.0
+    rotate_velocities[env] = 0.0
+    pending_control_mask[env] = 0
+
+
+@wp.kernel
+def _xr_reset_env_diagnostics(
+    env_ids: wp.array(dtype=wp.int32),
+    max_delta_lambda: wp.array(dtype=wp.float32),
+    max_correction: wp.array(dtype=wp.float32),
+):
+    """Clear residual diagnostics for the listed envs only.
+
+    A reset env has no solve history, so leaving the previous substep's residual
+    in place would make it look like a freshly reset env is still diverging when
+    read between ``reset()`` and the next ``step()``. Scoping the clear to the
+    listed envs keeps continuing envs' residuals readable.
+    """
+    env = env_ids[wp.tid()]
+    max_delta_lambda[env] = 0.0
+    max_correction[env] = 0.0
 
 
 # ============================================================================
@@ -2304,6 +2518,15 @@ class _Workspace:
         self.pos_corrections = wp.zeros(np_, dtype=wp.vec3, device=d)
         self.rot_corrections = wp.zeros(np_, dtype=wp.vec3, device=d)
 
+        # Rest state, captured at construction so reset() needs no reallocation.
+        self.rest_positions = wp.zeros(np_, dtype=wp.vec3, device=d)
+        self.rest_orientations = wp.zeros(np_, dtype=wp.quat, device=d)
+        # Env-id scratch for per-env kernels (reset, root placement). Staged on
+        # the host and copied, so no allocation happens on the hot path.
+        self.env_ids_scratch = wp.zeros(1, dtype=wp.int32, device=d)
+        self.env_ids_host = wp.zeros(1, dtype=wp.int32, device="cpu")
+        self.num_envs = 1
+
         self.inv_inertia_local_diag = wp.vec3(1.0, 1.0, 1.0)
         self.young_modulus: float = 1.0e6
         self.torsion_modulus: float = 1.0e6
@@ -2334,7 +2557,14 @@ class _BatchedWorkspace:
         device: Warp device string (``"cuda"`` or ``"cpu"``).
     """
 
-    def __init__(self, num_envs: int, num_points_per_rod: int, num_edges_per_rod: int, device: str):
+    def __init__(
+        self,
+        num_envs: int,
+        num_points_per_rod: int,
+        num_edges_per_rod: int,
+        device: str,
+        proximal_feed_span: int = 1,
+    ):
         ne_total = num_envs * num_edges_per_rod
         np_total = num_envs * num_points_per_rod
         nd_total = ne_total * 6
@@ -2401,7 +2631,14 @@ class _BatchedWorkspace:
         edge_rod_id_np = np.repeat(np.arange(num_envs, dtype=np.int32), num_edges_per_rod)
         # Per-env root particle indices (for proximal control / orientation set)
         root_idx_np = np.arange(num_envs, dtype=np.int32) * num_points_per_rod
-        next_idx_np = root_idx_np + 1
+        # The partner whose direction from the root becomes the insertion axis.
+        # Adjacent by default, which reads the rod's own tip-ward tangent at the
+        # root and therefore lets a fold there steer the push that deepens it.
+        # Reaching further along the shaft averages over that fold: the
+        # direction to a node tens of millimetres away barely moves when the
+        # first segment kinks, so the feed stops reinforcing it.
+        span = max(1, min(int(proximal_feed_span), num_points_per_rod - 1))
+        next_idx_np = root_idx_np + span
 
         self.rod_offsets = wp.array(rod_offsets_np, dtype=wp.int32, device=d)
         self.edge_offsets = wp.array(edge_offsets_np, dtype=wp.int32, device=d)
@@ -2414,9 +2651,18 @@ class _BatchedWorkspace:
         self.push_velocities = wp.zeros(num_envs, dtype=wp.float32, device=d)
         self.rotate_velocities = wp.zeros(num_envs, dtype=wp.float32, device=d)
 
-        # Diagnostics (written via atomic_max, read via numpy())
-        self.max_delta_lambda = wp.zeros(1, dtype=wp.float32, device=d)
-        self.max_correction = wp.zeros(1, dtype=wp.float32, device=d)
+        # Diagnostics, one slot per env (written via atomic_max, read via numpy())
+        self.max_delta_lambda = wp.zeros(num_envs, dtype=wp.float32, device=d)
+        self.max_correction = wp.zeros(num_envs, dtype=wp.float32, device=d)
+
+        # Rest state, captured at construction so reset() needs no reallocation
+        # and stays valid inside a captured CUDA graph.
+        self.rest_positions = wp.zeros(np_total, dtype=wp.vec3, device=d)
+        self.rest_orientations = wp.zeros(np_total, dtype=wp.quat, device=d)
+        # Env-id scratch for per-env kernels (reset, root placement). Staged on
+        # the host and copied, so no allocation happens on the hot path.
+        self.env_ids_scratch = wp.zeros(max(num_envs, 1), dtype=wp.int32, device=d)
+        self.env_ids_host = wp.zeros(max(num_envs, 1), dtype=wp.int32, device="cpu")
 
 
 # ============================================================================
@@ -2479,6 +2725,7 @@ class XPBDRodSolver:
 
         self._num_points = num_points
         self._num_edges = num_edges
+        self._linear_system = RodLinearSystem(num_edges, self._num_envs, device)
         self._num_substeps = int(sol.num_substeps)
         self._linear_damping = float(mat.damping)
         self._angular_damping = float(mat.damping)
@@ -2521,9 +2768,12 @@ class XPBDRodSolver:
         rest_lengths_np = np.full(num_edges, seg_len, dtype=np.float32)
         rest_darboux_np = np.zeros((num_edges, 3), dtype=np.float32)
         bend_stiff_np = np.zeros((num_edges, 3), dtype=np.float32)
-        bend_stiff_np[:, 0] = bend_coeff
-        bend_stiff_np[:, 1] = bend_coeff
-        bend_stiff_np[:, 2] = twist_coeff
+        # The constraint is Im(conj(q0) q1), i.e. half the relative angle.
+        # Energy = 1/2 * (4 EI/L) * C^2, with I = pi r^4/4 and J = 2I.
+        area_moment = math.pi * r**4 / 4.0
+        bend_stiff_np[:, 0] = bend_coeff * area_moment
+        bend_stiff_np[:, 1] = bend_coeff * area_moment
+        bend_stiff_np[:, 2] = twist_coeff * 2.0 * area_moment
 
         # ---- populate workspace ----
         # Always allocate the single-rod workspace; it provides the canonical
@@ -2543,6 +2793,8 @@ class XPBDRodSolver:
         ws.rest_lengths.assign(wp.array(rest_lengths_np, dtype=wp.float32, device=device))
         ws.rest_darboux.assign(wp.array(rest_darboux_np, dtype=wp.vec3, device=device))
         ws.bend_stiffness.assign(wp.array(bend_stiff_np, dtype=wp.vec3, device=device))
+        ws.rest_positions.assign(wp.array(positions_np, dtype=wp.vec3, device=device))
+        ws.rest_orientations.assign(wp.array(orientations_np, dtype=wp.quat, device=device))
 
         self._ws = ws
         self._device = device
@@ -2550,7 +2802,13 @@ class XPBDRodSolver:
         # Multi-env: build the batched workspace, replicating per-env state.
         self._bws: _BatchedWorkspace | None = None
         if self._num_envs > 1:
-            bws = _BatchedWorkspace(self._num_envs, num_points, num_edges, device)
+            bws = _BatchedWorkspace(
+                self._num_envs,
+                num_points,
+                num_edges,
+                device,
+                proximal_feed_span=getattr(self, "proximal_feed_span", 1),
+            )
 
             # Replicate scalar material params per env
             inv_I_local_np = np.tile(np.array([1.0, 1.0, 1.0], dtype=np.float32), (self._num_envs, 1))
@@ -2582,12 +2840,24 @@ class XPBDRodSolver:
             bws.rest_lengths.assign(wp.array(rest_len_tiled, dtype=wp.float32, device=device))
             bws.rest_darboux.assign(wp.array(rest_dar_tiled, dtype=wp.vec3, device=device))
             bws.bend_stiffness.assign(wp.array(bend_stiff_tiled, dtype=wp.vec3, device=device))
+            bws.rest_positions.assign(wp.array(pos_tiled, dtype=wp.vec3, device=device))
+            bws.rest_orientations.assign(wp.array(ori_tiled, dtype=wp.quat, device=device))
 
             self._bws = bws
+
+        # Proximal control latched by apply_proximal_control*, consumed by step.
+        self._pending_control: tuple[str, Any, Any, float] | None = None
+        # Reset masks commands without modifying caller-owned rate/pose arrays.
+        self._pending_control_mask = wp.ones(self._num_envs, dtype=wp.int32, device=device)
 
         # CUDA graph (lazily captured on first .step() if device supports it)
         self._cuda_graph = None
         self._cuda_graph_dt = None
+        self._cuda_graph_enabled = True
+
+        # Substep duration of the most recent step, needed to turn the
+        # accumulated Lagrange multipliers into forces in proximal_reaction().
+        self._last_sub_dt = 0.0
 
     # ------------------------------------------------------------------ step
     def step(self, dt: float) -> None:
@@ -2600,8 +2870,13 @@ class XPBDRodSolver:
         first time it is run with a given ``dt``; subsequent calls replay the
         graph for ~zero CPU overhead. The capture is invalidated automatically
         if ``dt`` changes or :meth:`reset_cuda_graph` is called explicitly.
+
+        Proximal control latched since the last step is applied here, before the
+        substeps that carry it down the rod.
         """
+        self._flush_pending_control()
         sub_dt = dt / self._num_substeps
+        self._last_sub_dt = float(sub_dt)
 
         if self._can_use_cuda_graph(sub_dt):
             if self._cuda_graph is None or self._cuda_graph_dt != sub_dt:
@@ -2626,6 +2901,8 @@ class XPBDRodSolver:
         Subclasses can override this to disable capture when they inject
         per-step bookkeeping that the graph would skip.
         """
+        if not self._cuda_graph_enabled:
+            return False
         if not str(self._device).startswith("cuda"):
             return False
         return True
@@ -2646,6 +2923,221 @@ class XPBDRodSolver:
         """Drop any cached CUDA graph (call after externally mutating state size)."""
         self._cuda_graph = None
         self._cuda_graph_dt = None
+
+    def set_cuda_graph_enabled(self, enabled: bool) -> None:
+        """Enable or disable this solver's internal CUDA graph capture.
+
+        Disable when an outer runtime already captures the step into its own
+        graph — Isaac Lab's ``NewtonManager`` does this — because CUDA graph
+        capture cannot be nested. Dropping the cached graph on disable keeps a
+        previously captured replay from being reused.
+        """
+        self._cuda_graph_enabled = bool(enabled)
+        if not self._cuda_graph_enabled:
+            self.reset_cuda_graph()
+
+    # ------------------------------------------------------------- coupling
+    def proximal_reaction(self, out: "wp.array | None" = None) -> "wp.array":
+        """Return the force each rod transmits to whatever holds its proximal end.
+
+        This is the quantity a coupled rigid solver needs in order to feel the
+        catheter. The proximal particle is held kinematically — ``lock_root``
+        gives it zero mass — so no momentum accumulates there and its reaction
+        cannot be recovered from a velocity difference. It is carried entirely
+        by the constraints joining it to the next particle, which is what this
+        reads: edge 0's accumulated stretch multipliers, scaled into a force by
+        the substep the multipliers were gathered over.
+
+        The returned force reflects everything the rod did during that substep,
+        including bending, buckling and vessel contact, which is what makes it
+        useful as coupling feedback.
+
+        This compatibility API reports only force. Use :meth:`proximal_wrench`
+        for the rotational Jacobian contraction that also recovers the root's
+        bending and twisting moment.
+
+        Args:
+            out: Optional ``(num_envs,)`` ``wp.vec3`` array to fill. Allocated
+                on demand when omitted.
+
+        Returns:
+            ``(num_envs,)`` array of world-frame forces in newtons.
+
+        Raises:
+            RuntimeError: If called before a step, since the multipliers are
+                zeroed at the start of every substep and carry no force until
+                one has run.
+            ValueError: If *out* has the wrong length.
+        """
+        if self._last_sub_dt <= 0.0:
+            raise RuntimeError(
+                "proximal_reaction() needs a completed step: the Lagrange multipliers it "
+                "reads are zeroed at the start of each substep, so they carry no force until "
+                "at least one substep has run."
+            )
+
+        ws = self._bws if self._bws is not None else self._ws
+        if ws is None:
+            raise RuntimeError("proximal_reaction() needs an initialised rod workspace.")
+
+        edges_per_rod = int(getattr(ws, "num_edges_per_rod", getattr(ws, "num_edges", 0)))
+        if edges_per_rod <= 0:
+            raise RuntimeError("proximal_reaction() needs a rod with at least one edge.")
+
+        if out is None:
+            out = wp.zeros(self._num_envs, dtype=wp.vec3, device=self._device)
+        elif out.shape[0] != self._num_envs:
+            raise ValueError(f"out must hold {self._num_envs} entries, got {out.shape[0]}")
+
+        wp.launch(
+            _xr_proximal_reaction,
+            dim=self._num_envs,
+            inputs=[
+                ws.lambda_sum,
+                edges_per_rod,
+                1.0 / (self._last_sub_dt * self._last_sub_dt),
+                out,
+            ],
+            device=self._device,
+        )
+        return out
+
+    def proximal_wrench(self, out=None):
+        """World force and moment on the holder, about the rod's proximal point.
+
+        Contract the final rotational Jacobian with accumulated multipliers.
+        This includes bend/twist couples and the stretch constraint's local
+        lever arm. Unlike a momentum estimate it works for a pinned root.
+        """
+        if self._last_sub_dt <= 0.0:
+            raise RuntimeError("proximal_wrench() needs a completed step")
+        ws = self._bws if self._bws is not None else self._ws
+        if out is None:
+            out = wp.zeros(self._num_envs, dtype=wp.spatial_vector, device=self._device)
+        if out.shape[0] != self._num_envs:
+            raise ValueError(f"out must hold {self._num_envs} entries")
+        if self._bws is None:
+            wp.launch(_xr_compute_jacobians, dim=self._num_edges, inputs=[
+                ws.orientations, ws.rest_lengths, ws.jacobian_pos, ws.jacobian_rot,
+            ], device=self._device)
+        else:
+            wp.launch(_xr_compute_jacobians_batched, dim=ws.ne_total, inputs=[
+                ws.orientations, ws.rest_lengths, ws.rod_offsets, ws.edge_offsets, ws.edge_rod_id,
+                ws.jacobian_pos, ws.jacobian_rot,
+            ], device=self._device)
+        wp.launch(_xr_proximal_wrench, dim=self._num_envs, inputs=[
+            ws.lambda_sum, ws.jacobian_rot, self._num_edges, 1.0 / self._last_sub_dt**2, out,
+        ], device=self._device)
+        return out
+
+    # ----------------------------------------------------------------- reset
+    def _resolve_env_ids(self, env_ids) -> "np.ndarray":
+        """Validate *env_ids* and return them as a unique, sorted int32 array."""
+        if env_ids is None:
+            return np.arange(self._num_envs, dtype=np.int32)
+        ids = to_host_ids(env_ids)
+        if ids.size == 0:
+            return np.empty(0, dtype=np.int32)
+        if ids.min() < 0 or ids.max() >= self._num_envs:
+            raise IndexError(
+                f"env_ids out of range for num_envs={self._num_envs}: "
+                f"min={int(ids.min())}, max={int(ids.max())}"
+            )
+        # Duplicates would make several threads write the same slot; harmless
+        # here since every write is idempotent, but dropping them keeps the
+        # launch dimension honest.
+        return np.unique(ids).astype(np.int32)
+
+    def _stage_env_ids(self, ws, ids: "np.ndarray") -> "wp.array":
+        """Upload *ids* into the workspace's preallocated env-id scratch.
+
+        Both buffers are sized ``num_envs`` at construction, so a partial
+        selection writes a prefix and the caller launches over that prefix only.
+        """
+        ws.env_ids_host.numpy()[: ids.size] = ids
+        wp.copy(ws.env_ids_scratch, ws.env_ids_host, count=ids.size)
+        return ws.env_ids_scratch
+
+    def reset(self, env_ids=None) -> None:
+        """Restore the listed envs to their rest pose, at rest.
+
+        Positions and orientations return to the construction-time rest state,
+        velocities, angular velocities, forces, torques and accumulated XPBD
+        multipliers are cleared, any standing proximal actuation is zeroed, and
+        the envs' residual diagnostics are cleared so they do not report a stale
+        solve (batched path only — the single-env substep collects no residual).
+        Envs not listed are untouched and keep stepping, including their own
+        diagnostics.
+
+        This is the entry point RL needs: every write is in place into buffers
+        allocated at construction, so a reset cannot invalidate a captured CUDA
+        graph, and it can be called between steps for just the envs that
+        terminated.
+
+        Args:
+            env_ids: Env indices to reset, as an ``np.ndarray``,
+                ``torch.Tensor`` (host or device), ``wp.array`` or sequence.
+                ``None`` resets every env. An empty sequence is a no-op.
+
+        Raises:
+            IndexError: If any id is outside ``[0, num_envs)``.
+        """
+        ids = self._resolve_env_ids(env_ids)
+        if ids.size == 0:
+            return
+
+        # Keep surviving environments' latched command. The reset-controls
+        # kernel masks only the terminated environments out of the next flush.
+        if ids.size == self._num_envs:
+            self._pending_control = None
+
+        ws = self._bws if self._bws is not None else self._ws
+        dev = self._device
+        env_id_view = self._stage_env_ids(ws, ids)
+
+        wp.launch(
+            _xr_reset_particles,
+            dim=(ids.size, self._num_points),
+            inputs=[
+                env_id_view,
+                int(self._num_points),
+                ws.rest_positions,
+                ws.rest_orientations,
+                ws.positions,
+                ws.predicted_positions,
+                ws.orientations,
+                ws.predicted_orientations,
+                ws.prev_orientations,
+                ws.velocities,
+                ws.angular_velocities,
+                ws.forces,
+                ws.torques,
+            ],
+            device=dev,
+        )
+        if self._num_edges > 0:
+            wp.launch(
+                _xr_reset_edges,
+                dim=(ids.size, self._num_edges),
+                inputs=[env_id_view, int(self._num_edges), ws.lambda_sum],
+                device=dev,
+            )
+        # Standing actuation and the residual diagnostics only exist on the
+        # batched workspace: the single-env control path applies its impulse
+        # immediately, and the single-env substep does not collect residuals.
+        if self._bws is not None:
+            wp.launch(
+                _xr_reset_controls,
+                dim=ids.size,
+                inputs=[env_id_view, ws.push_velocities, ws.rotate_velocities, self._pending_control_mask],
+                device=dev,
+            )
+            wp.launch(
+                _xr_reset_env_diagnostics,
+                dim=ids.size,
+                inputs=[env_id_view, ws.max_delta_lambda, ws.max_correction],
+                device=dev,
+            )
 
     def _substep(self, dt: float) -> None:
         ws = self._ws
@@ -2779,7 +3271,7 @@ class XPBDRodSolver:
         """Batched counterpart of :meth:`_post_constraints_hook`.  No-op by default."""
         del bws, dt, dev
 
-    def _project_direct(self, ws: _Workspace, dt: float, dev: str) -> None:
+    def _project_direct(self, ws: _Workspace, dt: float, dev: str, *, edge_color: int = -1) -> None:
         ne = ws.num_edges
         np_ = ws.num_points
 
@@ -2820,7 +3312,9 @@ class XPBDRodSolver:
             device=dev,
         )
 
-        dl = self._solve_system(ws, dt, dev)
+        dl = self._solve_system(ws, dt, dev, local_blocks=edge_color >= 0)
+        if edge_color >= 0:
+            wp.launch(_xr_select_edge_color, dim=ne * 6, inputs=[dl, ne, edge_color], device=dev)
 
         # Two-phase parallel corrections
         wp.launch(_xr_zero_v3, dim=np_, inputs=[ws.pos_corrections], device=dev)
@@ -2857,15 +3351,18 @@ class XPBDRodSolver:
             device=dev,
         )
 
-    def _solve_system(self, ws: _Workspace, dt: float, dev: str) -> "wp.array":
+    def _solve_system(self, ws: _Workspace, dt: float, dev: str, *, local_blocks: bool = False) -> "wp.array":
         """Assemble and solve the linear system, dispatching to the configured backend."""
         ne = ws.num_edges
         n_dofs = ws.n_dofs
 
-        if self._solver_backend == XPBD_DIRECT_SOLVE_SPLIT_THOMAS:
+        if not local_blocks and self._solver_backend == XPBD_DIRECT_SOLVE_BLOCK_THOMAS:
+            return self._linear_system.project(ws)
+
+        if not local_blocks and self._solver_backend == XPBD_DIRECT_SOLVE_SPLIT_THOMAS:
             return self._solve_split_thomas(ws, ne, dev)
 
-        if self._solver_backend == XPBD_DIRECT_SOLVE_BLOCK_JACOBI:
+        if local_blocks or self._solver_backend == XPBD_DIRECT_SOLVE_BLOCK_JACOBI:
             wp.launch(
                 _xr_assemble_jmjt,
                 dim=ne,
@@ -2948,112 +3445,7 @@ class XPBDRodSolver:
             wp.launch(_xr_spbsv_u11_1rhs, dim=1, inputs=[int(n_dofs), ws._ab, ws.rhs], device=dev)
             return ws.rhs
 
-        # Default: block_thomas (with tiled Cholesky for small systems)
-        if n_dofs <= _XPBD_TILE:
-            if ws._A is None:
-                ws._A = wp.zeros((_XPBD_TILE, _XPBD_TILE), dtype=wp.float32, device=dev)
-                ws._rhs_tile = wp.zeros(_XPBD_TILE, dtype=wp.float32, device=dev)
-                ws._dl_tile = wp.zeros(_XPBD_TILE, dtype=wp.float32, device=dev)
-            wp.launch(
-                _xr_zero_2d,
-                dim=_XPBD_TILE * _XPBD_TILE,
-                inputs=[
-                    ws._A,
-                    int(_XPBD_TILE),
-                    int(_XPBD_TILE),
-                ],
-                device=dev,
-            )
-            wp.launch(
-                _xr_assemble_jmjt_dense,
-                dim=ne,
-                inputs=[
-                    ws.jacobian_pos,
-                    ws.jacobian_rot,
-                    ws.compliance,
-                    ws.inv_masses,
-                    ws.inv_inertia,
-                    int(n_dofs),
-                    ws._A,
-                ],
-                device=dev,
-            )
-            wp.launch(
-                _xr_build_rhs,
-                dim=_XPBD_TILE,
-                inputs=[
-                    ws.constraint_values,
-                    ws.compliance,
-                    ws.lambda_sum,
-                    int(n_dofs),
-                    ws._rhs_tile,
-                ],
-                device=dev,
-            )
-            if n_dofs < _XPBD_TILE:
-                wp.launch(
-                    _xr_pad_diagonal,
-                    dim=_XPBD_TILE,
-                    inputs=[
-                        ws._A,
-                        int(n_dofs),
-                        int(_XPBD_TILE),
-                    ],
-                    device=dev,
-                )
-            wp.launch_tiled(
-                _xr_cholesky_solve_tile,
-                dim=[1, 1],
-                inputs=[ws._A, ws._rhs_tile],
-                outputs=[ws._dl_tile],
-                block_dim=_XPBD_BLOCK_DIM,
-                device=dev,
-            )
-            return ws._dl_tile
-
-        # Block Thomas for larger systems
-        wp.launch(
-            _xr_assemble_jmjt,
-            dim=ne,
-            inputs=[
-                ws.jacobian_pos,
-                ws.jacobian_rot,
-                ws.compliance,
-                ws.inv_masses,
-                ws.inv_inertia,
-                int(ne),
-                ws.diag_blocks,
-                ws.offdiag_blocks,
-            ],
-            device=dev,
-        )
-        wp.launch(
-            _xr_build_rhs,
-            dim=n_dofs,
-            inputs=[
-                ws.constraint_values,
-                ws.compliance,
-                ws.lambda_sum,
-                int(n_dofs),
-                ws.rhs,
-            ],
-            device=dev,
-        )
-        wp.launch(
-            _xr_block_thomas,
-            dim=1,
-            inputs=[
-                ws.diag_blocks,
-                ws.offdiag_blocks,
-                ws.rhs,
-                int(ne),
-                ws.c_blocks,
-                ws.d_prime,
-                ws.delta_lambda,
-            ],
-            device=dev,
-        )
-        return ws.delta_lambda
+        raise ValueError(f"Unsupported solver backend: {self._solver_backend}")
 
     def _solve_split_thomas(self, ws: _Workspace, ne: int, dev: str) -> "wp.array":
         """Solve using split 3×3 block Thomas for stretch and Darboux separately."""
@@ -3282,7 +3674,9 @@ class XPBDRodSolver:
             device=dev,
         )
 
-    def _project_direct_batched(self, bws: _BatchedWorkspace, dt: float, dev: str) -> None:
+    def _project_direct_batched(
+        self, bws: _BatchedWorkspace, dt: float, dev: str, *, edge_color: int = -1
+    ) -> None:
         tp = bws.np_total
         total_edges = bws.ne_total
         td = bws.nd_total
@@ -3362,27 +3756,27 @@ class XPBDRodSolver:
             device=dev,
         )
 
-        wp.launch(
-            _xr_block_thomas_batched,
-            dim=bws.num_envs,
-            inputs=[
-                bws.diag_blocks,
-                bws.offdiag_blocks,
-                bws.rhs,
-                bws.edge_offsets,
-                int(bws.num_envs),
-                bws.c_blocks,
-                bws.d_prime,
-                bws.delta_lambda,
-            ],
-            device=dev,
-        )
+        if edge_color >= 0:
+            wp.launch(
+                _xr_solve_blocks_jacobi,
+                dim=total_edges,
+                inputs=[bws.diag_blocks, bws.rhs, bws.delta_lambda, total_edges],
+                device=dev,
+            )
+            wp.launch(
+                _xr_select_edge_color,
+                dim=td,
+                inputs=[bws.delta_lambda, bws.num_edges_per_rod, edge_color],
+                device=dev,
+            )
+        else:
+            self._linear_system.project(bws)
 
         # Two-phase parallel corrections + diagnostic max-|Δλ| and max-correction
         wp.launch(_xr_zero_v3, dim=tp, inputs=[bws.pos_corrections], device=dev)
         wp.launch(_xr_zero_v3, dim=tp, inputs=[bws.rot_corrections], device=dev)
-        wp.launch(_xr_zero_f, dim=1, inputs=[bws.max_delta_lambda], device=dev)
-        wp.launch(_xr_zero_f, dim=1, inputs=[bws.max_correction], device=dev)
+        wp.launch(_xr_zero_f, dim=bws.num_envs, inputs=[bws.max_delta_lambda], device=dev)
+        wp.launch(_xr_zero_f, dim=bws.num_envs, inputs=[bws.max_correction], device=dev)
 
         wp.launch(
             _xr_compute_corrections_batched,
@@ -3426,14 +3820,24 @@ class XPBDRodSolver:
         rotate_velocity: float,
         dt: float,
     ) -> None:
-        """Apply kinematic push/rotate control to the root (proximal) particle.
+        """Latch kinematic push/rotate control for the root (proximal) particle.
 
         The root particle has ``inv_mass = 0`` so the XPBD solver will not move
         it — this kinematic update is the sole controller.
 
+        The command is stored and applied by the next :meth:`step`, not written
+        into the workspace here. Applying it immediately would lose it under
+        Newton, whose solver opens each step by copying its own particle buffer
+        over the rod's; a controller necessarily commands between steps, which
+        is exactly the window that copy overwrites. Latching also makes a
+        command mean the same thing regardless of when in the frame it arrives.
+
+        Only the most recent command survives to the next step, so calling this
+        twice without stepping in between applies the second, not their sum.
+
         This is the **CPU-bridged** path (uses PyTorch + a ``.norm()`` sync).
         For the multi-env case, prefer :meth:`apply_proximal_control_gpu`,
-        which is fully GPU-resident and CUDA-graph capturable.
+        which applies control on the GPU after consuming the Python latch.
 
         Args:
             push_velocity: Insertion speed along the rod axis (m/s).
@@ -3447,7 +3851,29 @@ class XPBDRodSolver:
             rot = np.full(self._num_envs, float(rotate_velocity), dtype=np.float32)
             self.apply_proximal_control_gpu(push, rot, dt)
             return
+        self._pending_control = ("scalar", float(push_velocity), float(rotate_velocity), float(dt))
 
+    def _flush_pending_control(self) -> None:
+        """Apply and clear the latched proximal command, if there is one."""
+        pending = self._pending_control
+        if pending is None:
+            return
+        self._pending_control = None
+        kind, push, rotate, dt = pending
+        if kind == "scalar":
+            self._apply_proximal_control_scalar(push, rotate, dt)
+        elif kind == "pose":
+            self._apply_root_pose(push, rotate, dt)
+        else:
+            self._apply_proximal_control_batched(push, rotate, dt)
+
+    def _apply_proximal_control_scalar(
+        self,
+        push_velocity: float,
+        rotate_velocity: float,
+        dt: float,
+    ) -> None:
+        """Move and twist the single rod's root particle. See :meth:`apply_proximal_control`."""
         pos_torch = wp.to_torch(self._ws.positions)
         ori_torch = wp.to_torch(self._ws.orientations)
 
@@ -3493,24 +3919,36 @@ class XPBDRodSolver:
         rotate_velocities,
         dt: float,
     ) -> None:
-        """Apply per-env push/rotate control fully on the GPU (no CPU sync).
+        """Latch per-env push/rotate control, marshalled entirely on the GPU.
 
-        This is the recommended controller for multi-env training: it issues a
-        single Warp launch over ``num_envs`` threads and is safe to capture
-        inside a CUDA graph.
+        This is the recommended controller for multi-env training: flushing it
+        issues a single Warp launch over ``num_envs`` threads. The Python latch
+        must run eagerly each step; outer CUDA graph replay cannot consume new
+        commands. The solver's internal graph covers only the later substeps.
+
+        As with :meth:`apply_proximal_control`, the command is applied by the
+        next :meth:`step` rather than here, and only the most recent one
+        survives. Inputs are still marshalled and validated on this call, so a
+        mis-shaped array is rejected where the caller can see it rather than at
+        the next step.
 
         Args:
             push_velocities: ``(num_envs,)`` array-like of axial push speeds.
-                Accepts ``np.ndarray``, ``torch.Tensor``, ``wp.array``, or list.
+                Accepts ``np.ndarray``, ``torch.Tensor`` (host or device),
+                ``wp.array``, or list, on the single-env path as well as the
+                batched one.
             rotate_velocities: ``(num_envs,)`` array-like of axial rotation
                 speeds (rad/s).
             dt: Time delta for this control step (seconds).
         """
         # Single-rod fast path: just delegate to the proven CPU-bridged method
-        # so behaviour is bit-for-bit identical to legacy code.
+        # so behaviour is bit-for-bit identical to legacy code. The batched
+        # workspace only exists for num_envs > 1, so a single-env caller lands
+        # here with whatever container it would have passed to the batch, and
+        # the host copy this needs is the one that path avoids.
         if self._bws is None:
-            push_v = float(np.asarray(push_velocities).reshape(-1)[0])
-            rot_v = float(np.asarray(rotate_velocities).reshape(-1)[0])
+            push_v = float(to_host(push_velocities, np.float32).reshape(-1)[0])
+            rot_v = float(to_host(rotate_velocities, np.float32).reshape(-1)[0])
             self.apply_proximal_control(push_v, rot_v, dt)
             return
 
@@ -3519,8 +3957,17 @@ class XPBDRodSolver:
         n = bws.num_envs
 
         # Marshal to wp.array of length num_envs (works for np / torch / list / wp).
+        # These land in the workspace's own command buffers, so latching keeps a
+        # reference rather than a copy and a second command overwrites the first.
         push_arr = self._coerce_per_env_float_array(push_velocities, n, dev, bws.push_velocities)
         rot_arr = self._coerce_per_env_float_array(rotate_velocities, n, dev, bws.rotate_velocities)
+        self._pending_control_mask.fill_(1)
+        self._pending_control = ("batched", push_arr, rot_arr, float(dt))
+
+    def _apply_proximal_control_batched(self, push_arr, rot_arr, dt: float) -> None:
+        """Move and twist every rod's root particle. See :meth:`apply_proximal_control_gpu`."""
+        bws = self._bws
+        n = bws.num_envs
 
         wp.launch(
             _xr_proximal_push_kernel,
@@ -3532,11 +3979,107 @@ class XPBDRodSolver:
                 rot_arr,
                 bws.root_idx,
                 bws.next_idx,
+                self._pending_control_mask,
                 float(dt),
                 int(n),
             ],
-            device=dev,
+            device=self._device,
         )
+
+    def set_root_pose_gpu(self, positions, orientations=None) -> None:
+        """Hold every rod's proximal end at a pose supplied by its mount.
+
+        The alternative to :meth:`apply_proximal_control_gpu`, and a different
+        statement about what is driving the wire. That method feeds the rod at a
+        *rate* along its own tangent, which suits a rail or a roller drive but
+        leaves the root's absolute position to accumulate from integration:
+        whatever the mount does, the root only ever hears about its speed. This
+        method takes the mount's pose directly, so a mount that lags, stalls
+        against a joint limit or is held back by contact stops the wire exactly
+        as much as it stopped itself.
+
+        Latched rather than applied here, matching
+        :meth:`apply_proximal_control_gpu`: the next :meth:`step` consumes it,
+        only the most recent command survives, and one command per step keeps
+        this capturable in a CUDA graph. Latching also means a pose command and
+        a rate command contradict each other, so the last one issued in a step
+        is the one that happens.
+
+        Takes no timestep, unlike the rate commands. A pose is not spent over an
+        interval, and the root cannot carry the velocity one would imply:
+        ``_xr_predict_pos`` zeroes the velocity of every zero-inverse-mass
+        particle at the top of each substep, so the root teleports to where it
+        is put.
+
+        Args:
+            positions: ``(num_envs, 3)`` array-like of world-frame root
+                positions. Accepts numpy, torch (host or device), ``wp.array``
+                or nested sequences.
+            orientations: Optional ``(num_envs, 4)`` array-like of xyzw root
+                orientations. Omit to place the root without dictating its
+                twist, which leaves axial rotation to
+                :meth:`apply_proximal_control_gpu` or to the solve.
+
+        Raises:
+            ValueError: If an input has the wrong shape.
+        """
+        n = self._num_envs
+        pos_arr = self._coerce_per_env_vec3_array(positions, n, "positions")
+        if orientations is None:
+            orient_roots = 0
+            ori_arr = wp.zeros(n, dtype=wp.quat, device=self._device)
+        else:
+            orient_roots = 1
+            ori_arr = self._coerce_per_env_quat_array(orientations, n, "orientations")
+
+        # The latch is shaped for the rate commands, whose fourth slot is a
+        # timestep this path has no use for.
+        self._pending_control_mask.fill_(1)
+        self._pending_control = ("pose", pos_arr, (ori_arr, orient_roots), 0.0)
+
+    def _apply_root_pose(self, pos_arr, orientation, _dt: float) -> None:
+        """Place the roots. See :meth:`set_root_pose_gpu`."""
+        ori_arr, orient_roots = orientation
+        ws = self._bws if self._bws is not None else self._ws
+        # The single-rod workspace has no per-rod stride to speak of; using the
+        # whole particle count keeps root 0 the only root either way.
+        points_per_rod = int(getattr(ws, "num_points_per_rod", self._num_points))
+
+        wp.launch(
+            _xr_set_root_pose_kernel,
+            dim=self._num_envs,
+            inputs=[
+                ws.positions,
+                ws.orientations,
+                ws.predicted_orientations,
+                ws.prev_orientations,
+                pos_arr,
+                ori_arr,
+                self._pending_control_mask,
+                int(orient_roots),
+                points_per_rod,
+                int(self._num_envs),
+            ],
+            device=self._device,
+        )
+
+    def _coerce_per_env_vec3_array(self, values, n: int, name: str) -> "wp.array":
+        """Materialise ``values`` as an ``(n,)`` ``wp.vec3`` device array."""
+        if isinstance(values, wp.array) and values.dtype == wp.vec3 and values.shape[0] == n:
+            return values
+        host = to_host(values, np.float32).reshape(-1, 3)
+        if host.shape[0] != n:
+            raise ValueError(f"{name} must hold {n} entries, got {host.shape[0]}")
+        return wp.array(host, dtype=wp.vec3, device=self._device)
+
+    def _coerce_per_env_quat_array(self, values, n: int, name: str) -> "wp.array":
+        """Materialise ``values`` as an ``(n,)`` ``wp.quat`` device array."""
+        if isinstance(values, wp.array) and values.dtype == wp.quat and values.shape[0] == n:
+            return values
+        host = to_host(values, np.float32).reshape(-1, 4)
+        if host.shape[0] != n:
+            raise ValueError(f"{name} must hold {n} entries, got {host.shape[0]}")
+        return wp.array(host, dtype=wp.quat, device=self._device)
 
     def set_root_orientation(self, env_idx: int, q) -> None:
         """Force the root particle of env ``env_idx`` to orientation ``q``.
@@ -3551,7 +4094,7 @@ class XPBDRodSolver:
         if isinstance(q, wp.quat):
             q_wp = q
         else:
-            q_arr = np.asarray(q, dtype=np.float32).reshape(-1)
+            q_arr = to_host(q, np.float32).reshape(-1)
             if q_arr.size != 4:
                 raise ValueError(f"set_root_orientation expects a 4-vector, got shape {q_arr.shape}")
             q_wp = wp.quat(float(q_arr[0]), float(q_arr[1]), float(q_arr[2]), float(q_arr[3]))
@@ -3596,15 +4139,12 @@ class XPBDRodSolver:
 
         Reuses the workspace ``scratch`` buffer to avoid an alloc per step.
         """
-        if isinstance(values, wp.array):
-            if values.size == n and values.dtype == wp.float32:
-                return values
-            arr_np = values.numpy().astype(np.float32, copy=False).reshape(-1)
-        elif isinstance(values, torch.Tensor):
-            arr_np = values.detach().to("cpu").contiguous().view(-1).numpy().astype(np.float32, copy=False)
-        else:
-            arr_np = np.asarray(values, dtype=np.float32).reshape(-1)
+        # A device array already shaped for the kernel goes straight through;
+        # everything else takes the host round trip.
+        if isinstance(values, wp.array) and values.size == n and values.dtype == wp.float32:
+            return values
 
+        arr_np = to_host(values, np.float32).reshape(-1)
         if arr_np.size == 1 and n > 1:
             arr_np = np.full(n, float(arr_np[0]), dtype=np.float32)
         if arr_np.size != n:
@@ -3626,6 +4166,22 @@ class XPBDRodSolver:
             t = wp.to_torch(self._bws.positions).clone()
             return t.view(self._num_envs, self._num_points, 3)
         return wp.to_torch(self._ws.positions).clone()
+
+    @property
+    def position_array(self) -> "wp.array":
+        """Live Warp view of particle positions — no copy, no reshape.
+
+        Flattened as ``(num_envs * num_points,)`` of ``wp.vec3`` so it can be
+        copied against an external particle buffer (e.g. Newton's
+        ``State.particle_q``) with a single offset. Mutating it mutates solver
+        state; use :attr:`positions` for a safe snapshot.
+        """
+        return self._bws.positions if self._bws is not None else self._ws.positions
+
+    @property
+    def velocity_array(self) -> "wp.array":
+        """Live Warp view of particle velocities, flattened like :attr:`position_array`."""
+        return self._bws.velocities if self._bws is not None else self._ws.velocities
 
     @property
     def orientations(self) -> torch.Tensor:
@@ -3654,6 +4210,11 @@ class XPBDRodSolver:
         return wp.to_torch(self._ws.velocities).clone()
 
     @property
+    def device(self) -> str:
+        """Warp device string the solver's arrays live on."""
+        return self._device
+
+    @property
     def num_points(self) -> int:
         return self._num_points
 
@@ -3668,22 +4229,41 @@ class XPBDRodSolver:
 
     @property
     def max_delta_lambda(self) -> float:
-        """Largest ``|Δλ|`` written by the most recent batched substep.
+        """Largest ``|Δλ|`` across the batch in the most recent substep.
 
-        Useful for monitoring solver convergence in multi-env training.
-        Returns ``0.0`` for the single-env path (diagnostic not collected).
+        Returns ``0.0`` for the single-env path (diagnostic not collected). See
+        :attr:`max_delta_lambda_per_env` to attribute a spike to one env.
         """
         if self._bws is None:
             return 0.0
-        return float(self._bws.max_delta_lambda.numpy()[0])
+        return float(self._bws.max_delta_lambda.numpy().max())
+
+    @property
+    def max_delta_lambda_per_env(self) -> "np.ndarray":
+        """Largest ``|Δλ|`` per env in the most recent substep, shape ``(num_envs,)``.
+
+        A batch-wide maximum cannot say *which* env is struggling, so RL
+        trainers should read this to reset or drop individual envs. Zeros on the
+        single-env path, where the diagnostic is not collected.
+        """
+        if self._bws is None:
+            return np.zeros(self._num_envs, dtype=np.float32)
+        return self._bws.max_delta_lambda.numpy().copy()
 
     @property
     def max_correction(self) -> float:
-        """Largest correction magnitude written by the most recent batched substep.
+        """Largest correction magnitude across the batch in the most recent substep.
 
         Tracks the maximum L2 norm of per-particle position/rotation corrections
         across all edges in the batch. Returns ``0.0`` for the single-env path.
         """
         if self._bws is None:
             return 0.0
-        return float(self._bws.max_correction.numpy()[0])
+        return float(self._bws.max_correction.numpy().max())
+
+    @property
+    def max_correction_per_env(self) -> "np.ndarray":
+        """Largest correction magnitude per env, shape ``(num_envs,)``."""
+        if self._bws is None:
+            return np.zeros(self._num_envs, dtype=np.float32)
+        return self._bws.max_correction.numpy().copy()

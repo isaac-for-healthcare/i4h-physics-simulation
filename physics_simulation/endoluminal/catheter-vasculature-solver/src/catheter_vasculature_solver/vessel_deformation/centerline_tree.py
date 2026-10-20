@@ -175,8 +175,8 @@ def transform_tree(tree: CenterlineTree, vessel: VesselConfig) -> CenterlineTree
     rotation = rotation_matrix_degrees(vessel.transform.rotation_euler_degrees)
     translation = np.asarray(vessel.transform.translation, dtype=np.float32)
     positions = ((tree.positions * scale) @ rotation.T + translation).astype(np.float32)
-    # Circular tubes cannot express anisotropic cross-sections; use the same
-    # conservative convention as the upstream static centerline renderer.
+    # Circular tubes cannot express anisotropic cross-sections, so take the
+    # smallest scale factor: the lumen never ends up wider than authored.
     radii = (tree.radii * float(np.min(scale))).astype(np.float32)
     return CenterlineTree(
         positions, tree.edges.copy(), radii, [p.copy() for p in tree.render_paths],

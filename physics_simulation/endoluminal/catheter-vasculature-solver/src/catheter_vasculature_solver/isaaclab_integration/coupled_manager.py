@@ -1,7 +1,7 @@
 # Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Path B: coupled MJWarp (rigid) + SolverXPBDRod (catheter) NewtonManager."""
+"""Coupled MJWarp (rigid) + XPBD catheter rod ``NewtonManager``."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 
 from isaaclab_newton.physics import NewtonManager
 
-from .rod_builder import register_xpbd_rod_builder_attributes
 from .solver_cfg import CoupledMJWarpXPBDRodSolverCfg, XPBDRodSolverCfg
 from .xpbd_rod_manager import NewtonXPBDRodManager
 
@@ -23,51 +22,57 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
     Mirrors the Isaac Lab MJWarp + VBD coupled-manager pattern:
 
     * Nested configs construct two sub-solvers.
-    * :meth:`_step_solver` owns contact + substep ordering.
-    * Base :class:`~isaaclab_newton.physics.NewtonManager` still owns model
-      lifecycle, Fabric sync, resets, and the outer substep loop.
+    * :meth:`_step_solver` owns contact and substep ordering.
+    * The base :class:`~isaaclab_newton.physics.NewtonManager` still owns model
+      lifecycle, Fabric sync, resets and the outer substep loop.
 
-    Substep algorithm (``coupling_mode="two_way"``)::
+    Substep algorithm::
 
         1. Clear rigid / particle force accumulators
-        2. Run Newton collision pipeline (shared contacts)
-        3. Optional: inject particle→body reactions into body_f
-        4. Step MJWarp rigid solver
-        5. Preserve contacts; clear particle forces written by rigid step
-        6. Step SolverXPBDRod
-        7. Optional: track / vessel containment hooks on particle_q
+        2. Apply the lagged catheter reaction  (two_way only)
+        3. Run Newton collision pipeline (shared contacts)
+        4. Step MJWarp rigid solver     (state_0 → state_1)
+        5. Step the catheter particles   (state_0 → state_1)
+        6. Harvest the catheter reaction      (two_way only)
 
-    Class-level slots (in addition to NewtonManager)::
+    Steps 2 and 6 form the relaxed lagged fixed point that Newton's own
+    coupled-solver framework uses for proxy coupling; see
+    :mod:`~catheter_vasculature_solver.isaaclab_integration.proxy_coupling` for
+    where this follows it and where it departs.
 
-        _rigid_solver  – MJWarp / SolverMuJoCo instance
-        _rod_solver    – SolverXPBDRod instance
-        _coupling_mode – \"one_way\" | \"two_way\"
-        _rod_solver_cfg / _coupled_cfg – retained configs for hooks
+    Vessel containment and track guidance need no step here: they run inside the
+    rod solver's own kernels. Scenes supply the vessel mesh or centerline
+    runtime by handing a configured rod to
+    :meth:`~catheter_vasculature_solver.isaaclab_integration.xpbd_rod_manager.NewtonXPBDRodManager.register_rod`.
     """
 
     _rigid_solver: Any = None
     _rod_solver: Any = None
+    _coupler: Any = None
     _coupling_mode: str = "one_way"
     _coupled_cfg: CoupledMJWarpXPBDRodSolverCfg | None = None
     _rod_solver_cfg: XPBDRodSolverCfg | None = None
-
-    # Optional GPU buffers registered by the env for catheter-style hooks
-    _track_start: Any = None
-    _track_dir: Any = None
-    _track_length: float = 0.0
-    _vessel_mesh: Any = None
+    #: Label of the resolved drive body, kept for the debug report.
+    _drive_body_label: str | None = None
+    #: Steps between coupling reports, or ``None`` when the diagnostic is off.
+    _coupling_debug_interval: int | None = None
+    _coupling_debug_steps: int = 0
 
     @classmethod
     def _register_builder_attributes(cls, builder) -> None:
-        register_xpbd_rod_builder_attributes(builder)
-        # If MJWarp also registers attrs via its manager, call that path too.
+        """Forward builder attribute registration to the rigid manager.
+
+        The rod itself registers nothing: it needs no Newton custom attributes,
+        because rod orientations and constraint topology stay inside its own
+        solver rather than on the Newton model.
+        """
         rigid_mgr = cls._resolve_rigid_manager_type()
         if rigid_mgr is not None and hasattr(rigid_mgr, "_register_builder_attributes"):
             rigid_mgr._register_builder_attributes(builder)
 
     @classmethod
     def _resolve_rigid_manager_type(cls):
-        """Return NewtonMJWarpManager class if importable."""
+        """Return the ``NewtonMJWarpManager`` class if importable."""
         try:
             from isaaclab_newton.physics import NewtonMJWarpManager
 
@@ -82,18 +87,16 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
 
     @classmethod
     def _build_rigid_solver(cls, model: "Model", rigid_cfg) -> Any:
-        """Build MJWarp solver via the in-tree manager when possible."""
+        """Build the MJWarp solver via the in-tree manager when possible."""
         rigid_mgr = cls._resolve_rigid_manager_type()
         if rigid_mgr is not None and hasattr(rigid_mgr, "build_nested_solver"):
             return rigid_mgr.build_nested_solver(model, rigid_cfg)
 
-        # Fallback: construct SolverMuJoCo directly from common cfg fields.
         try:
             from newton.solvers import SolverMuJoCo
         except ImportError as e:
             raise ImportError(
-                "Coupled Path B needs SolverMuJoCo (MJWarp) for the rigid half. "
-                f"Original error: {e}"
+                f"The coupled manager needs SolverMuJoCo (MJWarp) for the rigid half. Original error: {e}"
             ) from e
 
         kwargs: dict[str, Any] = {}
@@ -103,46 +106,162 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         return SolverMuJoCo(model, **kwargs)
 
     @classmethod
+    def _resolve_drive_body_name(cls, name: str, bodies_per_env: int) -> int:
+        """Turn a drive-body name into its per-env index.
+
+        ``Model`` drops body names, so this reads them off the ``ModelBuilder``
+        that produced it. IsaacLab finalizes the builder before building the
+        solver but keeps holding it, so the labels are still there; a caller
+        without one has to fall back to ``drive_body_index``.
+        """
+        from .proxy_coupling import resolve_drive_body_index
+
+        builder = getattr(NewtonManager, "_builder", None)
+        labels = getattr(builder, "body_label", None) if builder is not None else None
+        if not labels:
+            raise RuntimeError(
+                f"cannot resolve drive_body_name={name!r}: body names live on the Newton "
+                "ModelBuilder, which is unavailable here, and the finalized Model does not "
+                "carry them. Set drive_body_index instead."
+            )
+        index = resolve_drive_body_index(labels, name, bodies_per_env)
+        cls._drive_body_label = str(list(labels)[index])
+        return index
+
+    @classmethod
+    def _build_coupler(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg):
+        """Build the drive-reaction coupler for ``coupling_mode='two_way'``.
+
+        The reaction has to land on a body, so a two-way scene must identify the
+        one holding the catheter's proximal end, by name or by index. That index
+        is given per env and replicated here, which assumes Newton replicated
+        the bodies uniformly across envs.
+        """
+        drive_index = solver_cfg.drive_body_index
+        drive_name = getattr(solver_cfg, "drive_body_name", None)
+        if drive_index is None and drive_name is None:
+            raise ValueError(
+                "coupling_mode='two_way' needs drive_body_name or drive_body_index: the "
+                "catheter's reaction is transmitted through whichever rigid body holds its "
+                "proximal end, and there is nothing to push on until that body is named. Use "
+                "'one_way' for a scene where rigid bodies drive the catheter without feeling "
+                "it back."
+            )
+        if drive_index is not None and drive_name is not None:
+            raise ValueError(
+                f"drive_body_name={drive_name!r} and drive_body_index={drive_index} are both "
+                "set, so the intended drive body is ambiguous. Give exactly one."
+            )
+
+        particle_range = NewtonXPBDRodManager._require_particle_range()
+        num_envs = int(particle_range.num_envs)
+        body_count = int(model.body_count)
+
+        if body_count % num_envs:
+            raise ValueError(
+                f"Cannot map the drive body across envs: the model has {body_count} bodies, "
+                f"which is not a multiple of {num_envs} envs, so per-env body replication "
+                "cannot be inferred. Build the scene with a uniform body set per env."
+            )
+        bodies_per_env = body_count // num_envs
+
+        if drive_name is not None:
+            drive_index = cls._resolve_drive_body_name(str(drive_name), bodies_per_env)
+
+        if not 0 <= int(drive_index) < bodies_per_env:
+            raise IndexError(
+                f"drive_body_index={drive_index} is out of range: each env owns "
+                f"{bodies_per_env} bodies, so it must be indexed within a single env."
+            )
+
+        if int(particle_range.count) % num_envs:
+            raise ValueError(
+                f"Rod particle range holds {particle_range.count} particles across {num_envs} "
+                "envs, which is not a whole number per rod."
+            )
+
+        from .proxy_coupling import DriveReactionCoupler, debug_log_interval
+
+        coupler = DriveReactionCoupler(
+            body_count=body_count,
+            num_envs=num_envs,
+            root_offset=int(particle_range.offset),
+            root_stride=int(particle_range.count) // num_envs,
+            drive_bodies=[int(drive_index) + env * bodies_per_env for env in range(num_envs)],
+            mount_local=[tuple(solver_cfg.drive_mount_local)] * num_envs,
+            body_com=model.body_com,
+            relaxation=float(solver_cfg.drive_reaction_relaxation),
+            device=getattr(model, "device", None),
+        )
+
+        cls._coupling_debug_interval = debug_log_interval()
+        cls._coupling_debug_steps = 0
+        if cls._coupling_debug_interval is not None:
+            print(
+                f"[coupling] two-way drive body {cls._drive_body_label or drive_index} "
+                f"(per-env index {int(drive_index)} of {bodies_per_env}), "
+                f"relaxation={float(solver_cfg.drive_reaction_relaxation)}, "
+                f"{num_envs} env(s)",
+                flush=True,
+            )
+        return coupler
+
+    @classmethod
     def _build_solver(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg) -> None:
-        NewtonManager._coupled_cfg = solver_cfg  # type: ignore[attr-defined]
+        NewtonXPBDRodManager._reject_cuda_graph_capture(getattr(cls, "_cfg", None))
         cls._coupled_cfg = solver_cfg
         cls._rod_solver_cfg = solver_cfg.rod_solver_cfg
         cls._coupling_mode = str(solver_cfg.coupling_mode)
 
         cls._rigid_solver = cls._build_rigid_solver(model, solver_cfg.rigid_solver_cfg)
         cls._rod_solver = NewtonXPBDRodManager.build_nested_solver(model, solver_cfg.rod_solver_cfg)
+        cls._coupler = (
+            cls._build_coupler(model, solver_cfg) if cls._coupling_mode == "two_way" else None
+        )
 
-        # Expose the rod solver as the primary _solver for diagnostics / Fabric
-        # readers that expect a single handle; stepping uses _step_solver.
+        # Expose the rod solver as the primary handle for diagnostics / Fabric
+        # readers that expect one solver; stepping goes through _step_solver.
         NewtonManager._solver = cls._rod_solver
         NewtonManager._use_single_state = False
+        # Rigid bodies need Newton contacts even though the rod does not.
         NewtonManager._needs_collision_pipeline = True
 
-        # Stash class-level copies for _step_solver (base reads NewtonManager.*)
+        # Stash class-level copies where the base class looks for them.
         NewtonManager._rigid_solver = cls._rigid_solver  # type: ignore[attr-defined]
         NewtonManager._rod_solver = cls._rod_solver  # type: ignore[attr-defined]
+        NewtonManager._coupler = cls._coupler  # type: ignore[attr-defined]
         NewtonManager._coupling_mode = cls._coupling_mode  # type: ignore[attr-defined]
 
     @classmethod
     def _clear_force_buffers(cls, state) -> None:
         """Zero particle / body force accumulators when present."""
         for name in ("particle_f", "body_f", "joint_f"):
-            buf = getattr(state, name, None)
-            if buf is not None and hasattr(buf, "zero_"):
-                buf.zero_()
-            elif buf is not None and hasattr(buf, "fill_"):
-                buf.fill_(0)
+            buffer = getattr(state, name, None)
+            if buffer is None:
+                continue
+            if hasattr(buffer, "zero_"):
+                buffer.zero_()
+            elif hasattr(buffer, "fill_"):
+                buffer.fill_(0)
 
     @classmethod
     def _apply_soft_to_rigid_reactions(cls, contacts, state) -> None:
-        """Inject particle–body contact reactions into ``body_f`` (two-way).
+        """Inject the catheter's proximal reaction into ``body_f`` (two-way).
 
-        Concrete impulse mapping depends on the Newton contact buffer layout
-        in your Lab/Newton revision. Override this in a subclass or fill in
-        once your contact schema is fixed; default is a no-op placeholder so
-        one_way coupling still runs.
+        Applies the wrench harvested by the previous substep, so the rigid
+        solver feels the catheter's stiffness, buckling and vessel contact. A
+        lagged pass rather than a simultaneous solve, matching the proxy path in
+        Newton's coupled-solver framework.
+
+        ``contacts`` is unused: the reaction is transmitted through the rod's own
+        constraints at the drive point rather than through Newton's contact
+        buffers, which the rod solver does not read.
         """
-        del contacts, state
+        del contacts
+        coupler = cls._coupler or getattr(NewtonManager, "_coupler", None)
+        if coupler is None:
+            return
+        coupler.apply(state)
 
     @classmethod
     def _run_collision_pipeline(cls, state_0, state_1, control) -> Any:
@@ -151,52 +270,23 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         contacts = getattr(NewtonManager, "_contacts", None)
         if pipeline is None:
             return contacts
-        # API varies slightly across Lab revisions; prefer a step() / collide().
+        # The API varies slightly across Lab revisions; prefer step() then collide().
         if hasattr(pipeline, "step"):
             return pipeline.step(state_0, state_1, control, contacts)
         if hasattr(pipeline, "collide"):
-            # collide() fills the contacts buffer in place and returns nothing.
+            # ``CollisionPipeline.collide(state, contacts)``. The pipeline is
+            # constructed from the model and holds its own reference, so passing
+            # the model again shifts every argument by one and raises TypeError
+            # before any coupled step can run. Isaac Lab's own NewtonManager
+            # calls it the same way. It fills the buffer in place and returns
+            # nothing, so hand back the buffer rather than the call's result.
             pipeline.collide(state_0, contacts)
             return contacts
         return contacts
 
     @classmethod
-    def _apply_post_rod_hooks(cls, state) -> None:
-        """Optional track / vessel hooks after the rod substep.
-
-        Register buffers via :meth:`register_vessel_track` from the env.
-        Full vessel SDF kernels stay in :class:`CathRodSolver`; this hook is
-        the integration seam for Path B.
-        """
-        cfg = cls._coupled_cfg
-        if cfg is None:
-            return
-        if cfg.apply_track_guidance and cls._track_start is not None:
-            # Env-specific: project non-tip particles onto the insertion axis.
-            # Left as an extension point — call into the solver kernels when wired.
-            pass
-        if cfg.apply_vessel_containment_hooks and cls._vessel_mesh is not None:
-            pass
-        del state
-
-    @classmethod
-    def register_vessel_track(
-        cls,
-        *,
-        track_start=None,
-        track_dir=None,
-        track_length: float = 0.0,
-        vessel_mesh=None,
-    ) -> None:
-        """Attach vessel mesh / insertion track for optional post-step hooks."""
-        cls._track_start = track_start
-        cls._track_dir = track_dir
-        cls._track_length = float(track_length)
-        cls._vessel_mesh = vessel_mesh
-
-    @classmethod
     def _step_solver(cls, state_0, state_1, control, contacts, substep_dt: float) -> None:
-        """One coupled substep: contacts → rigid → rod (+ optional hooks)."""
+        """One coupled substep: contacts, then rigid, then rod."""
         rigid = cls._rigid_solver or getattr(NewtonManager, "_rigid_solver", None)
         rod = cls._rod_solver or getattr(NewtonManager, "_rod_solver", None)
         if rigid is None or rod is None:
@@ -205,60 +295,95 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
                 "Ensure _build_solver ran during NewtonManager.initialize()."
             )
 
-        mode = cls._coupling_mode
-        if contacts is None:
-            contacts = getattr(NewtonManager, "_contacts", None)
-
-        # 1) Clear force accumulators on the input state.
         cls._clear_force_buffers(state_0)
-
-        # 2) Shared Newton collision pass.
+        # Feedback from the previous substep has to land after the clear and
+        # before the rigid solve, or it would be zeroed before anything read it.
+        cls._apply_soft_to_rigid_reactions(contacts, state_0)
         contacts = cls._run_collision_pipeline(state_0, state_1, control) or contacts
 
-        # 3) Soft → rigid reactions (two-way only).
-        if mode == "two_way":
-            cls._apply_soft_to_rigid_reactions(contacts, state_0)
-
-        # 4) Advance rigid solver (MJWarp).
         rigid.step(state_0, state_1, control, contacts, substep_dt)
+        # MJWarp writes bodies and joints but leaves output particles untouched.
+        # Read the current particles, then publish only the rod's particle slice
+        # into the output, preserving the rigid solver's body and joint results.
+        rod.step(state_0, state_1, control, contacts, substep_dt)
 
-        # 5) Preserve contacts; clear particle forces written during rigid step.
-        if hasattr(state_1, "particle_f") and state_1.particle_f is not None:
-            if hasattr(state_1.particle_f, "zero_"):
-                state_1.particle_f.zero_()
+        coupler = cls._coupler or getattr(NewtonManager, "_coupler", None)
+        if coupler is not None:
+            coupler.harvest(state_1, rod.rod)
 
-        # 6) Advance catheter rod (SolverXPBDRod).
-        # Swap convention: rigid wrote into state_1; rod reads state_1 → state_0
-        # then we leave state_0 as the latest (matches double-buffer ping-pong
-        # used by NewtonManager when _use_single_state is False — the base
-        # loop typically swaps after _step_solver; keep both buffers updated).
-        rod.step(state_1, state_0, control, contacts, substep_dt)
+    @classmethod
+    def _log_solver_debug(cls) -> None:
+        """Report what the catheter is doing to its holder, when asked to.
 
-        # Copy rod-updated particle state back so Fabric sees one coherent state.
-        # Many Lab revisions treat state_1 as the next write target; re-sync
-        # particle_q/qd if both buffers exist.
-        if hasattr(state_0, "particle_q") and hasattr(state_1, "particle_q"):
-            if state_0.particle_q is not None and state_1.particle_q is not None:
-                state_1.particle_q.assign(state_0.particle_q)
-            if (
-                getattr(state_0, "particle_qd", None) is not None
-                and getattr(state_1, "particle_qd", None) is not None
-            ):
-                state_1.particle_qd.assign(state_0.particle_qd)
+        Fires once per env step rather than per substep, and only when
+        ``I4H_COUPLING_DEBUG`` is set, because reading the wrench back
+        synchronises with the device.
 
-        # 7) Optional catheter-style post hooks.
-        cls._apply_post_rod_hooks(state_1)
+        The force is the whole point of two-way coupling: it should sit near the
+        catheter's weight while the wire hangs free and rise along the insertion
+        axis as the tip loads against the vessel. A number that grows without
+        settling means the lagged feedback is ringing, which is what
+        ``drive_reaction_relaxation`` below 1 is for.
+        """
+        interval = cls._coupling_debug_interval
+        if interval is None:
+            return
+        coupler = cls._coupler or getattr(NewtonManager, "_coupler", None)
+        if coupler is None:
+            return
+
+        cls._coupling_debug_steps += 1
+        if (cls._coupling_debug_steps - 1) % interval:
+            return
+
+        body, force, torque = coupler.report()
+        print(
+            f"[coupling] step {cls._coupling_debug_steps} body {body} "
+            f"force={force} torque={torque}",
+            flush=True,
+        )
+
+    @classmethod
+    def reset_rod(cls, world_mask=None) -> None:
+        """Reset rod state and selected coupling history at an episode boundary.
+
+        ``world_mask`` has one entry per environment; ``None`` resets all.
+        This is the explicit scene entry point on Isaac Lab ffff603. Body and
+        joint poses remain those authored by the scene's rigid reset path.
+        """
+        rod = cls._rod_solver or getattr(NewtonManager, "_rod_solver", None)
+        if rod is None:
+            raise RuntimeError("The coupled solvers must be built before reset_rod().")
+        state = cls.get_state_0()
+        if state is None:
+            raise RuntimeError("Newton state must be initialized before reset_rod().")
+        rod.reset(state, world_mask=world_mask, flags=0)
+        rigid = cls._rigid_solver or getattr(NewtonManager, "_rigid_solver", None)
+        reset_rigid = getattr(rigid, "reset", None)
+        if reset_rigid is not None:
+            reset_rigid(state, world_mask=world_mask, flags=0)
+        coupler = cls._coupler or getattr(NewtonManager, "_coupler", None)
+        if coupler is not None:
+            coupler.reset(world_mask=world_mask)
+
+    @classmethod
+    def _reset_solver_internals(cls, world_mask) -> None:
+        """Extend newer Isaac Lab's reset boundary to both solvers and feedback."""
+        if world_mask is not None:
+            cls.reset_rod(world_mask)
 
     @classmethod
     def _solver_specific_clear(cls) -> None:
         cls._rigid_solver = None
         cls._rod_solver = None
+        cls._coupler = None
         cls._coupled_cfg = None
         cls._rod_solver_cfg = None
-        cls._track_start = None
-        cls._track_dir = None
-        cls._vessel_mesh = None
-        for attr in ("_rigid_solver", "_rod_solver", "_coupling_mode"):
+        cls._drive_body_label = None
+        cls._coupling_debug_interval = None
+        cls._coupling_debug_steps = 0
+        NewtonXPBDRodManager._solver_specific_clear()
+        for attr in ("_rigid_solver", "_rod_solver", "_coupler", "_coupling_mode"):
             if hasattr(NewtonManager, attr):
                 setattr(NewtonManager, attr, None)
 

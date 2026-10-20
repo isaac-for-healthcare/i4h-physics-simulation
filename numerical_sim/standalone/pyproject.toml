@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "i4h-standalone"
+version = "0.9.0"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.12,<3.13"
+dependencies = ["i4h-physics==0.9.0", "i4h-assessment==0.9.0", "i4h-surgical==0.9.0", "i4h-endoluminal==0.9.0", "i4h-isaaclab==0.9.0"]
+
+[project.optional-dependencies]
+usd = ["i4h-surgical[usd]==0.9.0", "i4h-endoluminal[usd]==0.9.0"]  # outside Isaac Lab
+render = ["slangpy==0.43.1", "pillow>=10.0"]
+gl = ["pyglet>=2.1.13", "imgui-bundle>=1.92.801"]
+xr = ["pillow>=10.0", "pyopenxr==1.1.5301", "isaacteleop[cloudxr]==1.4.145"]
+
+[project.scripts]
+i4h-sim = "i4h_standalone.app.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["i4h_standalone*"]
+
+[tool.setuptools.package-data]
+"i4h_standalone" = ["render/shaders/*.slang"]
+
+[tool.uv]
+conflicts = [[{extra = "render"}, {extra = "xr"}]]

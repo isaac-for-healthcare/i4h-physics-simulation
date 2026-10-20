@@ -1,0 +1,8 @@
+case: aorta_centreline.yaml
+procedure:
+  type: reach_target
+  tool: catheter
+  target: {position: [7.36, 0.17, 0.9]}   # aorta_shell_reach's target; 0.016 from the tree, inside the lumen
+  radius: 0.1
+  hold: 0.5
+  timeout: 120

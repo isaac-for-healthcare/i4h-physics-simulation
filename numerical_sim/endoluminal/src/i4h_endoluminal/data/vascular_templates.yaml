@@ -1,0 +1,7 @@
+# Neutral editing templates. These PBD coefficients are uncalibrated.
+schema_version: 1
+templates:
+  aortic: {stretch: 1.0, bend: 1.0, twist: 1.0}
+  coronary: {stretch: 1.0, bend: 1.0, twist: 1.0}
+  cerebral: {stretch: 1.0, bend: 1.0, twist: 1.0}
+  peripheral: {stretch: 1.0, bend: 1.0, twist: 1.0}

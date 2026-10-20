@@ -1,0 +1,41 @@
+[project]
+name = "i4h-numerical-workspace"
+version = "0.9.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["i4h-physics==0.9.0", "i4h-isaaclab==0.9.0", "i4h-standalone==0.9.0", "i4h-endoluminal==0.9.0", "i4h-surgical==0.9.0", "i4h-assessment==0.9.0",
+                "usd-core>=26.3; platform_machine != 'aarch64'",
+                "usd-exchange>=3.0; platform_machine == 'aarch64'"]  # the workspace runs outside Isaac Lab
+
+[project.optional-dependencies]
+render = ["i4h-standalone[render]==0.9.0"]
+gl = ["i4h-standalone[gl]==0.9.0"]
+xr = ["i4h-standalone[xr]==0.9.0"]
+vtu = ["i4h-physics[vtu]==0.9.0"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff==0.4.7"]  # ruff: the .pre-commit-config.yaml rev
+
+[tool.uv]
+package = false
+conflicts = [[{extra = "render"}, {extra = "xr"}]]
+
+[tool.uv.workspace]
+members = ["physics", "isaaclab", "standalone", "endoluminal", "surgical", "assessment"]
+
+[tool.uv.sources]
+i4h-physics = {workspace = true}
+i4h-isaaclab = {workspace = true}
+i4h-standalone = {workspace = true}
+i4h-endoluminal = {workspace = true}
+i4h-surgical = {workspace = true}
+i4h-assessment = {workspace = true}
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/runtime", "tests/packages"]

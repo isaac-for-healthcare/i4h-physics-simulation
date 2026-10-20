@@ -59,6 +59,9 @@ def _config(num_segments: int = NUM_SEGMENTS):
     cfg.geometry.num_segments = num_segments
     cfg.geometry.segment_length = SEGMENT_LENGTH
     cfg.solver.newton_iterations = 4
+    # Isolate wall-induced deflection. With physical EI the free cantilever
+    # sags under gravity; the former oversized stiffness concealed that load.
+    cfg.solver.gravity = (0.0, 0.0, 0.0)
     return cfg
 
 
@@ -231,6 +234,60 @@ def test_invalid_centerline_stage_is_rejected():
         solver.set_centerline_runtime(_runtime(), stage="sometimes")
 
 
+# ────────────────────────────────────────────────────────── contact reporting
+
+
+def test_solver_reports_no_contact_without_a_vessel():
+    cfg = _config()
+    solver = _solver(cfg, None)
+    for _ in range(10):
+        solver.step(cfg.solver.dt)
+
+    assert solver.contact_depth == 0.0
+    assert solver.contact_count == 0
+
+
+def test_solver_reports_contact_while_following_a_bend():
+    """The wall that deflects the tool is also what the penalty term should see."""
+    cfg = _config()
+    runtime = _runtime(two_way=False)
+    solver = _solver(cfg, runtime)
+    touched_wall = False
+    for _ in range(SETTLE_STEPS):
+        solver.step(cfg.solver.dt)
+        assert solver.contact_depth == runtime.contact_depth
+        if solver.contact_depth > 0.0:
+            assert solver.contact_count > 0
+            touched_wall = True
+    # Contact is transient: the deflected rod can move into the lumen interior.
+    assert touched_wall
+
+
+def test_solver_contact_clears_when_the_vessel_is_detached():
+    cfg = _config()
+    solver = _solver(cfg, _runtime(two_way=False))
+    for _ in range(SETTLE_STEPS):
+        solver.step(cfg.solver.dt)
+        if solver.contact_depth > 0.0:
+            break
+    assert solver.contact_depth > 0.0
+
+    solver.set_centerline_runtime(None)
+    assert solver.contact_depth == 0.0
+    assert solver.contact_count == 0
+
+
+def test_disabled_containment_reports_no_contact():
+    """Containment off means no corrections, so nothing should be recorded."""
+    cfg = _config()
+    solver = _solver(cfg, _runtime(two_way=False), centerline_containment_enabled=False)
+    for _ in range(SETTLE_STEPS):
+        solver.step(cfg.solver.dt)
+
+    assert solver.contact_depth == 0.0
+    assert solver.contact_count == 0
+
+
 # ───────────────────────────────────────────────────────── unsupported setups
 
 
@@ -244,10 +301,22 @@ def test_cuda_graph_capture_disabled_with_centerline():
     assert not solver.centerline_containment_enabled
 
 
-def test_batched_path_rejects_centerline_runtime():
-    with pytest.raises(NotImplementedError, match="single-environment"):
+def test_batched_path_requires_one_vessel_per_env():
+    """A single vessel shared across envs would silently couple their episodes.
+
+    The batched path supports centerline deformation, but only with one
+    independent vessel per env, so a mismatched runtime is rejected rather than
+    letting every env deform the same wall.
+    """
+    with pytest.raises(ValueError, match="num_envs"):
         _solver(_config(), _runtime(), num_envs=2)
 
     batched = _solver(_config(), None, num_envs=2)
-    with pytest.raises(NotImplementedError, match="single-environment"):
+    with pytest.raises(ValueError, match="num_envs"):
         batched.set_centerline_runtime(_runtime())
+
+    # A matching runtime attaches and steps.
+    batched.set_centerline_runtime(_runtime(num_envs=2))
+    assert batched.centerline_runtime is not None
+    batched.step(_config().solver.dt)
+    assert np.isfinite(batched.positions.detach().cpu().numpy()).all()

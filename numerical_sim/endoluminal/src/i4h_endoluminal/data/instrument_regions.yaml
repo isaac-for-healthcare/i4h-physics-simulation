@@ -1,0 +1,6 @@
+schema_version: 1
+default: unassigned
+regions:
+  - {name: shaft, interval: [0.0, 0.8]}
+  - {name: transition, interval: [0.8, 0.9]}
+  - {name: tip, interval: [0.9, 1.0]}

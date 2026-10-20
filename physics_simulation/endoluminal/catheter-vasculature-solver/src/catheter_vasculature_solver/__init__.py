@@ -22,7 +22,10 @@ Features:
 # Solver implementations (single comment block keeps isort/ruff-format stable —
 # interleaving comments between these imports causes the two hooks to oscillate):
 #   - cath_rod_solver: vessel mesh collision extension — catheter-in-vessel containment + track guidance
-#   - newton_xpbd_rod_wrapper: Newton GPU XPBD rod solver (requires Newton build with SolverXPBDRod, e.g. PR #1981)
+#   - newton_rod_bridge: Newton particle-buffer marshalling (no newton import; safe to export)
+#   - newton_rod_solver: Newton SolverBase wrapper around CathRodSolver — imports newton, so it is
+#     not exported here; import it from the module when a Newton Model/State is in play
+#   - newton_xpbd_rod_wrapper: Newton interop over the vendored SolverXPBDRod (see newton_xpbd_rod/)
 #   - rod_solver: kept for Isaac Lab/Newton integration (not used by standalone viewport path)
 #   - xpbd_rod_solver: self-contained XPBD rod solver — no external newton dependency
 from .cath_rod_solver import (
@@ -32,6 +35,7 @@ from .cath_rod_solver import (
     compute_signed_distances,
     compute_smooth_vertex_normals,
 )
+from .newton_rod_bridge import RodParticleBridge, RodParticleRange
 from .newton_xpbd_rod_wrapper import NewtonXPBDRodSolver, orientations_xyzw_along_polyline
 from .rod_data import (
     CollisionMeshConfig,
@@ -57,6 +61,8 @@ __all__ = [
     "compute_smooth_vertex_normals",
     "compute_signed_distances",
     "orientations_xyzw_along_polyline",
+    "RodParticleBridge",
+    "RodParticleRange",
     "RodConfig",
     "RodData",
     "RodMaterialConfig",

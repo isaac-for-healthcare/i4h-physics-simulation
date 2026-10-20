@@ -1,0 +1,9 @@
+case: chole_tet_med
+procedure:
+  type: grasp_target
+  tool: grasper
+  body: tissue.gallbladder
+  target: {body: tissue.gallbladder, index: 65}
+  radius: 0.15
+  hold: 0.5
+  timeout: 120

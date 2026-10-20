@@ -1,0 +1,7 @@
+i4h numerical simulation, version 0.9.0
+Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+
+Licensed under the Apache License, Version 2.0; see LICENSE. Ported kernels cite
+omnisurg and omniendo source files in their comments. Retain those attributions.
+Production assets, vendor wrappers and the separately maintained catheter solver
+are not part of this package.

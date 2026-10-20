@@ -305,8 +305,9 @@ class VesselSkinner:
     def compute_rest_coordinates(self, vertices, normals, positions, orientations) -> None:
         """Capture the rest vertex / center / frame each vertex is skinned from.
 
-        Argument order matches upstream so its call sites work unchanged.
-        ``normals`` is unused (upstream discards it too); pass ``None`` for
+        ``normals`` is accepted but unused: binding is purely positional, so the
+        rest frame is fully determined by the centerline. It stays in the
+        signature to keep existing call sites working. Pass ``None`` for
         ``vertices`` to reuse the vertices this skinner was constructed with.
         """
         del normals

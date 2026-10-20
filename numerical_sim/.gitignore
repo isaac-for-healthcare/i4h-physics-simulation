@@ -1,0 +1,32 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local runtime/test artifacts
+.warp_cache/
+.tmp_tests/
+*.nsys-rep
+*.sqlite
+
+FollouDeviceLogs/
+
+# Newton ViewerGL writes its imgui state into the cwd
+imgui.ini
+
+# Behavioural baselines (scripts/record_baseline.py)
+baselines/
+
+# Production assets are not in Git: scripts/fetch_assets.py fetches them (docs/asset-manifest.json lists each file)
+data/*
+!data/README.md
+
+# catheter parity (scripts/parity): the reference venv and run outputs
+/.parity/
+/parity/

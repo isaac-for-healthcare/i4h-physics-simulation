@@ -1,28 +1,29 @@
 # Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # SPDX-License-Identifier: BSD-3-Clause
-#
-# Path B helper: register SolverXPBDRod attributes and add catheter rods
-# onto a Newton ModelBuilder owned by Isaac Lab's NewtonManager.
 
-"""Map :class:`~catheter_vasculature_solver.RodConfig` onto Newton builder APIs.
+"""Add catheter rod particles to a Newton ``ModelBuilder``.
 
-Under Isaac Lab, :class:`~isaaclab_newton.physics.NewtonManager` owns
-``ModelBuilder.finalize()``. Rods must be registered on that builder
-*before* finalize — typically from an asset spawn / scene setup hook —
-while the manager only constructs ``SolverXPBDRod`` from the finalized model.
+Isaac Lab's ``NewtonManager`` owns ``ModelBuilder.finalize()``, so rods must be
+registered on the builder *before* finalize — typically from scene setup or an
+asset spawn hook — while the manager only constructs the solver from the
+finalized model.
+
+Only particles are added. Rod orientations, rest Darboux frames, per-edge
+stiffness and contact topology live inside
+:class:`~catheter_vasculature_solver.CathRodSolver`, so no Newton custom
+attributes are needed and the particle positions authored here are the entire
+Newton-side footprint of the rod.
 """
 
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 
-from ..rod_data import RodConfig
-
-if TYPE_CHECKING:
-    pass
+from ..newton_rod_bridge import RodParticleRange
+from ..rod_data import RodConfig, RodGeometryConfig, RodMaterialConfig, RodSolverConfig
 
 
 def _load_newton_xpbd_rod():
@@ -33,16 +34,56 @@ def _load_newton_xpbd_rod():
     return SolverXPBDRod, vendored_xpbd_rod
 
 
+def rod_config_from_solver_cfg(solver_cfg: Any, *, device: str) -> RodConfig:
+    """Translate an Isaac Lab rod solver config into a :class:`RodConfig`.
+
+    Duck-typed on purpose so it stays importable and testable without Isaac Lab;
+    any object exposing the same field names works.
+
+    Args:
+        solver_cfg: ``XPBDRodSolverCfg``-shaped config.
+        device: Warp device the rod must live on — normally the Newton model's
+            device, since the two have to match.
+    """
+    return RodConfig(
+        material=RodMaterialConfig(
+            young_modulus=float(solver_cfg.young_modulus),
+            shear_modulus=(
+                None if solver_cfg.torsion_modulus is None else float(solver_cfg.torsion_modulus)
+            ),
+            density=float(solver_cfg.density),
+            damping=float(solver_cfg.linear_damping),
+            bend_stiffness=float(solver_cfg.bend_stiffness),
+            twist_stiffness=float(solver_cfg.twist_stiffness),
+        ),
+        geometry=RodGeometryConfig(
+            num_segments=int(solver_cfg.num_segments),
+            segment_length=float(solver_cfg.segment_length),
+            radius=float(solver_cfg.radius),
+        ),
+        solver=RodSolverConfig(
+            num_substeps=int(solver_cfg.num_substeps),
+            gravity=tuple(float(g) for g in solver_cfg.gravity),
+        ),
+        device=device,
+    )
+
+
 def particle_mass_from_rod_config(config: RodConfig) -> float:
-    """Uniform per-particle mass [kg] from cylinder segment density."""
+    """Uniform per-particle mass [kg] from cylinder segment density.
+
+    Mirrors the rod solver's own mass computation so Newton and the rod agree.
+    Clamped away from zero because a zero mass marks a particle kinematic in
+    Newton, which is reserved for the locked root.
+    """
     r = (
         float(config.geometry.radius)
         if not isinstance(config.geometry.radius, list)
         else float(config.geometry.radius[0])
     )
-    L = float(config.geometry.segment_length)
-    rho = float(config.material.density)
-    return max(math.pi * r * r * L * rho, 1.0e-9)
+    length = float(config.geometry.segment_length)
+    density = float(config.material.density)
+    return max(math.pi * r * r * length * density, 1.0e-9)
 
 
 def torsion_modulus_from_rod_config(config: RodConfig) -> float:
@@ -56,27 +97,37 @@ def torsion_modulus_from_rod_config(config: RodConfig) -> float:
 def initial_rod_positions(
     config: RodConfig,
     *,
-    z_height: float = 1.0,
+    initial_height: float = 0.5,
     start: np.ndarray | None = None,
     direction: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Build rest centerline sample points for ``add_elastic_rod``.
+    """Build the rod's rest particle positions.
+
+    Matches :class:`~catheter_vasculature_solver.XPBDRodSolver`'s own rest
+    layout — ``num_segments + 1`` particles spaced by ``segment_length`` — so
+    the Newton model and the rod solver start from identical state. A mismatch
+    would show up as the rod snapping on the first step, since the bridge treats
+    the Newton state as authoritative.
 
     Args:
         config: Rod geometry / material config.
-        z_height: World Z of the centerline when ``start`` is omitted.
+        initial_height: World Z of the centerline when ``start`` is omitted.
+            Same meaning as the solver's ``initial_height``.
         start: Optional world-space origin ``(3,)``.
-        direction: Optional unit insertion direction ``(3,)``. Defaults to +X.
+        direction: Optional unit insertion direction ``(3,)``. Defaults to +X,
+            matching the solver's rest orientation.
 
     Returns:
-        ``(num_segments, 3)`` float32 positions (segment centers along the axis).
+        ``(num_segments + 1, 3)`` float32 particle positions.
     """
-    n = int(config.geometry.num_segments)
-    L = float(config.geometry.segment_length)
+    num_points = int(config.geometry.num_segments) + 1
+    length = float(config.geometry.segment_length)
+
     if start is None:
-        origin = np.array([0.0, 0.0, float(z_height)], dtype=np.float32)
+        origin = np.array([0.0, 0.0, float(initial_height)], dtype=np.float32)
     else:
         origin = np.asarray(start, dtype=np.float32).reshape(3)
+
     if direction is None:
         axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
     else:
@@ -86,20 +137,8 @@ def initial_rod_positions(
             raise ValueError("direction must be non-zero")
         axis = axis / norm
 
-    pos = np.zeros((n, 3), dtype=np.float32)
-    for i in range(n):
-        pos[i] = origin + axis * ((i + 0.5) * L)
-    return pos
-
-
-def register_xpbd_rod_builder_attributes(builder: Any) -> None:
-    """Register SolverXPBDRod custom particle/shape attributes on *builder*.
-
-    Call from ``NewtonManager._register_builder_attributes`` before particles
-    are added / finalize runs.
-    """
-    SolverXPBDRod, _ = _load_newton_xpbd_rod()
-    SolverXPBDRod.register_custom_attributes(builder)
+    offsets = (np.arange(num_points, dtype=np.float32) * length)[:, None]
+    return (origin[None, :] + axis[None, :] * offsets).astype(np.float32)
 
 
 def add_catheter_rod_to_builder(
@@ -107,55 +146,70 @@ def add_catheter_rod_to_builder(
     config: RodConfig,
     *,
     positions: np.ndarray | None = None,
-    z_height: float = 1.0,
+    initial_height: float = 0.5,
     start: np.ndarray | None = None,
     direction: np.ndarray | None = None,
     lock_root: bool = True,
-    lock_root_rotation: bool = True,
     num_envs: int = 1,
-) -> None:
-    """Add one (or ``num_envs``) elastic rod(s) to a Newton ``ModelBuilder``.
+) -> RodParticleRange:
+    """Add one rod's particles (or ``num_envs`` replicas) to a Newton builder.
 
-    This is the Path B spawn hook: Isaac Lab owns finalize; you only append
-    rod particles/constraints here during scene construction.
+    Args:
+        builder: Newton ``ModelBuilder`` being populated before finalize.
+        config: Rod geometry / material config, also used by the solver.
+        positions: Optional explicit ``(num_segments + 1, 3)`` rest positions.
+            Defaults to :func:`initial_rod_positions`.
+        initial_height: Forwarded to :func:`initial_rod_positions`.
+        start: Forwarded to :func:`initial_rod_positions`.
+        direction: Forwarded to :func:`initial_rod_positions`.
+        lock_root: Give the root particle zero mass so Newton treats it as
+            kinematic, matching the rod solver's locked root.
+        num_envs: Number of rods to replicate into the same model.
+
+    Returns:
+        The :class:`~catheter_vasculature_solver.newton_rod_bridge.RodParticleRange`
+        describing where these particles landed. Pass it to
+        :class:`~catheter_vasculature_solver.newton_rod_solver.NewtonCathRodSolver`.
     """
     if num_envs < 1:
         raise ValueError(f"num_envs must be >= 1, got {num_envs}")
 
-    _, xpbd_rod = _load_newton_xpbd_rod()
-
+    num_points = int(config.geometry.num_segments) + 1
     if positions is None:
-        positions = initial_rod_positions(config, z_height=z_height, start=start, direction=direction)
+        positions = initial_rod_positions(
+            config, initial_height=initial_height, start=start, direction=direction
+        )
     else:
         positions = np.asarray(positions, dtype=np.float32)
-
-    r = config.geometry.radius
-    radius = float(r[0]) if isinstance(r, list) else float(r)
-    particle_mass = particle_mass_from_rod_config(config)
-    torsion_mod = torsion_modulus_from_rod_config(config)
-    bend = float(max(config.material.bend_stiffness, 1.0e-4))
-    twist = float(max(config.material.twist_stiffness, 1.0e-4))
-    young = float(config.material.young_modulus)
-
-    for _ in range(num_envs):
-        xpbd_rod.add_elastic_rod(
-            builder,
-            positions=positions,
-            radius=radius,
-            particle_mass=particle_mass,
-            bend_stiffness=bend,
-            twist_stiffness=twist,
-            young_modulus=young,
-            torsion_modulus=torsion_mod,
-            lock_root=lock_root,
-            lock_root_rotation=lock_root_rotation,
+    if positions.shape != (num_points, 3):
+        raise ValueError(
+            f"positions must have shape ({num_points}, 3) to match num_segments + 1, "
+            f"got {positions.shape}"
         )
+
+    radius = config.geometry.radius
+    radius = float(radius[0]) if isinstance(radius, list) else float(radius)
+    particle_mass = particle_mass_from_rod_config(config)
+    zero_velocity = (0.0, 0.0, 0.0)
+
+    offset = int(builder.particle_count)
+    for _ in range(num_envs):
+        for index in range(num_points):
+            mass = 0.0 if (lock_root and index == 0) else particle_mass
+            builder.add_particle(
+                pos=tuple(float(v) for v in positions[index]),
+                vel=zero_velocity,
+                mass=mass,
+                radius=radius,
+            )
+
+    return RodParticleRange(offset=offset, count=num_points * num_envs, num_envs=num_envs)
 
 
 __all__ = [
     "add_catheter_rod_to_builder",
     "initial_rod_positions",
     "particle_mass_from_rod_config",
-    "register_xpbd_rod_builder_attributes",
+    "rod_config_from_solver_cfg",
     "torsion_modulus_from_rod_config",
 ]

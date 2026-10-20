@@ -580,7 +580,26 @@ def _lumped_node_mass(edges, seg_len, n_nodes, density):
 # Rod object + step driver
 # --------------------------------------------------------------------------- #
 class CosseratRod:
-    """Per-segment PBD Cosserat rod. Chain by default; pass ``edges`` for a tree/graph."""
+    """Per-segment PBD Cosserat rod. Chain by default; pass ``edges`` for a tree/graph.
+
+    Multi-env: ``num_envs > 1`` replicates the rod into one contiguous buffer per
+    array, with node and segment indices offset per env. Every kernel here is
+    purely index-based, so the batched state needs no kernel changes — and
+    because envs share no nodes, replicas of a color group merge into that same
+    color. The number of launches per projection iteration is therefore
+    independent of ``num_envs``, which is what makes the batch cheap.
+
+    Topology is shared across envs; geometry need not be. Pass ``positions`` as
+    ``(n_nodes, 3)`` to replicate one shape, or ``(num_envs, n_nodes, 3)`` to give
+    every env its own anatomy. Rest lengths, frames and rest Darboux vectors are
+    then derived per env. Envs with *different* topology (differing node or edge
+    counts) are out of scope: they cannot share the index and color arrays.
+
+    Attributes:
+        n_nodes: Total nodes across all envs (the launch dimension).
+        n_nodes_per_env: Nodes in one env; env ``e`` owns
+            ``[e * n_nodes_per_env, (e + 1) * n_nodes_per_env)``.
+    """
 
     def __init__(self, positions, device, edges=None, bend_pairs=None,
                  node_mass=1.0, seg_inertia=1.0,
@@ -588,69 +607,104 @@ class CosseratRod:
                  fix_root_pos=True, fix_root_orient=True, fix_tip_orient=False,
                  fixed_nodes=None, fixed_segments=None, freeze_positions=False,
                  orientation_mode="pbd", scr_stretch_stiffness=1.0, scr_bend_stiffness=0.5,
-                 density=None):
-        positions = np.asarray(positions, dtype=np.float32).reshape((-1, 3))
+                 density=None, num_envs=1):
+        num_envs = int(num_envs)
+        if num_envs < 1:
+            raise ValueError(f"num_envs must be >= 1, got {num_envs}")
+        positions = np.asarray(positions, dtype=np.float32)
+        if positions.ndim == 3:
+            if positions.shape[0] != num_envs:
+                raise ValueError(
+                    f"per-env positions have {positions.shape[0]} envs but num_envs={num_envs}"
+                )
+            env_positions = positions.reshape((num_envs, -1, 3))
+        else:
+            env_positions = np.repeat(positions.reshape((1, -1, 3)), num_envs, axis=0)
+
         self.device = device
-        self.n_nodes = len(positions)
+        self.num_envs = num_envs
+        self.n_nodes_per_env = int(env_positions.shape[1])
+        self.n_nodes = self.n_nodes_per_env * num_envs
 
         is_chain = edges is None
         if is_chain:
-            edges = [(i, i + 1) for i in range(self.n_nodes - 1)]
-        edges = [(int(a), int(b)) for a, b in edges]
-        self.edges = edges
-        self.n_seg = len(edges)
+            local_edges = [(i, i + 1) for i in range(self.n_nodes_per_env - 1)]
+        else:
+            local_edges = [(int(a), int(b)) for a, b in edges]
+        self.local_edges = local_edges
+        self.n_seg_per_env = len(local_edges)
+        self.n_seg = self.n_seg_per_env * num_envs
         # Root the bend-pair spanning tree and the frame transport at the first fixed node.
         root = int(fixed_nodes[0]) if fixed_nodes else 0
         if bend_pairs is None:
-            bend_pairs = derive_bend_pairs(edges, root=root)
-        bend_pairs = [(int(a), int(b)) for a, b in bend_pairs]
-        self.bend_pairs = bend_pairs
-        self.n_pair = len(bend_pairs)
-
-        q = _chain_frames(positions) if is_chain else _tree_frames(positions, edges, root=root)
-        rd = _rest_darboux(q, bend_pairs)
-        seg_len = np.asarray([np.linalg.norm(positions[b] - positions[a]) for a, b in edges], dtype=np.float32)
-
-        # Boundary conditions. Mass is either uniform (node_mass) or length-lumped from
-        # adjacent segments (density) so behavior is resolution-consistent.
-        if freeze_positions:
-            inv_mass = np.zeros(self.n_nodes, dtype=np.float32)
-        elif density is not None:
-            m = _lumped_node_mass(edges, seg_len, self.n_nodes, float(density))
-            inv_mass = np.where(m > 0.0, 1.0 / np.maximum(m, 1e-12), 0.0).astype(np.float32)
+            local_pairs = derive_bend_pairs(local_edges, root=root)
         else:
-            inv_mass = np.full(self.n_nodes, 1.0 / node_mass, dtype=np.float32)
-        if not freeze_positions:
-            if fixed_nodes is not None:
-                for i in fixed_nodes:
-                    inv_mass[int(i)] = 0.0
-            elif fix_root_pos:
-                inv_mass[0] = 0.0
-        inv_mass_q = np.full(self.n_seg, 1.0 / seg_inertia, dtype=np.float32)
+            local_pairs = [(int(a), int(b)) for a, b in bend_pairs]
+        self.local_bend_pairs = local_pairs
+        self.n_pair_per_env = len(local_pairs)
+        self.n_pair = self.n_pair_per_env * num_envs
+
+        # Per-env rest state: frames, rest Darboux and segment lengths all follow
+        # from that env's geometry, which may differ even though topology does not.
+        q_envs, rd_envs, seg_len_envs, inv_mass_envs = [], [], [], []
+        for e in range(num_envs):
+            pe = env_positions[e]
+            qe = _chain_frames(pe) if is_chain else _tree_frames(pe, local_edges, root=root)
+            q_envs.append(qe)
+            if self.n_pair_per_env > 0:
+                rd_envs.append(_rest_darboux(qe, local_pairs))
+            seg_len_e = np.asarray(
+                [np.linalg.norm(pe[b] - pe[a]) for a, b in local_edges], dtype=np.float32
+            )
+            seg_len_envs.append(seg_len_e)
+            inv_mass_envs.append(
+                self._build_inv_mass(
+                    local_edges, seg_len_e, self.n_nodes_per_env, freeze_positions,
+                    density, node_mass, fixed_nodes, fix_root_pos,
+                )
+            )
+
+        q = np.concatenate(q_envs, axis=0)
+        seg_len = np.concatenate(seg_len_envs)
+        inv_mass = np.concatenate(inv_mass_envs)
+        # Bend arrays keep a single dummy row when the topology has no bend pairs.
+        rd = np.concatenate(rd_envs, axis=0) if rd_envs else np.zeros((1, 4), dtype=np.float64)
+
+        inv_mass_q_local = np.full(max(self.n_seg_per_env, 1), 1.0 / seg_inertia, dtype=np.float32)
         if fixed_segments is not None:
             for s in fixed_segments:
-                inv_mass_q[int(s)] = 0.0
+                inv_mass_q_local[int(s)] = 0.0
         else:
             if fix_root_orient:
-                inv_mass_q[0] = 0.0
+                inv_mass_q_local[0] = 0.0
             if fix_tip_orient:
-                inv_mass_q[-1] = 0.0
+                inv_mass_q_local[-1] = 0.0
+        inv_mass_q = np.tile(inv_mass_q_local, num_envs)
 
         kbt = np.tile(np.array([bend_stiffness[0], bend_stiffness[1], twist_stiffness], np.float32),
                       (max(self.n_pair, 1), 1))
 
-        seg_n0 = np.asarray([a for a, _ in edges], dtype=np.int32)
-        seg_n1 = np.asarray([b for _, b in edges], dtype=np.int32)
-        bend_a = np.asarray([a for a, _ in bend_pairs] or [0], dtype=np.int32)
-        bend_b = np.asarray([b for _, b in bend_pairs] or [0], dtype=np.int32)
+        # Index arrays: local topology shifted into each env's own node/segment window.
+        node_off = (np.arange(num_envs, dtype=np.int64) * self.n_nodes_per_env)[:, None]
+        seg_off = (np.arange(num_envs, dtype=np.int64) * self.n_seg_per_env)[:, None]
+        la = np.asarray([a for a, _ in local_edges] or [0], dtype=np.int64)[None, :]
+        lb = np.asarray([b for _, b in local_edges] or [0], dtype=np.int64)[None, :]
+        seg_n0 = (la + node_off).reshape(-1).astype(np.int32)
+        seg_n1 = (lb + node_off).reshape(-1).astype(np.int32)
+        pa = np.asarray([a for a, _ in local_pairs] or [0], dtype=np.int64)[None, :]
+        pb = np.asarray([b for _, b in local_pairs] or [0], dtype=np.int64)[None, :]
+        bend_a = (pa + seg_off).reshape(-1).astype(np.int32)
+        bend_b = (pb + seg_off).reshape(-1).astype(np.int32)
+        self.edges = list(zip(seg_n0.tolist(), seg_n1.tolist(), strict=True))
+        self.bend_pairs = list(zip(bend_a.tolist(), bend_b.tolist(), strict=True))
 
         # Warp arrays.
-        self.x = wp.array(positions, dtype=wp.vec3, device=device)
+        self.x = wp.array(env_positions.reshape((-1, 3)), dtype=wp.vec3, device=device)
         self.p = wp.zeros(self.n_nodes, dtype=wp.vec3, device=device)
         self.v = wp.zeros(self.n_nodes, dtype=wp.vec3, device=device)
         self.q = wp.array(q.astype(np.float32), dtype=wp.quat, device=device)
         self.u = wp.array(q.astype(np.float32).copy(), dtype=wp.quat, device=device)
-        self.omega = wp.zeros(self.n_seg, dtype=wp.vec3, device=device)
+        self.omega = wp.zeros(max(self.n_seg, 1), dtype=wp.vec3, device=device)
         self.rest_darboux = wp.array(rd.astype(np.float32), dtype=wp.quat, device=device)
         self.rest_len = wp.array(seg_len, dtype=wp.float32, device=device)
         self.stretch_multiplier = wp.array(
@@ -669,10 +723,19 @@ class CosseratRod:
         # Color groups (device arrays of item indices) for race-free colored Gauss-Seidel:
         # no two edges in a stretch color share a node; no two bend pairs in a bend color
         # share a segment. Symmetric branching relies on symmetric frames (see _tree_frames),
-        # not on the sweep order.
-        self.stretch_groups = [wp.array(g, device=device) for g in _color_edges(edges, self.n_seg)]
-        self.bend_groups = ([wp.array(g, device=device) for g in _color_bend_pairs(bend_pairs)]
-                            if self.n_pair > 0 else [])
+        # not on the sweep order. Replicas join the same color: distinct envs share no
+        # nodes, so they cannot race, and the launch count stays constant in num_envs.
+        self.stretch_groups = [
+            wp.array(g, device=device)
+            for g in self._replicate_groups(_color_edges(local_edges, self.n_seg_per_env),
+                                            self.n_seg_per_env, num_envs)
+        ]
+        self.bend_groups = (
+            [wp.array(g, device=device)
+             for g in self._replicate_groups(_color_bend_pairs(local_pairs),
+                                             self.n_pair_per_env, num_envs)]
+            if self.n_pair_per_env > 0 else []
+        )
         self._rest_len_np = seg_len
 
         # SCR closed-form orientation mode: per-segment coloring + incident-bend-pair CSR.
@@ -681,16 +744,82 @@ class CosseratRod:
         self.orientation_mode = orientation_mode
         self.scr_stretch_stiffness = float(scr_stretch_stiffness)
         self.scr_bend_stiffness = float(scr_bend_stiffness)
-        self.seg_groups = [wp.array(g, device=device) for g in _color_segments(bend_pairs, self.n_seg)]
-        off, nb, rest, role, scale = _segment_pair_csr(bend_pairs, rd, seg_len, self.n_seg)
+        self.seg_groups = [
+            wp.array(g, device=device)
+            for g in self._replicate_groups(_color_segments(local_pairs, self.n_seg_per_env),
+                                            self.n_seg_per_env, num_envs)
+        ]
+        off, nb, rest, role, scale = self._batched_segment_pair_csr(
+            local_pairs, rd_envs, seg_len_envs, num_envs
+        )
         self.seg_pair_off = wp.array(off, dtype=wp.int32, device=device)
         self.seg_pair_nb = wp.array(nb, dtype=wp.int32, device=device)
         self.seg_pair_rest = wp.array(rest, dtype=wp.quat, device=device)
         self.seg_pair_role = wp.array(role, dtype=wp.int32, device=device)
         self.seg_pair_scale = wp.array(scale, dtype=wp.float32, device=device)
 
+    # ------------------------------------------------------------ build helpers
+    @staticmethod
+    def _build_inv_mass(edges, seg_len, n_nodes, freeze_positions, density,
+                        node_mass, fixed_nodes, fix_root_pos):
+        """Node inverse masses for one env: uniform, or length-lumped from ``density``."""
+        if freeze_positions:
+            return np.zeros(n_nodes, dtype=np.float32)
+        if density is not None:
+            m = _lumped_node_mass(edges, seg_len, n_nodes, float(density))
+            inv_mass = np.where(m > 0.0, 1.0 / np.maximum(m, 1e-12), 0.0).astype(np.float32)
+        else:
+            inv_mass = np.full(n_nodes, 1.0 / node_mass, dtype=np.float32)
+        if fixed_nodes is not None:
+            for i in fixed_nodes:
+                inv_mass[int(i)] = 0.0
+        elif fix_root_pos:
+            inv_mass[0] = 0.0
+        return inv_mass
+
+    @staticmethod
+    def _replicate_groups(groups, stride, num_envs):
+        """Shift each color group into every env's index window and merge them."""
+        if num_envs == 1:
+            return groups
+        offsets = (np.arange(num_envs, dtype=np.int64) * stride)[:, None]
+        return [(g.astype(np.int64)[None, :] + offsets).reshape(-1).astype(np.int32) for g in groups]
+
+    @staticmethod
+    def _batched_segment_pair_csr(local_pairs, rd_envs, seg_len_envs, num_envs):
+        """Concatenate per-env SCR CSR blocks, offsetting neighbours and row starts."""
+        n_seg_per_env = len(seg_len_envs[0])
+        per_env = [
+            _segment_pair_csr(
+                local_pairs,
+                rd_envs[e] if rd_envs else np.zeros((1, 4)),
+                seg_len_envs[e],
+                n_seg_per_env,
+            )
+            for e in range(num_envs)
+        ]
+        if num_envs == 1:
+            return per_env[0]
+        entries = int(per_env[0][0][-1])  # incident entries per env (topology is shared)
+        off = np.concatenate(
+            [per_env[e][0][:-1] + e * entries for e in range(num_envs)]
+            + [np.asarray([num_envs * entries], dtype=np.int32)]
+        ).astype(np.int32)
+        nb = np.concatenate(
+            [per_env[e][1] + e * n_seg_per_env for e in range(num_envs)]
+        ).astype(np.int32)
+        rest = np.concatenate([per_env[e][2] for e in range(num_envs)])
+        role = np.concatenate([per_env[e][3] for e in range(num_envs)]).astype(np.int32)
+        scale = np.concatenate([per_env[e][4] for e in range(num_envs)]).astype(np.float32)
+        return off, nb, rest, role, scale
+
+    # ------------------------------------------------------------------ readback
     def positions(self):
         return self.x.numpy()
+
+    def positions_per_env(self):
+        """Node positions shaped ``(num_envs, n_nodes_per_env, 3)``."""
+        return self.x.numpy().reshape((self.num_envs, self.n_nodes_per_env, 3))
 
     def quaternions(self):
         return self.q.numpy()

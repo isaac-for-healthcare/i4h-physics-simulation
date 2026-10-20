@@ -24,4 +24,4 @@ jobs:
         run: npm install -g markdown-link-check
 
       - name: Check for broken links
-        run: find . -name "*.md" -not -path "./physics_simulation/cosmos_h_dreams/*" -print0 | xargs -0 -n1 markdown-link-check --config .github/markdown-link-check.json
+        run: find . -name "*.md" -not -path "./neural_sim/cosmos_h_dreams/*" -not -path "./physics_simulation/endoluminal/catheter-vasculature-solver/*" -print0 | xargs -0 -n1 markdown-link-check --config .github/markdown-link-check.json

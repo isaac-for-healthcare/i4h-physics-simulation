@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "i4h-assessment"
+version = "0.9.0"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.12,<3.13"
+dependencies = ["i4h-physics==0.9.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["i4h_assessment*"]

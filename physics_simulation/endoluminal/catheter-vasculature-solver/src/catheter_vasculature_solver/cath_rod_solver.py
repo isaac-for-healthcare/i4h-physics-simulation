@@ -73,9 +73,12 @@ Usage::
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import warp as wp
 
+from .host_arrays import to_host
 from .xpbd_rod_solver import XPBDRodSolver, _Workspace
 
 try:
@@ -320,10 +323,16 @@ def _track_sliding_kernel(
     track_length: float,
     track_stiffness: float,
     end_idx: int,
+    points_per_env: int,
 ):
-    """Project non-tip rod particles toward the insertion axis (track)."""
+    """Project non-tip rod particles toward the insertion axis (track).
+
+    ``points_per_env`` makes the non-tip test env-local, so one launch covers a
+    whole batch. Single-env callers pass ``num_points``, for which the modulo is
+    the identity and behaviour is unchanged.
+    """
     i = wp.tid()
-    if i >= end_idx:
+    if i % points_per_env >= end_idx:
         return
     if inv_masses[i] <= 0.0:
         return
@@ -332,6 +341,72 @@ def _track_sliding_kernel(
     t = wp.clamp(wp.dot(p - track_start, track_dir), 0.0, track_length)
     proj = track_start + track_dir * t
     predicted_positions[i] = p + (proj - p) * track_stiffness
+
+
+@wp.kernel
+def _track_polyline_kernel(
+    predicted_positions: wp.array(dtype=wp.vec3),
+    inv_masses: wp.array(dtype=float),
+    track_path: wp.array(dtype=wp.vec3),
+    path_count: int,
+    track_stiffness: float,
+    end_idx: int,
+    points_per_env: int,
+):
+    """Project non-tip rod particles toward a curved insertion path.
+
+    The curved counterpart of :func:`_track_sliding_kernel`, for anatomy rather
+    than a bench rail. A straight track is only usable where the vessel is
+    straight; projecting onto a ray through a curved lumen would pull the wire
+    out through the wall, which is why guidance is otherwise left off there.
+
+    Why this is what stops the shaft bunching: containment is a one-sided radial
+    test, so a particle anywhere inside the lumen is corrected by exactly
+    nothing and is free to slide along the vessel and pile up against its
+    neighbours. Removing the two lateral degrees of freedom leaves arc length as
+    the only way the rod can move, and the distance constraints already resist
+    compression along it -- so spacing is recovered by the existing solve rather
+    than prescribed here. That only holds when this runs *before* the solve; run
+    afterwards it is the last word on position, and the chords never re-equalize.
+
+    The projection is a blend rather than a snap, so it argues with the elastic
+    solve instead of overruling it, and ``end_idx`` leaves the distal tip free to
+    deform and steer.
+
+    ``path_count`` is the number of points in ``track_path``, which is shared
+    across environments; ``points_per_env`` makes the non-tip test env-local so
+    one launch covers a whole batch.
+    """
+    i = wp.tid()
+    if i % points_per_env >= end_idx:
+        return
+    # Skips the root while a mount is prescribing it, whose inverse mass is
+    # zeroed. Guidance must not fight the pose the holder asked for.
+    if inv_masses[i] <= 0.0:
+        return
+    if path_count < 2:
+        return
+
+    p = predicted_positions[i]
+    closest = track_path[0]
+    best = wp.dot(p - closest, p - closest)
+    # Brute force over segments, as the containment kernel does over centerline
+    # edges: a centerline resampled for a catheter is hundreds of points, and a
+    # BVH would have to be refit every step once the vessel deforms.
+    for segment in range(path_count - 1):
+        a = track_path[segment]
+        ab = track_path[segment + 1] - a
+        span = wp.dot(ab, ab)
+        t = float(0.0)
+        if span > 1.0e-18:
+            t = wp.clamp(wp.dot(p - a, ab) / span, 0.0, 1.0)
+        q = a + ab * t
+        d2 = wp.dot(p - q, p - q)
+        if d2 < best:
+            best = d2
+            closest = q
+
+    predicted_positions[i] = p + (closest - p) * track_stiffness
 
 
 @wp.kernel
@@ -361,22 +436,135 @@ def _set_root_position_kernel(
 
 
 @wp.kernel
+def _distance_cleanup_kernel(
+    predicted_positions: wp.array(dtype=wp.vec3),
+    inv_masses: wp.array(dtype=float),
+    rest_lengths: wp.array(dtype=float),
+    points_per_env: int,
+    edges_per_env: int,
+    color: int,
+    relaxation: float,
+):
+    """Restore edge lengths after a containment projection has disturbed them.
+
+    Containment runs after the constraint solve because that is the only side of
+    it where a projection persists, but it is then also the last word on
+    position and overrides the stretch constraints the solve had satisfied.
+    Particles slide radially and pile up along the vessel: measured chords ran
+    from 6% to 362% of rest, which is the bunching and the long gaps seen in the
+    viewport. This is the missing third step -- re-satisfy the distances *after*
+    containment, so both get to hold.
+
+    Containment corrections are radial and small, so restoring length mostly
+    moves particles along the vessel rather than back through its wall, which is
+    what makes this recoverable rather than a second tug of war.
+
+    Runs as two-colour Gauss-Seidel: even edges then odd, so no two threads write
+    the same particle while each sweep still sees its neighbour's result. Jacobi
+    would be race-free too but propagates a correction one edge per iteration,
+    and a 40-edge chain does not have that many to spare.
+
+    Args:
+        predicted_positions: Particle positions to correct, modified in place.
+        inv_masses: Per-particle inverse mass; zero pins a particle, which is how
+            a prescribed root stays where its mount put it.
+        rest_lengths: Per-edge target length.
+        points_per_env: Particles per rod, to index within an environment.
+        edges_per_env: Edges per rod.
+        color: ``0`` for even edges, ``1`` for odd.
+        relaxation: Fraction of each correction to apply, in ``(0, 1]``.
+    """
+    env, e = wp.tid()
+    if e % 2 != color:
+        return
+    i = env * points_per_env + e
+    j = i + 1
+    w1 = inv_masses[i]
+    w2 = inv_masses[j]
+    total = w1 + w2
+    # Both ends pinned: no correction is possible and the constraint is the
+    # caller's to have made satisfiable.
+    if total <= 0.0:
+        return
+    delta = predicted_positions[j] - predicted_positions[i]
+    dist = wp.length(delta)
+    # A fully collapsed edge has no direction to separate along. Leaving it is
+    # safe because its neighbours still have one, and the next sweep sees a
+    # non-degenerate edge again.
+    if dist < 1.0e-12:
+        return
+    direction = delta / dist
+    correction = relaxation * (dist - rest_lengths[env * edges_per_env + e]) / total
+    predicted_positions[i] = predicted_positions[i] + direction * (w1 * correction)
+    predicted_positions[j] = predicted_positions[j] - direction * (w2 * correction)
+
+
+@wp.kernel
 def _update_tip_rest_darboux_kernel(
     rest_darboux: wp.array(dtype=wp.vec3),
+    baseline: wp.array(dtype=wp.vec3),
     num_edges: int,
     tip_num_edges: int,
-    bend_angle: float,
+    bend_angle: wp.array(dtype=wp.float32),
 ):
-    """Encode a steerable pre-bend into the bend constraint's REST shape."""
+    """Encode a steerable pre-bend into the bend constraint's REST shape.
+
+    The bend is added to *baseline* rather than written over the buffer, so
+    whatever rest shape was authored for the body survives being steered. See
+    :meth:`CathRodSolver.set_tip_bend` for the ``2n - 1`` and for why the bend
+    is added rather than assigned.
+    """
     e = wp.tid()
     if e >= num_edges:
         return
     tip_start = num_edges - tip_num_edges
     if e >= tip_start:
-        per_edge = bend_angle / float(tip_num_edges)
-        rest_darboux[e] = wp.vec3(per_edge, 0.0, 0.0)
+        per_edge = wp.sin(bend_angle[0] / float(2 * tip_num_edges - 1))
+        rest_darboux[e] = baseline[e] + wp.vec3(per_edge, 0.0, 0.0)
     else:
-        rest_darboux[e] = wp.vec3(0.0, 0.0, 0.0)
+        rest_darboux[e] = baseline[e]
+
+
+@wp.kernel
+def _update_tip_rest_darboux_batched_kernel(
+    rest_darboux: wp.array(dtype=wp.vec3),
+    baseline: wp.array(dtype=wp.vec3),
+    edges_per_env: int,
+    tip_num_edges: int,
+    bend_angle: wp.array(dtype=wp.float32),
+):
+    """Per-env counterpart: each env steers its own tip.
+
+    ``bend_angle`` is indexed by env, so a batched rollout can hold a different
+    tip shape per environment. A shared angle is the degenerate case of filling
+    the array.
+    """
+    env, e = wp.tid()
+    tip_start = edges_per_env - tip_num_edges
+    i = env * edges_per_env + e
+    if e >= tip_start:
+        per_edge = wp.sin(bend_angle[env] / float(2 * tip_num_edges - 1))
+        rest_darboux[i] = baseline[i] + wp.vec3(per_edge, 0.0, 0.0)
+    else:
+        rest_darboux[i] = baseline[i]
+
+
+@wp.kernel
+def _set_root_position_batched_kernel(
+    positions: wp.array(dtype=wp.vec3),
+    predicted_positions: wp.array(dtype=wp.vec3),
+    velocities: wp.array(dtype=wp.vec3),
+    points_per_env: int,
+    env_ids: wp.array(dtype=wp.int32),
+    new_pos: wp.array(dtype=wp.vec3),
+):
+    """Kinematically write each listed env's root particle and zero its velocity."""
+    slot = wp.tid()
+    i = env_ids[slot] * points_per_env
+    p = new_pos[slot]
+    positions[i] = p
+    predicted_positions[i] = p
+    velocities[i] = wp.vec3(0.0, 0.0, 0.0)
 
 
 @wp.kernel
@@ -648,6 +836,8 @@ def _project_mesh_edge_collision_kernel(
     use_smooth_normals: bool,
     max_triangles: int,
     corrections: wp.array(dtype=wp.vec3),
+    points_per_env: int,
+    edges_per_env: int,
 ):
     """Per-rod-edge: rod-segment vs. mesh-edge collision (max-penetration variant).
 
@@ -655,13 +845,20 @@ def _project_mesh_edge_collision_kernel(
     ``ia < ib`` so each undirected edge is visited once), finds the single
     mesh edge with maximum rod-segment penetration, and accumulates the
     correction into the shared buffer.
+
+    ``points_per_env`` / ``edges_per_env`` map a global edge to its own env's
+    particle window, so one launch covers a batch. Single-env callers pass
+    ``(num_points, num_edges)``, for which ``pi == edge`` and behaviour is
+    unchanged. The floor division is required: envs have one more particle than
+    edge, so a fractional quotient would land ``pi`` in the wrong env window.
     """
     edge = wp.tid()
+    pi = (edge // edges_per_env) * points_per_env + (edge % edges_per_env)
 
-    p0 = predicted_positions[edge]
-    p1 = predicted_positions[edge + 1]
-    inv0 = inv_masses[edge]
-    inv1 = inv_masses[edge + 1]
+    p0 = predicted_positions[pi]
+    p1 = predicted_positions[pi + 1]
+    inv0 = inv_masses[pi]
+    inv1 = inv_masses[pi + 1]
     if inv0 <= 0.0 and inv1 <= 0.0:
         return
 
@@ -742,9 +939,9 @@ def _project_mesh_edge_collision_kernel(
         if denom > 1.0e-8:
             correction = -best_n * (best_pen / denom)
             if inv0 > 0.0:
-                wp.atomic_add(corrections, edge, correction * best_bar.x * inv0)
+                wp.atomic_add(corrections, pi, correction * best_bar.x * inv0)
             if inv1 > 0.0:
-                wp.atomic_add(corrections, edge + 1, correction * best_bar.y * inv1)
+                wp.atomic_add(corrections, pi + 1, correction * best_bar.y * inv1)
 
 
 @wp.kernel
@@ -759,14 +956,21 @@ def _project_mesh_edge_collision_kernel_averaged(
     use_smooth_normals: bool,
     max_triangles: int,
     corrections: wp.array(dtype=wp.vec3),
+    points_per_env: int,
+    edges_per_env: int,
 ):
-    """Per-rod-edge: rod-segment vs. mesh-edge collision (averaged variant)."""
-    edge = wp.tid()
+    """Per-rod-edge: rod-segment vs. mesh-edge collision (averaged variant).
 
-    p0 = predicted_positions[edge]
-    p1 = predicted_positions[edge + 1]
-    inv0 = inv_masses[edge]
-    inv1 = inv_masses[edge + 1]
+    ``points_per_env`` / ``edges_per_env`` are the batch mapping described on
+    :func:`_project_mesh_edge_collision_kernel`.
+    """
+    edge = wp.tid()
+    pi = (edge // edges_per_env) * points_per_env + (edge % edges_per_env)
+
+    p0 = predicted_positions[pi]
+    p1 = predicted_positions[pi + 1]
+    inv0 = inv_masses[pi]
+    inv1 = inv_masses[pi + 1]
     if inv0 <= 0.0 and inv1 <= 0.0:
         return
 
@@ -850,9 +1054,9 @@ def _project_mesh_edge_collision_kernel_averaged(
     if col_count > 0:
         inv_count = 1.0 / float(col_count)
         if inv0 > 0.0:
-            wp.atomic_add(corrections, edge, delta0 * inv_count)
+            wp.atomic_add(corrections, pi, delta0 * inv_count)
         if inv1 > 0.0:
-            wp.atomic_add(corrections, edge + 1, delta1 * inv_count)
+            wp.atomic_add(corrections, pi + 1, delta1 * inv_count)
 
 
 @wp.kernel
@@ -975,6 +1179,22 @@ class CathRodSolver(XPBDRodSolver):
         track_stiffness: Blend factor for track snapping (``0`` = free,
             ``1`` = perfectly locked to axis).
         track_enabled: Toggle track guidance on/off.
+        proximal_feed_span: How many nodes ahead of the root supply the
+            insertion direction. One is the rod's own first-segment tangent,
+            which a fold at the root turns -- and the push then drives further
+            into the fold, so it grows on its own. A span of several nodes
+            reads the same direction over a baseline long enough that the fold
+            barely moves it. Must be set before the first step, since the index
+            array is built once with the workspace.
+        track_free_distal_edges: How many distal edges guidance leaves alone,
+            when that should differ from ``tip_num_edges``. Unset, the two are
+            the same and guidance holds everything but the steerable tip, which
+            prescribes the whole route the wire takes. Set larger, guidance
+            becomes a proximal rail: the shaft behind the working length is
+            held on the path it already traversed, which is where it physically
+            lies, while the distal window stays free to be steered. Make that
+            window longer than the route still to be navigated and guidance
+            constrains nothing the operator has yet to choose.
         collision_enabled: Toggle vessel containment on/off.
         collision_mesh_normals: Optional pre-computed smooth vertex normals
             on the *same* device as the solver.  Pass the output of
@@ -1005,13 +1225,20 @@ class CathRodSolver(XPBDRodSolver):
             ``2 * particle_radius + segment_length``.
         centerline_runtime: Optional :class:`CenterlineVesselRuntime` — a
             deforming Cosserat centerline vessel co-simulated with the catheter.
-            Single-environment only.
+            Supports independent vessels in single and batched solves.
         centerline_containment_enabled: Contain the catheter inside the live
             lumen. Defaults to ``True`` whenever ``centerline_runtime`` is given.
         centerline_containment_stage: ``"pre"`` or ``"post"`` — when centerline
             containment runs relative to the XPBD constraint solve
             (default ``"post"``). Independent of ``collision_projection_stage``,
             which governs the static mesh path.
+        contact_coupling_iterations: Alternate live-wall projections with
+            global elastic solves, updating position and orientation.
+            Each edge block solves all six stretch/shear and bend/twist
+            constraints. Zero retains the global direct solve and legacy
+            pre/post containment. When enabled, this replaces centerline
+            stage ordering and position-only cleanup; use physical rotational
+            inertia for the material frames.
         **kwargs: Keyword arguments forwarded to :class:`XPBDRodSolver`.
     """
 
@@ -1027,6 +1254,14 @@ class CathRodSolver(XPBDRodSolver):
         segment_length: float,
         track_stiffness: float = 1.0,
         track_enabled: bool = True,
+        track_free_distal_edges: int | None = None,
+        proximal_feed_span: int = 1,
+        track_path: np.ndarray | None = None,
+        track_stage: str | None = None,
+        containment_cleanup_iterations: int = 0,
+        containment_cleanup_relaxation: float = 1.0,
+        containment_cleanup_rounds: int = 1,
+        contact_coupling_iterations: int = 0,
         collision_enabled: bool = True,
         collision_mesh_normals: "wp.array | None" = None,
         smooth_collision_normals_enabled: bool = False,
@@ -1062,8 +1297,49 @@ class CathRodSolver(XPBDRodSolver):
         self.track_dir = wp.vec3(float(track_dir[0]), float(track_dir[1]), float(track_dir[2]))
         self.track_length = float(track_length)
         self.tip_num_edges = int(tip_num_edges)
+        # Rest curvature as authored, snapshotted the first time a tip bend is
+        # applied and re-read on every one after that. Steering has to be
+        # absolute rather than cumulative -- an action supplies an angle, not a
+        # delta -- which means each update has to know the unsteered shape. One
+        # slot per workspace because both can exist and only one is read.
+        self._tip_bend_baseline_ws: "wp.array | None" = None
+        self._tip_bend_baseline_bws: "wp.array | None" = None
+        self._tip_bend_angle_device: "wp.array | None" = None
         self.track_stiffness = float(track_stiffness)
         self.track_enabled = bool(track_enabled)
+        if track_free_distal_edges is not None and int(track_free_distal_edges) < 0:
+            raise ValueError(f"track_free_distal_edges must be non-negative, got {track_free_distal_edges}")
+        self.track_free_distal_edges = None if track_free_distal_edges is None else int(track_free_distal_edges)
+        if int(proximal_feed_span) < 1:
+            raise ValueError(f"proximal_feed_span must be at least 1, got {proximal_feed_span}")
+        self.proximal_feed_span = int(proximal_feed_span)
+        # Kept on the host and uploaded per device on first use, matching how the
+        # collision-normal buffers are handled: the workspace device is not known
+        # until a step runs.
+        self._track_path_host = self._validated_track_path(track_path)
+        self._track_path_device: dict[str, wp.array] = {}
+        # Defaults to post for the straight rail, which is where it has always
+        # run. A curved track wants pre instead, so that the distance
+        # constraints are what finally set the chord lengths.
+        self.track_stage = _normalize_collision_projection_stage(
+            track_stage if track_stage is not None else COLLISION_PROJECTION_STAGE_POST
+        )
+        # Off by default: it costs two launches per iteration and only earns them
+        # where a post-solve containment projection is disturbing edge lengths.
+        self.containment_cleanup_iterations = max(int(containment_cleanup_iterations), 0)
+        if not 0.0 < float(containment_cleanup_relaxation) <= 1.0:
+            raise ValueError(
+                "containment_cleanup_relaxation must be in (0, 1], got "
+                f"{containment_cleanup_relaxation}"
+            )
+        self.containment_cleanup_relaxation = float(containment_cleanup_relaxation)
+        # How many times to alternate containment with the cleanup sweeps. One
+        # runs containment once and spends the whole sweep budget after it, which
+        # is the original sequencing and lets the sweeps overrule containment.
+        self.containment_cleanup_rounds = max(1, int(containment_cleanup_rounds))
+        if int(contact_coupling_iterations) != contact_coupling_iterations or contact_coupling_iterations < 0:
+            raise ValueError("contact_coupling_iterations must be a nonnegative integer")
+        self.contact_coupling_iterations = int(contact_coupling_iterations)
         self.collision_enabled = bool(collision_enabled)
         self.collision_iterations = max(1, int(collision_iterations))
         self.collision_pre_constraints_enabled = bool(collision_pre_constraints_enabled)
@@ -1110,30 +1386,7 @@ class CathRodSolver(XPBDRodSolver):
         self.collision_friction_coeff = 0.0
         self.collision_friction_contact_band = 0.004
 
-        # Vessel containment and track guidance are wired only into the
-        # single-environment substep hooks; the batched (num_envs > 1) hooks are
-        # still base-class no-ops. Fail loudly here rather than silently skipping
-        # those projections in multi-env mode. Batched dynamics without
-        # collision/guidance are fine, so only guard when either is active.
-        if self._bws is not None and (self.collision_enabled or self.track_enabled):
-            raise NotImplementedError(
-                "CathRodSolver vessel collision and track guidance are only "
-                "implemented for the single-environment path, but "
-                f"num_envs={self._num_envs} was requested. The batched multi-env path "
-                "currently runs core rod dynamics only. Use num_envs=1 for "
-                "collision/track guidance, or pass collision_enabled=False and "
-                "track_enabled=False to run the batched path without them."
-            )
-
-        # Centerline co-simulation hooks into the single-rod substep only. The
-        # batched substep would otherwise advance rods while the vessel stayed
-        # frozen and containment silently never ran.
-        if self._bws is not None and self.centerline_runtime is not None:
-            raise NotImplementedError(
-                "CathRodSolver centerline vessel deformation is only implemented "
-                f"for the single-environment path, but num_envs={self._num_envs} was "
-                "requested. Use num_envs=1 for centerline deformation."
-            )
+        self._validate_centerline_batch(self.centerline_runtime)
 
     # ──────────────────────────────────────────────────────────────────────
     # Public API
@@ -1164,45 +1417,211 @@ class CathRodSolver(XPBDRodSolver):
         self.collision_pre_constraints_enabled = normalized == COLLISION_PROJECTION_STAGE_PRE
         self.collision_post_constraints_enabled = normalized == COLLISION_PROJECTION_STAGE_POST
 
-    def set_root_position(self, world_pos) -> None:
-        """Kinematically write the root particle position (fixed-rail advance)."""
-        if self._bws is not None:
-            raise NotImplementedError("set_root_position currently supports the single-rod path only.")
-        ws = self._ws
-        if ws is None:
+    def set_root_position(self, world_pos, env_ids=None) -> None:
+        """Kinematically write root particle positions (fixed-rail advance).
+
+        Args:
+            world_pos: ``(3,)`` applied to every selected env, or ``(N, 3)`` giving
+                one position per selected env.
+            env_ids: Envs to write. ``None`` means all. Ignored on the
+                single-env path.
+
+        Raises:
+            ValueError: If *world_pos* does not broadcast to the selected envs.
+            IndexError: If any env id is out of range.
+        """
+        if self._bws is None:
+            ws = self._ws
+            if ws is None:
+                return
+            p = to_host(world_pos, np.float32).reshape(-1)
+            if p.size != 3:
+                raise ValueError(f"world_pos must be (3,), got shape {p.shape}")
+            wp.launch(
+                _set_root_position_kernel,
+                dim=1,
+                inputs=[
+                    ws.positions,
+                    ws.predicted_positions,
+                    ws.velocities,
+                    wp.vec3(float(p[0]), float(p[1]), float(p[2])),
+                ],
+                device=self._device,
+            )
             return
-        p = np.asarray(world_pos, dtype=np.float32).reshape(-1)
-        if p.size != 3:
-            raise ValueError(f"world_pos must be (3,), got shape {p.shape}")
+
+        bws = self._bws
+        ids = self._resolve_env_ids(env_ids)
+        if ids.size == 0:
+            return
+        pos = to_host(world_pos, np.float32).reshape((-1, 3))
+        if pos.shape[0] == 1:
+            pos = np.repeat(pos, ids.size, axis=0)
+        elif pos.shape[0] != ids.size:
+            raise ValueError(
+                f"world_pos has {pos.shape[0]} rows but {ids.size} envs were selected"
+            )
+        env_id_view = self._stage_env_ids(bws, ids)
         wp.launch(
-            _set_root_position_kernel,
-            dim=1,
+            _set_root_position_batched_kernel,
+            dim=ids.size,
             inputs=[
-                ws.positions,
-                ws.predicted_positions,
-                ws.velocities,
-                wp.vec3(float(p[0]), float(p[1]), float(p[2])),
+                bws.positions,
+                bws.predicted_positions,
+                bws.velocities,
+                int(bws.num_points_per_rod),
+                env_id_view,
+                wp.array(pos, dtype=wp.vec3, device=self._device),
             ],
             device=self._device,
         )
 
-    def set_tip_bend(self, bend_angle: float, tip_num_edges: int | None = None) -> None:
-        """Update the tip-edge rest Darboux vector (fixed device pre-bend at startup)."""
+    def capture_tip_bend_baseline(self) -> None:
+        """Re-read the unsteered rest curvature that :meth:`set_tip_bend` adds to.
+
+        Runs by itself before the first steer, so the common case needs nothing.
+        Call it again after writing rest curvature straight into the solver --
+        :func:`i4h_arena.medical.newton_catheter_physics.seed_rest_curvature_from_path`
+        is the case that exists -- or that shape counts as part of the bend and
+        the next steer undoes it.
+
+        It snapshots the buffer as it stands, so calling it while a bend is
+        applied bakes that bend in as the new rest shape.
+        """
         ws = self._ws
+        if ws is not None and ws.num_edges > 0:
+            self._tip_bend_baseline_ws = wp.clone(ws.rest_darboux)
+        bws = self._bws
+        if bws is not None and bws.num_edges_per_rod > 0:
+            self._tip_bend_baseline_bws = wp.clone(bws.rest_darboux)
+
+    def _tip_bend_angle_buffer(self, bend_angle: Any, count: int) -> "wp.array":
+        """Coerce a steering command into a device float array of *count* angles.
+
+        A device-resident tensor is handed through as it stands, so steering the
+        tip every step from an action costs no host transfer. A scalar is
+        broadcast into a buffer that is reused across calls.
+        """
+        if isinstance(bend_angle, wp.array):
+            if bend_angle.dtype != wp.float32:
+                raise TypeError(f"bend_angle array must be float32, got {bend_angle.dtype}")
+            if bend_angle.shape[0] < count:
+                raise ValueError(f"bend_angle holds {bend_angle.shape[0]} angles, need {count}")
+            return bend_angle
+        if hasattr(bend_angle, "detach") and hasattr(bend_angle, "contiguous"):
+            flat = bend_angle.detach().reshape(-1).float().contiguous()
+            if flat.numel() < count:
+                raise ValueError(f"bend_angle holds {flat.numel()} angles, need {count}")
+            return wp.from_torch(flat, dtype=wp.float32)
+        values = np.asarray(bend_angle, dtype=np.float32).reshape(-1)
+        if values.size == 1:
+            values = np.full(count, float(values[0]), dtype=np.float32)
+        elif values.size < count:
+            raise ValueError(f"bend_angle holds {values.size} angles, need {count}")
+        buffer = self._tip_bend_angle_device
+        if buffer is None or buffer.shape[0] < count:
+            buffer = wp.zeros(count, dtype=wp.float32, device=self._device)
+            self._tip_bend_angle_device = buffer
+        buffer.assign(wp.array(values[:count], dtype=wp.float32, device=self._device))
+        return buffer
+
+    def set_tip_bend(self, bend_angle: Any, tip_num_edges: int | None = None) -> None:
+        """Steer the tip by rewriting the tip edges' rest Darboux vector.
+
+        Safe to call every step: the angle is absolute, measured from the
+        authored rest shape rather than from wherever the last call left the
+        buffer, so a controller supplies an angle and not a delta.
+
+        Args:
+            bend_angle: Turn of the tip *polyline*, in radians, either one value
+                shared by every env or one per env. A device tensor is used
+                where it lies.
+            tip_num_edges: Trailing edges to spread the bend over. Defaults to
+                the solver's own ``tip_num_edges``.
+
+        The bend is about the tip's local X axis. Pointing it at a particular
+        branch is the axial rotation command's job, which is also how a
+        pre-shaped wire is aimed in a real procedure.
+
+        The kernels write ``sin(angle / (2n - 1))`` into each of the ``n`` tip
+        edges, which is what makes the argument an angle rather than a solver
+        coordinate. The derivation, from Mosaic's measurement of this same
+        entry point:
+
+        ``rest_darboux`` holds the imaginary part of the rotation between an
+        edge's two end-frames, and a quaternion's imaginary part is
+        ``sin(phi / 2)``, so a per-edge value ``d`` turns that edge's frame by
+        ``phi = 2 asin(d)`` and the ``n`` tip frames turn by ``n phi`` in total.
+        The polyline turns *less* than the frames do: a segment points along the
+        average of the frames at its two ends, so the tip segments point at
+        ``phi/2, 3phi/2, ..., (n - 1/2) phi`` and the last one reaches only
+        ``(n - 1/2) phi``. The final half-hinge of frame rotation lives past the
+        last segment. Setting ``(n - 1/2) phi`` equal to the requested angle and
+        solving gives ``d = sin(angle / (2n - 1))``.
+
+        That matters because the node positions are what a camera sees and what
+        a policy is scored against, not the frame ladder. Writing ``angle / n``
+        per edge -- the obvious reading, and what this did before -- over-bends
+        by very nearly ``(2n - 1) / n``, so a requested 1.5 rad came out at
+        2.86 rad with the shipped ``tip_num_edges = 10``.
+
+        Two consequences worth knowing. Because ``sin`` is bounded, a large
+        request can no longer drive ``asin`` out of domain; the old form went
+        undefined once the argument passed ``n``, which a one-edge tip band
+        reached at 1 rad -- inside the shipped 1.5 rad ceiling. And the mapping
+        is exact only while ``angle <= (2n - 1) pi / 2``, beyond which
+        ``asin(sin(x))`` folds back and a larger request realizes a smaller
+        turn. That is 29.8 rad at ten edges and ``pi / 2`` at one, so the
+        shipped ceiling fits either way, with 0.07 rad to spare in the
+        single-edge case.
+
+        The derivation assumes the tip's baseline curvature is zero, which is
+        the shipped rest shape. Steering a tip that was authored curved adds to
+        that curvature, and the realized turn is then the sum rather than the
+        request.
+        """
         n_tip = int(tip_num_edges if tip_num_edges is not None else self.tip_num_edges)
-        if ws is None or ws.num_edges <= 0 or n_tip <= 0:
+        if n_tip <= 0:
             return
-        wp.launch(
-            _update_tip_rest_darboux_kernel,
-            dim=ws.num_edges,
-            inputs=[
-                ws.rest_darboux,
-                int(ws.num_edges),
-                n_tip,
-                float(bend_angle),
-            ],
-            device=self._device,
-        )
+        if self._tip_bend_baseline_ws is None and self._tip_bend_baseline_bws is None:
+            self.capture_tip_bend_baseline()
+        # Both workspaces exist in batched mode but only the batched buffers are
+        # read by the batched solve, so writing just _ws would silently do
+        # nothing. Keep them consistent by writing whichever exists.
+        ws = self._ws
+        bws = self._bws
+        # Sized once for the widest consumer: the single-env kernel reads entry
+        # zero, so one buffer serves both and a batched step does not reallocate.
+        needed = 1
+        if bws is not None and bws.num_edges_per_rod > 0:
+            needed = max(needed, int(bws.num_envs))
+        angles = self._tip_bend_angle_buffer(bend_angle, needed)
+        if ws is not None and ws.num_edges > 0 and self._tip_bend_baseline_ws is not None:
+            wp.launch(
+                _update_tip_rest_darboux_kernel,
+                dim=ws.num_edges,
+                inputs=[
+                    ws.rest_darboux,
+                    self._tip_bend_baseline_ws,
+                    int(ws.num_edges),
+                    n_tip,
+                    angles,
+                ],
+                device=self._device,
+            )
+        if bws is not None and bws.num_edges_per_rod > 0 and self._tip_bend_baseline_bws is not None:
+            wp.launch(
+                _update_tip_rest_darboux_batched_kernel,
+                dim=(bws.num_envs, bws.num_edges_per_rod),
+                inputs=[
+                    bws.rest_darboux,
+                    self._tip_bend_baseline_bws,
+                    int(bws.num_edges_per_rod),
+                    n_tip,
+                    angles,
+                ],
+                device=self._device,
+            )
 
     # ──────────────────────────────────────────────────────────────────────
     # Internal helpers
@@ -1216,17 +1635,170 @@ class CathRodSolver(XPBDRodSolver):
             self._dummy_collision_mesh_normals[dev] = wp.zeros(1, dtype=wp.vec3, device=dev)
         return self._dummy_collision_mesh_normals[dev], False
 
-    def _ensure_edge_corrections(self, ws: _Workspace, dev: str) -> "wp.array":
+    def _ensure_edge_corrections(
+        self, ws: _Workspace, dev: str, *, num_points: int | None = None
+    ) -> "wp.array":
         """Lazily allocate (or reuse) the per-rod edge-collision buffer."""
-        if self._mesh_edge_corrections is None or self._mesh_edge_corrections.shape[0] < ws.num_points:
-            self._mesh_edge_corrections = wp.zeros(max(1, ws.num_points), dtype=wp.vec3, device=dev)
+        n_points = int(num_points if num_points is not None else ws.num_points)
+        if self._mesh_edge_corrections is None or self._mesh_edge_corrections.shape[0] < n_points:
+            self._mesh_edge_corrections = wp.zeros(max(1, n_points), dtype=wp.vec3, device=dev)
         return self._mesh_edge_corrections
 
-    def _project_track_guidance(self, ws: _Workspace, dev: str) -> None:
-        """Project non-tip particles onto the insertion axis."""
-        if not self.track_enabled:
+    @staticmethod
+    def _validated_track_path(track_path: "np.ndarray | None") -> "np.ndarray | None":
+        """Normalize an ordered guidance path, or ``None`` for the straight rail.
+
+        Ordering is the caller's responsibility and cannot be checked here: the
+        points have to run proximal to distal along the route the wire takes,
+        because consecutive pairs are treated as segments. A shuffled path is a
+        valid polyline that happens to zig-zag across the anatomy.
+        """
+        if track_path is None:
+            return None
+        path = np.asarray(track_path, dtype=np.float32).reshape(-1, 3)
+        if len(path) < 2:
+            raise ValueError(f"track_path needs at least 2 points to form a segment, got {len(path)}")
+        if not np.all(np.isfinite(path)):
+            raise ValueError("track_path contains non-finite coordinates")
+        return path
+
+    def _track_path_for_device(self, dev: str) -> "wp.array | None":
+        """Upload the guidance path to ``dev`` once and reuse it thereafter."""
+        if self._track_path_host is None:
+            return None
+        cached = self._track_path_device.get(dev)
+        if cached is None:
+            cached = wp.array(self._track_path_host, dtype=wp.vec3, device=dev)
+            self._track_path_device[dev] = cached
+        return cached
+
+    def _project_containment_and_cleanup(
+        self,
+        project_containment,
+        predicted_positions,
+        inv_masses,
+        rest_lengths,
+        *,
+        num_envs: int,
+        points_per_env: int,
+        edges_per_env: int,
+        dev: str,
+    ) -> None:
+        """Alternate containment and length cleanup until both roughly hold.
+
+        These two projections disagree, and running one after the other lets
+        whichever went last win outright. Containment shoves a particle radially
+        without regard for its neighbours, which mangles edge lengths; the
+        cleanup sweeps equalize edge lengths with no idea where the vessel is,
+        which shoves particles laterally through the wall. Measured on the s0011
+        route with one containment followed by 128 sweeps: chords reach a
+        best-ever 100-104% while 13 of 41 particles sit outside the lumen, the
+        worst containment recorded. The sweeps simply had the last word.
+
+        Alternating in ``containment_cleanup_rounds`` rounds is the standard
+        answer -- projecting onto each constraint set in turn converges toward a
+        point in both, instead of to whichever was applied last. The sweep budget
+        is divided across rounds rather than multiplied by them, so raising the
+        round count trades sweep depth per round for agreement between the two
+        and leaves the cleanup cost alone. Containment itself is re-run per
+        round, which is the added cost.
+
+        One round reproduces the original sequencing exactly.
+        """
+        rounds = max(1, int(self.containment_cleanup_rounds))
+        total = max(int(self.containment_cleanup_iterations), 0)
+        for round_index in range(rounds):
+            if project_containment is not None:
+                project_containment()
+            # Spread the remainder over the earliest rounds so the totals match
+            # the single-round budget exactly and a sweep is never silently lost.
+            sweeps = total // rounds + (1 if round_index < total % rounds else 0)
+            self._project_distance_cleanup(
+                predicted_positions,
+                inv_masses,
+                rest_lengths,
+                num_envs=num_envs,
+                points_per_env=points_per_env,
+                edges_per_env=edges_per_env,
+                dev=dev,
+                iterations=sweeps,
+            )
+
+    def _project_distance_cleanup(
+        self,
+        predicted_positions,
+        inv_masses,
+        rest_lengths,
+        *,
+        num_envs: int,
+        points_per_env: int,
+        edges_per_env: int,
+        dev: str,
+        iterations: int | None = None,
+    ) -> None:
+        """Re-satisfy edge lengths that a post-solve projection has disturbed.
+
+        Ordered after containment rather than before it: running first would just
+        be more constraint solve, and containment would overwrite the result as
+        it already overwrites the solve's. ``iterations`` overrides the configured
+        budget so a caller alternating the two can spend it a slice at a time.
+        """
+        sweeps = self.containment_cleanup_iterations if iterations is None else int(iterations)
+        if sweeps <= 0 or edges_per_env <= 0:
             return
-        end_idx = max(1, ws.num_points - self.tip_num_edges)
+        for _ in range(sweeps):
+            # Even edges then odd. Splitting the sweep is what keeps two threads
+            # off the same shared particle.
+            for color in (0, 1):
+                wp.launch(
+                    _distance_cleanup_kernel,
+                    dim=(num_envs, edges_per_env),
+                    inputs=[
+                        predicted_positions,
+                        inv_masses,
+                        rest_lengths,
+                        int(points_per_env),
+                        int(edges_per_env),
+                        int(color),
+                        float(self.containment_cleanup_relaxation),
+                    ],
+                    device=dev,
+                )
+
+    def _track_guidance_active(self, stage: str) -> bool:
+        """Is guidance enabled and scheduled for this side of the solve?"""
+        return self.track_enabled and self.track_stage == stage
+
+    def _track_end_index(self, points_per_env: int) -> int:
+        """First particle index guidance leaves free.
+
+        At least one particle stays guided even when the free window is asked
+        to cover the whole rod, since a guidance pass that touches nothing is
+        better expressed by disabling it.
+        """
+        free_edges = self.tip_num_edges if self.track_free_distal_edges is None else self.track_free_distal_edges
+        return max(1, int(points_per_env) - int(free_edges))
+
+    def _project_track_guidance(self, ws: _Workspace, dev: str) -> None:
+        """Project non-tip particles onto the insertion axis or path."""
+        end_idx = self._track_end_index(ws.num_points)
+        path = self._track_path_for_device(dev)
+        if path is not None:
+            wp.launch(
+                _track_polyline_kernel,
+                dim=ws.num_points,
+                inputs=[
+                    ws.predicted_positions,
+                    ws.inv_masses,
+                    path,
+                    int(path.shape[0]),
+                    float(self.track_stiffness),
+                    int(end_idx),
+                    int(ws.num_points),
+                ],
+                device=dev,
+            )
+            return
         wp.launch(
             _track_sliding_kernel,
             dim=ws.num_points,
@@ -1238,53 +1810,115 @@ class CathRodSolver(XPBDRodSolver):
                 float(self.track_length),
                 float(self.track_stiffness),
                 int(end_idx),
+                int(ws.num_points),
             ],
             device=dev,
         )
 
-    def _project_vessel_containment(self, ws: _Workspace, dev: str) -> None:
-        """Run vessel containment for the configured number of iterations."""
+    def _project_track_guidance_batched(self, bws, dev: str) -> None:
+        """Track guidance for every env in one launch (the track is shared)."""
+        points_per_env = int(bws.num_points_per_rod)
+        end_idx = self._track_end_index(points_per_env)
+        path = self._track_path_for_device(dev)
+        if path is not None:
+            wp.launch(
+                _track_polyline_kernel,
+                dim=bws.np_total,
+                inputs=[
+                    bws.predicted_positions,
+                    bws.inv_masses,
+                    path,
+                    int(path.shape[0]),
+                    float(self.track_stiffness),
+                    int(end_idx),
+                    points_per_env,
+                ],
+                device=dev,
+            )
+            return
+        wp.launch(
+            _track_sliding_kernel,
+            dim=bws.np_total,
+            inputs=[
+                bws.predicted_positions,
+                bws.inv_masses,
+                self.track_start,
+                self.track_dir,
+                float(self.track_length),
+                float(self.track_stiffness),
+                int(end_idx),
+                points_per_env,
+            ],
+            device=dev,
+        )
+
+    def _project_vessel_containment(
+        self,
+        ws: _Workspace,
+        dev: str,
+        *,
+        num_points: int | None = None,
+        num_edges: int | None = None,
+        points_per_env: int | None = None,
+        edges_per_env: int | None = None,
+    ) -> None:
+        """Run vessel containment for the configured number of iterations.
+
+        Every kernel here is per-particle or per-rod-edge against a *shared*
+        static mesh, so the batched path is the same launches over the whole
+        concatenated buffer. The counts default to this workspace's own, which
+        is what the single-env path passes.
+
+        Args:
+            num_points: Total particles to cover (default ``ws.num_points``).
+            num_edges: Total rod edges to cover (default ``ws.num_edges``).
+            points_per_env: Particles per env, for mapping an edge to its own
+                env's particle window. Defaults to *num_points* (single env).
+            edges_per_env: Rod edges per env. Defaults to *num_edges*.
+        """
         if not self.collision_enabled or self.collision_mesh is None:
             return
 
+        n_points = int(num_points if num_points is not None else ws.num_points)
+        n_edges = int(num_edges if num_edges is not None else ws.num_edges)
+        ppe = int(points_per_env if points_per_env is not None else n_points)
+        epe = int(edges_per_env if edges_per_env is not None else n_edges)
+
         smooth_normals, use_smooth = self._collision_normals_for_device(dev)
+        mesh_args = [
+            self.collision_mesh.id,
+            smooth_normals,
+            ws.inv_masses,
+            float(self.mesh_edge_collision_radius),
+            float(self.mesh_edge_collision_query_radius),
+            float(self.sign_scale),
+            bool(use_smooth),
+            int(self.mesh_edge_collision_max_triangles),
+        ]
+        sdf_args = [
+            self.collision_mesh.id,
+            smooth_normals,
+            ws.inv_masses,
+            float(self.sign_scale),
+            bool(use_smooth),
+            float(self.target_phi),
+            float(self.max_dist),
+        ]
 
         if self.mesh_edge_collision_enabled:
-            corrections = self._ensure_edge_corrections(ws, dev)
+            corrections = self._ensure_edge_corrections(ws, dev, num_points=n_points)
             for _ in range(self.collision_iterations):
-                wp.launch(_clear_vec3_kernel, dim=ws.num_points, inputs=[corrections], device=dev)
+                wp.launch(_clear_vec3_kernel, dim=n_points, inputs=[corrections], device=dev)
                 wp.launch(
                     _project_mesh_vertex_collision_kernel_averaged,
-                    dim=ws.num_points,
-                    inputs=[
-                        ws.predicted_positions,
-                        self.collision_mesh.id,
-                        smooth_normals,
-                        ws.inv_masses,
-                        float(self.mesh_edge_collision_radius),
-                        float(self.mesh_edge_collision_query_radius),
-                        float(self.sign_scale),
-                        bool(use_smooth),
-                        int(self.mesh_edge_collision_max_triangles),
-                        corrections,
-                    ],
+                    dim=n_points,
+                    inputs=[ws.predicted_positions, *mesh_args, corrections],
                     device=dev,
                 )
                 wp.launch(
                     _project_mesh_edge_collision_kernel_averaged,
-                    dim=ws.num_edges,
-                    inputs=[
-                        ws.predicted_positions,
-                        self.collision_mesh.id,
-                        smooth_normals,
-                        ws.inv_masses,
-                        float(self.mesh_edge_collision_radius),
-                        float(self.mesh_edge_collision_query_radius),
-                        float(self.sign_scale),
-                        bool(use_smooth),
-                        int(self.mesh_edge_collision_max_triangles),
-                        corrections,
-                    ],
+                    dim=n_edges,
+                    inputs=[ws.predicted_positions, *mesh_args, corrections, ppe, epe],
                     device=dev,
                 )
                 # Robustness pass: add max-penetration contacts to catch deep
@@ -1293,41 +1927,19 @@ class CathRodSolver(XPBDRodSolver):
                 # one flush applies the combined displacement.
                 wp.launch(
                     _project_mesh_vertex_collision_kernel,
-                    dim=ws.num_points,
-                    inputs=[
-                        ws.predicted_positions,
-                        self.collision_mesh.id,
-                        smooth_normals,
-                        ws.inv_masses,
-                        float(self.mesh_edge_collision_radius),
-                        float(self.mesh_edge_collision_query_radius),
-                        float(self.sign_scale),
-                        bool(use_smooth),
-                        int(self.mesh_edge_collision_max_triangles),
-                        corrections,
-                    ],
+                    dim=n_points,
+                    inputs=[ws.predicted_positions, *mesh_args, corrections],
                     device=dev,
                 )
                 wp.launch(
                     _project_mesh_edge_collision_kernel,
-                    dim=ws.num_edges,
-                    inputs=[
-                        ws.predicted_positions,
-                        self.collision_mesh.id,
-                        smooth_normals,
-                        ws.inv_masses,
-                        float(self.mesh_edge_collision_radius),
-                        float(self.mesh_edge_collision_query_radius),
-                        float(self.sign_scale),
-                        bool(use_smooth),
-                        int(self.mesh_edge_collision_max_triangles),
-                        corrections,
-                    ],
+                    dim=n_edges,
+                    inputs=[ws.predicted_positions, *mesh_args, corrections, ppe, epe],
                     device=dev,
                 )
                 wp.launch(
                     _apply_mesh_edge_collision_corrections_kernel,
-                    dim=ws.num_points,
+                    dim=n_points,
                     inputs=[ws.predicted_positions, ws.inv_masses, corrections],
                     device=dev,
                 )
@@ -1335,43 +1947,36 @@ class CathRodSolver(XPBDRodSolver):
                 # even if edge contacts miss a high-curvature corner.
                 wp.launch(
                     _project_vessel_containment_kernel,
-                    dim=ws.num_points,
-                    inputs=[
-                        ws.positions,
-                        ws.predicted_positions,
-                        self.collision_mesh.id,
-                        smooth_normals,
-                        ws.inv_masses,
-                        float(self.sign_scale),
-                        bool(use_smooth),
-                        float(self.target_phi),
-                        float(self.max_dist),
-                    ],
+                    dim=n_points,
+                    inputs=[ws.positions, ws.predicted_positions, *sdf_args],
                     device=dev,
                 )
         else:
             for _ in range(self.collision_iterations):
                 wp.launch(
                     _project_vessel_containment_kernel,
-                    dim=ws.num_points,
-                    inputs=[
-                        ws.positions,
-                        ws.predicted_positions,
-                        self.collision_mesh.id,
-                        smooth_normals,
-                        ws.inv_masses,
-                        float(self.sign_scale),
-                        bool(use_smooth),
-                        float(self.target_phi),
-                        float(self.max_dist),
-                    ],
+                    dim=n_points,
+                    inputs=[ws.positions, ws.predicted_positions, *sdf_args],
                     device=dev,
                 )
 
         if getattr(self, "_apply_friction_after_containment", True):
-            self._apply_collision_friction(ws, dev)
+            self._apply_collision_friction(ws, dev, num_points=n_points)
 
-    def _apply_collision_friction(self, ws: _Workspace, dev: str) -> None:
+    def _project_vessel_containment_batched(self, bws, dev: str) -> None:
+        """Static-mesh containment for every env in one launch per kernel."""
+        self._project_vessel_containment(
+            bws,
+            dev,
+            num_points=bws.np_total,
+            num_edges=bws.ne_total,
+            points_per_env=bws.num_points_per_rod,
+            edges_per_env=bws.num_edges_per_rod,
+        )
+
+    def _apply_collision_friction(
+        self, ws: _Workspace, dev: str, *, num_points: int | None = None
+    ) -> None:
         """Damp tangential velocity where the rod contacts the vessel wall."""
         if (
             not self.collision_friction_enabled
@@ -1384,7 +1989,7 @@ class CathRodSolver(XPBDRodSolver):
         smooth_normals, use_smooth = self._collision_normals_for_device(dev)
         wp.launch(
             _apply_wall_contact_friction_kernel,
-            dim=ws.num_points,
+            dim=int(num_points if num_points is not None else ws.num_points),
             inputs=[
                 ws.positions,
                 ws.velocities,
@@ -1421,11 +2026,7 @@ class CathRodSolver(XPBDRodSolver):
             stage: ``"pre"`` or ``"post"`` — when containment runs relative to
                 the XPBD constraint solve. Unchanged when omitted.
         """
-        if runtime is not None and self._bws is not None:
-            raise NotImplementedError(
-                "CathRodSolver centerline vessel deformation is only implemented "
-                f"for the single-environment path, but this solver has num_envs={self._num_envs}."
-            )
+        self._validate_centerline_batch(runtime)
         self.centerline_runtime = runtime
         if stage is not None:
             self.centerline_containment_stage = _normalize_collision_projection_stage(stage)
@@ -1434,6 +2035,56 @@ class CathRodSolver(XPBDRodSolver):
         self.centerline_containment_enabled = bool(containment_enabled) and runtime is not None
         # Centerline predict/project/finalize is outside the captured rod graph.
         self.reset_cuda_graph()
+
+    @property
+    def contact_depth(self) -> float:
+        """Deepest lumen penetration in metres during the last substep.
+
+        Covers centerline containment only, so static mesh collision and the
+        floor plane do not contribute. Zero without an attached centerline
+        runtime.
+        """
+        runtime = self.centerline_runtime
+        return 0.0 if runtime is None else runtime.contact_depth
+
+    @property
+    def contact_count(self) -> int:
+        """Contacting centerline samples during the last substep."""
+        runtime = self.centerline_runtime
+        return 0 if runtime is None else runtime.contact_count
+
+    @property
+    def contact_depth_per_env(self) -> np.ndarray:
+        """Deepest lumen penetration per env, shape ``(num_envs,)``.
+
+        A per-env signal is what a trainer needs in order to penalise or
+        terminate the env that perforated, rather than the whole batch.
+        """
+        runtime = self.centerline_runtime
+        if runtime is None:
+            return np.zeros(self._num_envs, dtype=np.float32)
+        return runtime.contact_depth_per_env
+
+    @property
+    def contact_count_per_env(self) -> np.ndarray:
+        """Contacting centerline samples per env, shape ``(num_envs,)``."""
+        runtime = self.centerline_runtime
+        if runtime is None:
+            return np.zeros(self._num_envs, dtype=np.int32)
+        return runtime.contact_count_per_env
+
+    def reset(self, env_ids=None) -> None:
+        """Reset the listed envs' catheter *and* their vessels.
+
+        Extends :meth:`XPBDRodSolver.reset` so a reset env starts against an
+        undeformed wall. Without this the rod would return to rest inside a
+        lumen still carrying the previous episode's deformation, which would
+        leak state across episode boundaries.
+        """
+        super().reset(env_ids)
+        runtime = self.centerline_runtime
+        if runtime is not None:
+            runtime.reset(env_ids)
 
     def _can_use_cuda_graph(self, sub_dt: float) -> bool:
         # The vessel launches are inside _substep, so they *are* capturable — a
@@ -1470,25 +2121,147 @@ class CathRodSolver(XPBDRodSolver):
         super()._substep(dt)
         runtime.finalize(dt)
 
+    def _substep_batched(self, dt: float) -> None:
+        """Batched counterpart of :meth:`_substep`, driving the per-env vessels.
+
+        The base :meth:`step` dispatches straight to this method when batched, so
+        the vessel lifecycle has to be driven here as well — otherwise the walls
+        would stay frozen while every env's rod advanced against them.
+        """
+        runtime = self.centerline_runtime
+        if runtime is None:
+            super()._substep_batched(dt)
+            return
+
+        runtime.begin_step(self._bws.positions)
+        runtime.predict(dt)
+        runtime.project_constraints()
+        super()._substep_batched(dt)
+        runtime.finalize(dt)
+
+    def _validate_centerline_batch(self, runtime) -> None:
+        """Require one independent vessel per env, so no env shares a wall.
+
+        A mismatch would either index out of bounds in the batched containment
+        kernel or, worse, quietly couple envs through a single vessel — which
+        would make every env's trajectory depend on its neighbours.
+        """
+        if runtime is None:
+            return
+        vessel_envs = int(getattr(runtime, "num_envs", 1))
+        if vessel_envs != self._num_envs:
+            raise ValueError(
+                f"centerline vessel has num_envs={vessel_envs} but this solver has "
+                f"num_envs={self._num_envs}. Build the runtime with "
+                f"CenterlineVesselRuntime.from_tree(..., num_envs={self._num_envs}) so each "
+                "env owns its own deformable vessel."
+            )
+
     def _centerline_containment_active(self, stage: str) -> bool:
         return self.centerline_containment_enabled and self.centerline_containment_stage == stage
 
+    def _coupled_centerline_active(self) -> bool:
+        return self.centerline_containment_enabled and self.contact_coupling_iterations > 0
+
+    def _project_direct(self, ws: _Workspace, dt: float, dev: str) -> None:
+        """Reconcile live contact with positions AND material frames.
+
+        Compliance and elastic multipliers are prepared once by the base
+        substep. Keep those multipliers across nonlinear iterations, then let
+        the base integrator derive velocities from the final solved state.
+        No position-only cleanup follows this solve.
+        """
+        if not self._coupled_centerline_active():
+            return super()._project_direct(ws, dt, dev)
+        for _ in range(self.contact_coupling_iterations):
+            if self.centerline_runtime.two_way:
+                self.centerline_runtime.project_constraints()
+            self._project_centerline_containment(ws)
+            super()._project_direct(ws, dt, dev)
+
+    def _project_direct_batched(self, bws, dt: float, dev: str) -> None:
+        """Independent contact/elastic iterations for each rod in the batch."""
+        if not self._coupled_centerline_active():
+            return super()._project_direct_batched(bws, dt, dev)
+        for _ in range(self.contact_coupling_iterations):
+            if self.centerline_runtime.two_way:
+                self.centerline_runtime.project_constraints()
+            self._project_centerline_containment_batched(bws)
+            super()._project_direct_batched(bws, dt, dev)
+
     def _pre_constraints_hook(self, ws: _Workspace, dt: float, dev: str) -> None:
-        """Apply vessel containment *before* XPBD constraint solve when configured."""
+        """Apply guidance and vessel containment *before* XPBD constraint solve."""
         del dt
+        # Guidance leads, so containment sees a rod already on its route and has
+        # only residual penetration left to answer for.
+        if self._track_guidance_active(COLLISION_PROJECTION_STAGE_PRE):
+            self._project_track_guidance(ws, dev)
         if self.collision_pre_constraints_enabled:
             self._project_vessel_containment(ws, dev)
-        if self._centerline_containment_active(COLLISION_PROJECTION_STAGE_PRE):
+        if (
+            not self._coupled_centerline_active()
+            and self._centerline_containment_active(COLLISION_PROJECTION_STAGE_PRE)
+        ):
             self._project_centerline_containment(ws)
 
     def _post_constraints_hook(self, ws: _Workspace, dt: float, dev: str) -> None:
         """Apply track guidance and vessel containment *after* XPBD constraint solve."""
         del dt
-        self._project_track_guidance(ws, dev)
+        if self._track_guidance_active(COLLISION_PROJECTION_STAGE_POST):
+            self._project_track_guidance(ws, dev)
         if self.collision_post_constraints_enabled:
             self._project_vessel_containment(ws, dev)
+        if self._coupled_centerline_active():
+            return
+        containment = None
         if self._centerline_containment_active(COLLISION_PROJECTION_STAGE_POST):
-            self._project_centerline_containment(ws)
+            containment = lambda: self._project_centerline_containment(ws)  # noqa: E731
+        self._project_containment_and_cleanup(
+            containment,
+            ws.predicted_positions,
+            ws.inv_masses,
+            ws.rest_lengths,
+            num_envs=1,
+            points_per_env=int(ws.num_points),
+            edges_per_env=int(ws.num_edges),
+            dev=dev,
+        )
+
+    def _pre_constraints_hook_batched(self, bws, dt: float, dev: str) -> None:
+        """Batched counterpart of :meth:`_pre_constraints_hook`."""
+        del dt
+        if self._track_guidance_active(COLLISION_PROJECTION_STAGE_PRE):
+            self._project_track_guidance_batched(bws, dev)
+        if self.collision_pre_constraints_enabled:
+            self._project_vessel_containment_batched(bws, dev)
+        if (
+            not self._coupled_centerline_active()
+            and self._centerline_containment_active(COLLISION_PROJECTION_STAGE_PRE)
+        ):
+            self._project_centerline_containment_batched(bws)
+
+    def _post_constraints_hook_batched(self, bws, dt: float, dev: str) -> None:
+        """Batched counterpart of :meth:`_post_constraints_hook`."""
+        del dt
+        if self._track_guidance_active(COLLISION_PROJECTION_STAGE_POST):
+            self._project_track_guidance_batched(bws, dev)
+        if self.collision_post_constraints_enabled:
+            self._project_vessel_containment_batched(bws, dev)
+        if self._coupled_centerline_active():
+            return
+        containment = None
+        if self._centerline_containment_active(COLLISION_PROJECTION_STAGE_POST):
+            containment = lambda: self._project_centerline_containment_batched(bws)  # noqa: E731
+        self._project_containment_and_cleanup(
+            containment,
+            bws.predicted_positions,
+            bws.inv_masses,
+            bws.rest_lengths,
+            num_envs=int(bws.num_envs),
+            points_per_env=int(bws.num_points_per_rod),
+            edges_per_env=int(bws.num_edges_per_rod),
+            dev=dev,
+        )
 
     def _project_centerline_containment(self, ws: _Workspace) -> None:
         """Project catheter predicted positions into the live centerline lumen."""
@@ -1500,6 +2273,18 @@ class CathRodSolver(XPBDRodSolver):
             ws.inv_masses,
             ws.num_points,
             ws.num_edges,
+        )
+
+    def _project_centerline_containment_batched(self, bws) -> None:
+        """Contain every env's catheter against its own live lumen in one launch."""
+        runtime = self.centerline_runtime
+        if runtime is None:
+            return
+        runtime.project_containment(
+            bws.predicted_positions,
+            bws.inv_masses,
+            bws.np_total,
+            bws.ne_total,
         )
 
 
@@ -1516,7 +2301,9 @@ __all__ = [
     "_project_mesh_vertex_collision_kernel_averaged",
     "_project_vessel_containment_kernel",
     "_sample_signed_distance_kernel",
+    "_set_root_position_batched_kernel",
     "_set_root_position_kernel",
+    "_update_tip_rest_darboux_batched_kernel",
     "_update_tip_rest_darboux_kernel",
     "_apply_wall_contact_friction_kernel",
 ]
