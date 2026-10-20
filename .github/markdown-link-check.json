@@ -5,9 +5,6 @@
             "pattern": "https://github.com/isaac-for-healthcare/i4h-physics-simulation"
         },
         {
-            "pattern": "https://github.com/isaac-for-healthcare/i4h-digital-twin-internal"
-        },
-        {
             "pattern": "http://0.0.0.0:8000"
         },
         {

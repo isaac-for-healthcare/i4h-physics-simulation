@@ -143,7 +143,7 @@ Notes:
 
 Use the digital twin package to generate patient-specific CT artifacts, then initialize solver constraints from those artifacts.
 
-These packages ship in the [Isaac for Healthcare digital twin repository](https://github.com/isaac-for-healthcare/i4h-digital-twin-internal) under `patient-digital-twin`. Two pieces matter for interoperability: `vasculature_digital_twin` provides the `vdt-*` commands used below, and `imaging_to_mesh` converts a vessel mask into the vessel USD (`convert_mask_to_usd`) that carries the lumen geometry into simulation.
+These packages ship in the [Isaac for Healthcare digital twin repository](https://github.com/isaac-for-healthcare/i4h-digital-twin/tree/main/patient-digital-twin) under `patient-digital-twin`. Two pieces matter for interoperability: `vasculature_digital_twin` provides the `vdt-*` commands used below, and `imaging_to_mesh` converts a vessel mask into the vessel USD (`convert_mask_to_usd`) that carries the lumen geometry into simulation.
 
 1) Generate CT cache + vessel artifacts:
 
