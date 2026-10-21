@@ -200,3 +200,32 @@ A 2-world model, each world with a revolute pendulum and 5 particles, 50 steps a
 - **MuJoCo-Warp:** particles untouched; in-place and double-buffered `body_q` identical (max difference 0); the output buffer's particles are never written.
 - **Featherstone:** particles integrated (they fall under gravity); in-place and double-buffered `body_q` identical.
 - **Featherstone with `integrate_particles` disabled:** particles untouched; `body_q` identical to the default. It still evaluates particle contact forces into `particle_f`/`body_f` (`solver_featherstone.py:552-557`), which is why it is rejected.
+
+## 7. Internal navigation commands (migration worktree)
+
+`catheter_control.root_mode` defaults to `track`. `external_pose` takes a full
+batch through `control.write_root_poses(positions, rotations)` or
+`component.write_root_poses(..., control="catheter_control")`. Positions are
+(E,3), rotations are xyzw (E,4), in component coordinates. NumPy, Warp float32
+scalar/vector arrays and Torch float32 tensors are accepted. Device sources must
+be on the component device. Torch's current producer stream is ordered before
+Warp; callers using another Warp producer stream must establish its dependency.
+Destination command buffers retain their identity across writes and resets.
+
+External poses own both translation and rotation without slew or rate integration;
+the first two action columns are inactive, tip steering remains active. Rigid
+mount ownership and external-pose ownership are mutually exclusive. Selected
+reset restores authored startup root commands. `track_path` is an immutable
+component-frame polyline; `distal_free_nodes` is independent of steering tip edges.
+Without these settings the existing straight guide behavior is preserved.
+
+Rod assets accept independent `startup_positions`, `startup_frames`,
+`rest_lengths` and `rest_curvature` (dimensionless Darboux vectors). Placement is
+restored on reset; placement on a curve does not author material curvature.
+Linear graph containment accepts per-environment `interior_deadband` (default 1)
+and `interior_stiffness` (default 0). Interior pull acts on the wire only and is
+not wall contact. Nonzero interior stiffness requires `spline: false`.
+
+For the internal migration, legacy trajectory comparisons in section 4 are
+**diagnostics**, not release gates. Analytic limits, coupling checks and the
+existing bent-lumen bound remain gates; see `migration/internal-endoluminal.md`.

@@ -91,24 +91,53 @@ def material_frames(positions: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 
 def add_rod(scene: Scene, name: str, start, direction, count: int, segment_length: float, radius: float,
-            mass: float = 1.0, lock_root: bool = True, visual=None, membership=None) -> Body:
+            mass: float = 1.0, lock_root: bool = True, visual=None, membership=None,
+            startup_positions=None, startup_frames=None, rest_lengths=None, rest_curvature=None) -> Body:
     """A straight rod of ``count`` nodes spaced ``segment_length`` apart, one part named after the body.
     ``mass`` is per node; a locked root has zero inverse mass and inverse rotational mass (the
-    catheter's insertion point, driven by ``catheter_control``)."""
+    catheter's insertion point, driven by ``catheter_control``).
+    ``startup_positions (P,3)`` and ``startup_frames (P,4)`` author placement/reset,
+    with normalized xyzw frames. ``rest_lengths (P-1,)`` and dimensionless
+    ``rest_curvature (P-1,3)`` author material independently; absent overrides
+    retain the straight rod's material even when startup placement is curved."""
     P = int(count)
     if P < 3:
         raise ValueError(f"rod {name!r}: count must be at least 3, got {P}")
-    if float(segment_length) <= 0.0 or float(radius) <= 0.0 or float(mass) <= 0.0:
+    if not np.isfinite([segment_length, radius, mass]).all() or min(segment_length, radius, mass) <= 0.0:
         raise ValueError(f"rod {name!r}: segment_length, radius and mass must be positive")
     start = np.asarray(start, np.float32).reshape(3)
     direction = np.asarray(direction, np.float64).reshape(3)
     norm = float(np.linalg.norm(direction))
-    if norm < 1.0e-8:
+    if not np.isfinite(start).all() or not np.isfinite(norm) or norm < 1.0e-8:
         raise ValueError(f"rod {name!r}: direction must be non-zero")
     direction = (direction / norm).astype(np.float32)
     positions = start[None] + np.arange(P, dtype=np.float32)[:, None] * float(segment_length) * direction[None]
     frames, rest_darboux = material_frames(positions)
     rest_len = np.linalg.norm(np.diff(positions, axis=0), axis=1).astype(np.float32)
+    # Material defaults remain straight, independently of startup placement.
+    # Validate before allocating a body or any device buffers.
+    def authored(value, shape, label):
+        array = np.asarray(value, dtype=np.float32)
+        if array.shape != shape or not np.isfinite(array).all():
+            raise ValueError(f"rod {name!r}: {label} must have finite shape {shape}")
+        return array.copy()
+
+    if startup_positions is not None:
+        positions = authored(startup_positions, (P, 3), "startup_positions")
+        frames, _ = material_frames(positions)
+    if startup_frames is not None:
+        frames = authored(startup_frames, (P, 4), "startup_frames")
+        norms = np.linalg.norm(frames.astype(np.float64), axis=1)
+        if np.any(norms <= 1.0e-12):
+            raise ValueError(f"rod {name!r}: startup_frames must contain nonzero xyzw quaternions")
+        frames /= norms[:, None]
+    if rest_lengths is not None:
+        rest_len = authored(rest_lengths, (P - 1,), "rest_lengths")
+        if np.any(rest_len <= 0.0):
+            raise ValueError(f"rod {name!r}: rest_lengths must be positive")
+    if rest_curvature is not None:
+        rest_darboux = authored(rest_curvature, (P - 1, 3), "rest_curvature")
+    start = positions[0].copy()
     inv_mass = np.full(P, 1.0 / float(mass), np.float32)
     inv_mass_q = np.ones(P, np.float32)
     if lock_root:
