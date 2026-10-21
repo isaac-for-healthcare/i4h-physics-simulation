@@ -1185,7 +1185,8 @@ class CathRodSolver(XPBDRodSolver):
             snapped to the track.
         particle_radius: Effective rod radius for collision detection (metres).
         segment_length: Rest length of a single rod segment (metres).  Used
-            to set the default ``max_dist`` BVH search radius.
+            to set the default ``max_dist`` BVH search radius, together with
+            the longest of ``env_segment_lengths`` when that is given.
         track_stiffness: Blend factor for track snapping (``0`` = free,
             ``1`` = perfectly locked to axis).
         track_enabled: Toggle track guidance on/off.
@@ -1369,9 +1370,8 @@ class CathRodSolver(XPBDRodSolver):
             self.set_collision_projection_stage(collision_projection_stage)
         self.sign_scale = float(sign_scale)
         self.target_phi = float(target_phi) if target_phi is not None else -float(particle_radius)
-        self.max_dist = (
-            float(max_dist) if max_dist is not None else 2.0 * float(particle_radius) + float(segment_length)
-        )
+        longest_segment = max(float(segment_length), *self.env_segment_lengths)
+        self.max_dist = float(max_dist) if max_dist is not None else 2.0 * float(particle_radius) + longest_segment
 
         # Centerline Cosserat vessel (optional). The centerline is its own
         # collision path, so it carries its own stage rather than reusing the

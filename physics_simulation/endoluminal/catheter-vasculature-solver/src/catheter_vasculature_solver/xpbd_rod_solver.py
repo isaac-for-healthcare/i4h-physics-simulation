@@ -2690,6 +2690,11 @@ class XPBDRodSolver:
         floor_restitution: Bounce coefficient on floor contact (0..1). Applied
             in both single- and multi-env paths.
         initial_height: Z offset for the rod root particle.
+        env_segment_lengths: Optional rest length of one segment for each
+            environment, ``(num_envs,)``. Every rod keeps ``num_segments``
+            segments, so this sets a different rod length per environment;
+            particle masses follow each environment's own segment length.
+            Defaults to ``config.geometry.segment_length`` everywhere.
     """
 
     def __init__(
@@ -2701,6 +2706,7 @@ class XPBDRodSolver:
         floor_restitution: float = 0.0,
         initial_height: float = 0.5,
         solver_backend: str = XPBD_DIRECT_SOLVE_BLOCK_THOMAS,
+        env_segment_lengths: Any = None,
     ):
         if num_envs < 1:
             raise ValueError(f"num_envs must be >= 1, got {num_envs}")
@@ -2719,7 +2725,9 @@ class XPBDRodSolver:
         sol = config.solver
 
         num_segments = int(geo.num_segments)
-        seg_len = float(geo.segment_length)
+        env_seg_lens = self._validated_segment_lengths(env_segment_lengths, float(geo.segment_length))
+        self.env_segment_lengths = tuple(float(value) for value in env_seg_lens)
+        seg_len = self.env_segment_lengths[0]
         num_points = num_segments + 1
         num_edges = num_segments
 
@@ -2732,8 +2740,9 @@ class XPBDRodSolver:
 
         # ---- compute material properties ----
         r = float(geo.radius) if not isinstance(geo.radius, list) else float(geo.radius[0])
-        particle_mass = float(mat.density) * math.pi * r * r * seg_len
-        inv_mass = 1.0 / particle_mass if particle_mass > 0.0 else 0.0
+        particle_masses = float(mat.density) * math.pi * r * r * env_seg_lens
+        env_inv_masses = np.where(particle_masses > 0.0, 1.0 / np.maximum(particle_masses, 1.0e-30), 0.0)
+        inv_mass = float(env_inv_masses[0])
 
         young_modulus = float(mat.young_modulus)
         if mat.shear_modulus is not None:
@@ -2821,12 +2830,15 @@ class XPBDRodSolver:
             bws.torsion_modulus.assign(wp.array(tors_np, dtype=wp.float32, device=device))
             bws.gravity.assign(wp.array(gravity_np, dtype=wp.vec3, device=device))
 
-            # Tile per-rod state across envs
-            pos_tiled = np.tile(positions_np, (self._num_envs, 1))
+            # Tile per-rod state across envs, scaled to each env's segment length.
+            scale = (env_seg_lens / seg_len).astype(np.float32)
+            pos_tiled = (positions_np[None] * scale[:, None, None]).reshape(-1, 3)
+            pos_tiled[:, 2] = initial_height
             ori_tiled = np.tile(orientations_np, (self._num_envs, 1))
-            inv_mass_tiled = np.tile(inv_masses_np, self._num_envs)
+            inv_mass_tiled = np.repeat(env_inv_masses.astype(np.float32), num_points)
+            inv_mass_tiled[::num_points] = 0.0
             quat_inv_tiled = np.tile(quat_inv_masses_np, self._num_envs)
-            rest_len_tiled = np.tile(rest_lengths_np, self._num_envs)
+            rest_len_tiled = np.repeat(env_seg_lens.astype(np.float32), num_edges)
             rest_dar_tiled = np.tile(rest_darboux_np, (self._num_envs, 1))
             bend_stiff_tiled = np.tile(bend_stiff_np, (self._num_envs, 1))
 
@@ -2858,6 +2870,17 @@ class XPBDRodSolver:
         # Substep duration of the most recent step, needed to turn the
         # accumulated Lagrange multipliers into forces in proximal_reaction().
         self._last_sub_dt = 0.0
+
+    def _validated_segment_lengths(self, values: Any, default: float) -> np.ndarray:
+        """One positive, finite segment length per environment, as float64."""
+        if values is None:
+            return np.full(self._num_envs, float(default), dtype=np.float64)
+        lengths = np.asarray(values, dtype=np.float64).reshape(-1)
+        if lengths.shape != (self._num_envs,):
+            raise ValueError(f"env_segment_lengths must have shape ({self._num_envs},), got {lengths.shape}")
+        if not np.all(np.isfinite(lengths)) or np.any(lengths <= 0.0):
+            raise ValueError("env_segment_lengths must be finite and positive")
+        return lengths
 
     # ------------------------------------------------------------------ step
     def step(self, dt: float) -> None:

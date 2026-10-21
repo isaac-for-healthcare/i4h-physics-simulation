@@ -69,19 +69,20 @@ def rod_config_from_solver_cfg(solver_cfg: Any, *, device: str) -> RodConfig:
     )
 
 
-def particle_mass_from_rod_config(config: RodConfig) -> float:
+def particle_mass_from_rod_config(config: RodConfig, segment_length: float | None = None) -> float:
     """Uniform per-particle mass [kg] from cylinder segment density.
 
     Mirrors the rod solver's own mass computation so Newton and the rod agree.
     Clamped away from zero because a zero mass marks a particle kinematic in
-    Newton, which is reserved for the locked root.
+    Newton, which is reserved for the locked root. ``segment_length`` overrides
+    the config's, for a rod whose length differs per environment.
     """
     r = (
         float(config.geometry.radius)
         if not isinstance(config.geometry.radius, list)
         else float(config.geometry.radius[0])
     )
-    length = float(config.geometry.segment_length)
+    length = float(config.geometry.segment_length if segment_length is None else segment_length)
     density = float(config.material.density)
     return max(math.pi * r * r * length * density, 1.0e-9)
 
@@ -163,6 +164,7 @@ def add_catheter_rod_to_builder(
     direction: np.ndarray | None = None,
     lock_root: bool = True,
     num_envs: int = 1,
+    env_segment_lengths: Any = None,
 ) -> RodParticleRange:
     """Add one rod's particles (or ``num_envs`` replicas) to a Newton builder.
 
@@ -181,6 +183,9 @@ def add_catheter_rod_to_builder(
         lock_root: Give the root particle zero mass so Newton treats it as
             kinematic, matching the rod solver's locked root.
         num_envs: Number of rods to replicate into the same model.
+        env_segment_lengths: Optional ``(num_envs,)`` segment length per env,
+            matching the solver's ``env_segment_lengths`` so each env's particle
+            mass agrees with its rod. Defaults to the config's segment length.
 
     Returns:
         The :class:`~catheter_vasculature_solver.newton_rod_bridge.RodParticleRange`
@@ -210,13 +215,21 @@ def add_catheter_rod_to_builder(
 
     radius = config.geometry.radius
     radius = float(radius[0]) if isinstance(radius, list) else float(radius)
-    particle_mass = particle_mass_from_rod_config(config)
+    if env_segment_lengths is None:
+        particle_masses = [particle_mass_from_rod_config(config)] * num_envs
+    else:
+        lengths = np.asarray(env_segment_lengths, dtype=np.float64).reshape(-1)
+        if lengths.shape != (num_envs,):
+            raise ValueError(f"env_segment_lengths must have shape ({num_envs},), got {lengths.shape}")
+        if not np.all(np.isfinite(lengths)) or np.any(lengths <= 0.0):
+            raise ValueError("env_segment_lengths must be finite and positive")
+        particle_masses = [particle_mass_from_rod_config(config, float(length)) for length in lengths]
     zero_velocity = (0.0, 0.0, 0.0)
 
     offset = int(builder.particle_count)
     for env in range(num_envs):
         for index in range(num_points):
-            mass = 0.0 if (lock_root and index == 0) else particle_mass
+            mass = 0.0 if (lock_root and index == 0) else particle_masses[env]
             builder.add_particle(
                 pos=tuple(float(v) for v in positions[env, index]),
                 vel=zero_velocity,

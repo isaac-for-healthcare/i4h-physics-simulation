@@ -217,6 +217,8 @@ Multi-environment vessels: pass `num_envs` to `CenterlineVesselRuntime.from_tree
 
 Different patients in one batch: `CenterlineVesselRuntime.from_trees(trees, env_trees=...)` gives each env its own vessel tree, with its own node and edge counts and its own entry. Every env's vessel is padded to the largest tree, so the batch keeps one fixed-stride layout and containment stays one launch; padded nodes carry no mass and padded edges are never searched. Pair it with per-env guidance on `CathRodSolver`: `track_start` / `track_dir` accept `(num_envs, 3)`, and `track_path` accepts one route per env (lengths may differ). `add_catheter_rod_to_builder` takes per-env `start`, `direction` or `positions` for each env's starting shape. A batched env reproduces its patient simulated alone (`tests/test_per_env_anatomy.py`).
 
+Routes of different lengths can get catheters of different lengths: `env_segment_lengths` on the solver sets each env's segment rest length while every rod keeps `num_segments` segments. Pass the same values to `add_catheter_rod_to_builder` so Newton's particle masses agree with the rod's.
+
 Because the launch count is independent of `num_envs`, wall-clock time per step is nearly flat and env-steps/s scales close to linearly. Measured on one RTX A6000 with a 24-segment catheter against a 16-segment two-way vessel, two Cosserat iterations per step:
 
 | `num_envs` | steps/s | env-steps/s | vs. 1 env |
