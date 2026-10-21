@@ -141,6 +141,18 @@ def initial_rod_positions(
     return (origin[None, :] + axis[None, :] * offsets).astype(np.float32)
 
 
+def _per_env_vectors(value, num_envs: int, name: str) -> list:
+    """``value`` as one ``(3,)`` vector (or ``None``) per env."""
+    if value is None:
+        return [None] * num_envs
+    vectors = np.asarray(value, dtype=np.float32)
+    if vectors.ndim == 1:
+        return [vectors] * num_envs
+    if vectors.shape != (num_envs, 3):
+        raise ValueError(f"{name} must have shape (3,) or ({num_envs}, 3), got {vectors.shape}")
+    return list(vectors)
+
+
 def add_catheter_rod_to_builder(
     builder: Any,
     config: RodConfig,
@@ -157,11 +169,15 @@ def add_catheter_rod_to_builder(
     Args:
         builder: Newton ``ModelBuilder`` being populated before finalize.
         config: Rod geometry / material config, also used by the solver.
-        positions: Optional explicit ``(num_segments + 1, 3)`` rest positions.
+        positions: Optional explicit rest positions: ``(num_segments + 1, 3)``
+            shared by every replica, or ``(num_envs, num_segments + 1, 3)`` with
+            one shape per env (each env's own route into its own anatomy).
             Defaults to :func:`initial_rod_positions`.
         initial_height: Forwarded to :func:`initial_rod_positions`.
-        start: Forwarded to :func:`initial_rod_positions`.
-        direction: Forwarded to :func:`initial_rod_positions`.
+        start: Forwarded to :func:`initial_rod_positions`; ``(3,)`` or
+            ``(num_envs, 3)``.
+        direction: Forwarded to :func:`initial_rod_positions`; ``(3,)`` or
+            ``(num_envs, 3)``.
         lock_root: Give the root particle zero mass so Newton treats it as
             kinematic, matching the rod solver's locked root.
         num_envs: Number of rods to replicate into the same model.
@@ -176,15 +192,20 @@ def add_catheter_rod_to_builder(
 
     num_points = int(config.geometry.num_segments) + 1
     if positions is None:
-        positions = initial_rod_positions(
-            config, initial_height=initial_height, start=start, direction=direction
-        )
+        starts = _per_env_vectors(start, num_envs, "start")
+        directions = _per_env_vectors(direction, num_envs, "direction")
+        positions = np.stack([
+            initial_rod_positions(config, initial_height=initial_height, start=s, direction=d)
+            for s, d in zip(starts, directions, strict=True)
+        ])
     else:
         positions = np.asarray(positions, dtype=np.float32)
-    if positions.shape != (num_points, 3):
+        if positions.ndim == 2:
+            positions = np.broadcast_to(positions, (num_envs,) + positions.shape)
+    if positions.shape != (num_envs, num_points, 3):
         raise ValueError(
-            f"positions must have shape ({num_points}, 3) to match num_segments + 1, "
-            f"got {positions.shape}"
+            f"positions must have shape ({num_points}, 3) or ({num_envs}, {num_points}, 3) "
+            f"to match num_segments + 1, got {positions.shape}"
         )
 
     radius = config.geometry.radius
@@ -193,11 +214,11 @@ def add_catheter_rod_to_builder(
     zero_velocity = (0.0, 0.0, 0.0)
 
     offset = int(builder.particle_count)
-    for _ in range(num_envs):
+    for env in range(num_envs):
         for index in range(num_points):
             mass = 0.0 if (lock_root and index == 0) else particle_mass
             builder.add_particle(
-                pos=tuple(float(v) for v in positions[index]),
+                pos=tuple(float(v) for v in positions[env, index]),
                 vel=zero_velocity,
                 mass=mass,
                 radius=radius,
