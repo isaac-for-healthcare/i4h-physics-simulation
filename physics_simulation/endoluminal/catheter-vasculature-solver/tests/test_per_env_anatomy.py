@@ -116,11 +116,11 @@ def _rod_config(device: str, segment_length: float = SEGMENT_LENGTH) -> RodConfi
 
 def _solver(device, num_envs, *, runtime=None, track_start=ENTRY, track_dir=(1.0, 0.0, 0.0),
             track_path=None, track_enabled=False, segment_length=SEGMENT_LENGTH,
-            env_segment_lengths=None) -> CathRodSolver:
+            env_segment_lengths=None, collision_mesh=None) -> CathRodSolver:
     return CathRodSolver(
         _rod_config(device, segment_length),
         num_envs=num_envs,
-        collision_mesh=None,
+        collision_mesh=collision_mesh,
         track_start=np.asarray(track_start, dtype=np.float32),
         track_dir=np.asarray(track_dir, dtype=np.float32),
         track_path=track_path,
@@ -191,6 +191,42 @@ def test_mixed_topology_rod_matches_each_rod_alone(device, mode):
         # Padding stays parked on the env's root, which never moves.
         np.testing.assert_array_equal(per_env[env, len(reference):], np.broadcast_to(
             shapes[name][0][0], per_env[env, len(reference):].shape))
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_scr_env_without_bend_pairs_matches_alone(device):
+    """A single-segment env has no bend pair; it must not shift the next env's SCR entries."""
+    def chain(nodes):
+        return np.stack([np.linspace(0.0, 0.1 * (nodes - 1), nodes), np.zeros(nodes), np.zeros(nodes)],
+                        axis=1).astype(np.float32)
+
+    shapes = [chain(2), chain(4)]
+    batch = CosseratRod.from_envs(shapes, device, env_edges=[None, None], orientation_mode="scr")
+    alone = [CosseratRod(shape, device, orientation_mode="scr") for shape in shapes]
+    for _ in range(20):
+        for rod in (*alone, batch):
+            cosserat_step(rod, 0.005, gravity=(0.0, 0.0, -9.81), iterations=3)
+    per_env = batch.positions_per_env()
+    for env, rod in enumerate(alone):
+        reference = rod.positions()
+        np.testing.assert_allclose(per_env[env, : len(reference)], reference, rtol=0, atol=1.0e-6)
+
+    only_single = CosseratRod.from_envs([chain(2), chain(2)], device, env_edges=[None, None],
+                                        orientation_mode="scr")
+    cosserat_step(only_single, 0.005, gravity=(0.0, 0.0, -9.81), iterations=3)
+    assert np.isfinite(only_single.positions()).all()
+
+
+def test_fixed_nodes_accept_arrays():
+    """An ndarray of fixed nodes roots the topology like the equivalent list."""
+    as_list = CosseratRod(TREE, "cpu", edges=TREE_EDGES, fixed_nodes=[2], fixed_segments=[0])
+    as_array = CosseratRod(TREE, "cpu", edges=TREE_EDGES, fixed_nodes=np.array([2]), fixed_segments=[0])
+    for rod in (as_list, as_array):
+        cosserat_step(rod, 0.005, gravity=(0.0, 0.0, -9.81), iterations=3)
+    np.testing.assert_array_equal(as_array.positions(), as_list.positions())
+    batch = CosseratRod.from_envs([CHAIN, TREE], "cpu", env_edges=[CHAIN_EDGES, TREE_EDGES],
+                                  env_fixed_nodes=[np.array([0]), np.array([], dtype=np.int64)])
+    assert not batch.uniform_topology
 
 
 def test_padding_is_inert():
@@ -435,8 +471,88 @@ def test_builder_masses_follow_each_env_segment_length(cpu_rod_config):
     assert np.all(masses[:, 0] == 0.0)
     np.testing.assert_allclose(masses[0, 1:], particle_mass_from_rod_config(cpu_rod_config), rtol=1.0e-12)
     np.testing.assert_allclose(masses[1, 1:], 2.0 * masses[0, 1:], rtol=1.0e-6)
+    spacing = np.linalg.norm(np.diff(np.asarray(builder.positions).reshape(2, points, 3), axis=1), axis=-1)
+    np.testing.assert_allclose(spacing[0], base, rtol=1.0e-5)
+    np.testing.assert_allclose(spacing[1], 2.0 * base, rtol=1.0e-5)
     with pytest.raises(ValueError, match="env_segment_lengths"):
         add_catheter_rod_to_builder(_Builder(), cpu_rod_config, num_envs=2, env_segment_lengths=(base,))
+
+
+def test_builder_checks_explicit_positions_against_env_segment_lengths(cpu_rod_config):
+    from catheter_vasculature_solver.isaaclab_integration import add_catheter_rod_to_builder, initial_rod_positions
+
+    base = float(cpu_rod_config.geometry.segment_length)
+    lengths = (base, 2.0 * base)
+    straight = np.stack([initial_rod_positions(cpu_rod_config, segment_length=length) for length in lengths])
+    add_catheter_rod_to_builder(_Builder(), cpu_rod_config, positions=straight, num_envs=2,
+                                env_segment_lengths=lengths)
+
+    # Chords along a gentle bend are a little shorter than the arc and still accepted.
+    points = straight.shape[1]
+    angles = np.linspace(0.0, 0.5, points)
+    radius = lengths[1] / (angles[1] - angles[0])
+    bent = straight.copy()
+    bent[1] = np.stack([radius * np.sin(angles), radius * (1.0 - np.cos(angles)), np.full(points, 0.5)], axis=1)
+    add_catheter_rod_to_builder(_Builder(), cpu_rod_config, positions=bent, num_envs=2,
+                                env_segment_lengths=lengths)
+
+    with pytest.raises(ValueError, match=r"env 1 .* env_segment_lengths\[1\]"):
+        add_catheter_rod_to_builder(_Builder(), cpu_rod_config, positions=straight[0], num_envs=2,
+                                    env_segment_lengths=lengths)
+
+
+# --------------------------------------------------------------------------- #
+# Single-anatomy state on the solver
+# --------------------------------------------------------------------------- #
+def test_track_axes_are_read_only_and_replaced_through_setter():
+    solver = _solver("cpu", 2)
+    with pytest.raises(AttributeError):
+        solver.track_start = wp.vec3(1.0, 2.0, 3.0)
+    with pytest.raises(AttributeError):
+        solver.track_dir = wp.vec3(0.0, 1.0, 0.0)
+    with pytest.raises(ValueError, match="read-only"):
+        solver.track_starts[0, 0] = 1.0
+    uploaded = solver._track_axes_for_device("cpu")[0].numpy()
+    np.testing.assert_allclose(uploaded, ENTRY[None], rtol=0, atol=0)
+
+    starts = np.array([ENTRY, ENTRY + [0.0, 0.05, 0.0]], dtype=np.float32)
+    solver.set_track_axes(starts, (0.0, 1.0, 0.0))
+    np.testing.assert_allclose(solver._track_axes_for_device("cpu")[0].numpy(), starts, rtol=0, atol=0)
+    np.testing.assert_allclose(solver._track_axes_for_device("cpu")[1].numpy(), [[0.0, 1.0, 0.0]] * 2)
+    assert tuple(solver.track_start) == pytest.approx(tuple(ENTRY))
+    assert tuple(solver.track_dir) == pytest.approx((0.0, 1.0, 0.0))
+
+    route = _line(ENTRY, ENTRY + [0.3, 0.0, 0.0], 4)
+    solver.set_track_path(route)
+    np.testing.assert_allclose(solver._track_path_for_device("cpu")[0].numpy(), route, rtol=0, atol=0)
+    solver.set_track_path(None)
+    assert solver._track_path_for_device("cpu") is None
+
+
+def _unit_mesh(device="cpu"):
+    points = wp.array(np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0]], dtype=np.float32), dtype=wp.vec3, device=device)
+    return wp.Mesh(points=points, indices=wp.array(np.array([0, 1, 2], dtype=np.int32), device=device))
+
+
+def test_collision_mesh_refuses_per_env_anatomy():
+    mesh = _unit_mesh()
+    runtime = CenterlineVesselRuntime.from_trees([_curved_lumen(0.05), _fork_lumen()], device="cpu",
+                                                 **VESSEL_KWARGS)
+    with pytest.raises(ValueError, match="single anatomy"):
+        _solver("cpu", 2, runtime=runtime, collision_mesh=mesh)
+    solver = _solver("cpu", 2, runtime=runtime)
+    with pytest.raises(ValueError, match="single anatomy"):
+        solver.set_collision_mesh(mesh)
+
+    routes = [_line(ENTRY, ENTRY + [0.3, 0.0, 0.0], 4), _line(ENTRY, ENTRY + [0.3, 0.05, 0.0], 6)]
+    with pytest.raises(ValueError, match="single anatomy"):
+        _solver("cpu", 2, track_path=routes, collision_mesh=mesh)
+    shared = _solver("cpu", 2, track_path=[routes[0], routes[0]], collision_mesh=mesh)
+    with pytest.raises(ValueError, match="single anatomy"):
+        shared.set_track_path(routes)
+
+    uniform = CenterlineVesselRuntime.from_tree(_curved_lumen(0.05), device="cpu", num_envs=2, **VESSEL_KWARGS)
+    assert _solver("cpu", 2, runtime=uniform, collision_mesh=mesh).collision_mesh is mesh
 
 
 def test_builder_places_each_env_on_its_own_start(cpu_rod_config):

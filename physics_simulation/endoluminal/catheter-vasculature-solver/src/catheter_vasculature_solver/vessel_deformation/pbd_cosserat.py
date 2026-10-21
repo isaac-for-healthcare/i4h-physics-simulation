@@ -598,7 +598,7 @@ def _env_topology(cache, n_nodes, edges, bend_pairs, fixed_nodes):
         [(i, i + 1) for i in range(n_nodes - 1)] if is_chain else [(int(a), int(b)) for a, b in edges]
     )
     # Root the bend-pair spanning tree and the frame transport at the first fixed node.
-    root = int(fixed_nodes[0]) if fixed_nodes else 0
+    root = int(fixed_nodes[0]) if fixed_nodes is not None and len(fixed_nodes) else 0
     pairs_key = None if bend_pairs is None else tuple((int(a), int(b)) for a, b in bend_pairs)
     key = (n_nodes, is_chain, root, tuple(local_edges), pairs_key)
     topo = cache.get(key)
@@ -948,7 +948,9 @@ class CosseratRod:
 
         Every env's block has ``n_seg_per_env`` rows (padded segments have none), and
         row starts accumulate each env's own entry count, which differs between
-        topologies.
+        topologies. A block with no bend pair carries one placeholder entry, so
+        only each env's live entries are concatenated; otherwise that
+        placeholder would shift every later env's neighbours.
         """
         num_envs = len(env_pairs)
         per_env = [
@@ -962,17 +964,20 @@ class CosseratRod:
         ]
         if num_envs == 1:
             return per_env[0]
-        starts = np.cumsum([0] + [int(block[0][-1]) for block in per_env])
+        live = [int(block[0][-1]) for block in per_env]
+        starts = np.cumsum([0] + live)
+        if starts[-1] == 0:
+            return (np.zeros(num_envs * n_seg_per_env + 1, np.int32),) + tuple(per_env[0][1:])
         off = np.concatenate(
             [per_env[e][0][:-1] + starts[e] for e in range(num_envs)]
             + [np.asarray([starts[-1]], dtype=np.int32)]
         ).astype(np.int32)
         nb = np.concatenate(
-            [per_env[e][1] + e * n_seg_per_env for e in range(num_envs)]
+            [per_env[e][1][: live[e]] + e * n_seg_per_env for e in range(num_envs)]
         ).astype(np.int32)
-        rest = np.concatenate([per_env[e][2] for e in range(num_envs)])
-        role = np.concatenate([per_env[e][3] for e in range(num_envs)]).astype(np.int32)
-        scale = np.concatenate([per_env[e][4] for e in range(num_envs)]).astype(np.float32)
+        rest = np.concatenate([per_env[e][2][: live[e]] for e in range(num_envs)])
+        role = np.concatenate([per_env[e][3][: live[e]] for e in range(num_envs)]).astype(np.int32)
+        scale = np.concatenate([per_env[e][4][: live[e]] for e in range(num_envs)]).astype(np.float32)
         return off, nb, rest, role, scale
 
     # ------------------------------------------------------------------ readback

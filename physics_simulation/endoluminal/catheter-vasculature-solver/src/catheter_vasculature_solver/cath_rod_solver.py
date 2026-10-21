@@ -1298,15 +1298,11 @@ class CathRodSolver(XPBDRodSolver):
     ):
         super().__init__(*args, **kwargs)
 
-        self.track_starts, self.track_dirs = self._validated_track_axes(track_start, track_dir)
+        self.set_track_axes(track_start, track_dir)
 
         self.collision_mesh = collision_mesh
         self.collision_mesh_normals = collision_mesh_normals
         self.smooth_collision_normals_enabled = bool(smooth_collision_normals_enabled)
-        # The first env's axis, kept for callers that read a single track.
-        self.track_start = wp.vec3(*(float(v) for v in self.track_starts[0]))
-        self.track_dir = wp.vec3(*(float(v) for v in self.track_dirs[0]))
-        self._track_axes_device: dict[str, tuple[wp.array, wp.array]] = {}
         self.track_length = float(track_length)
         self.tip_num_edges = int(tip_num_edges)
         # Rest curvature as authored, snapshotted the first time a tip bend is
@@ -1328,8 +1324,7 @@ class CathRodSolver(XPBDRodSolver):
         # Kept on the host and uploaded per device on first use, matching how the
         # collision-normal buffers are handled: the workspace device is not known
         # until a step runs.
-        self._track_path_host = self._validated_track_path(track_path)
-        self._track_path_device: dict[str, tuple[wp.array, wp.array]] = {}
+        self.set_track_path(track_path)
         # Defaults to post for the straight rail, which is where it has always
         # run. A curved track wants pre instead, so that the distance
         # constraints are what finally set the chord lengths.
@@ -1415,8 +1410,87 @@ class CathRodSolver(XPBDRodSolver):
             collision_mesh_normals: Optional pre-computed smooth vertex normals
                 on the solver device.
         """
+        self._require_single_anatomy_for_mesh(mesh=collision_mesh)
         self.collision_mesh = collision_mesh
         self.collision_mesh_normals = collision_mesh_normals
+
+    @property
+    def track_starts(self) -> np.ndarray:
+        """Insertion-axis origins, ``(T, 3)`` with ``T`` 1 or ``num_envs``. Read-only."""
+        return self._track_starts
+
+    @property
+    def track_dirs(self) -> np.ndarray:
+        """Unit insertion directions matching :attr:`track_starts`. Read-only."""
+        return self._track_dirs
+
+    @property
+    def track_start(self) -> wp.vec3:
+        """The first env's insertion origin, for callers that read a single track."""
+        return wp.vec3(*(float(v) for v in self._track_starts[0]))
+
+    @property
+    def track_dir(self) -> wp.vec3:
+        """The first env's insertion direction, for callers that read a single track."""
+        return wp.vec3(*(float(v) for v in self._track_dirs[0]))
+
+    def set_track_axes(self, track_start, track_dir) -> None:
+        """Replace the insertion axes, one shared or one per env.
+
+        The axes are uploaded to each device once, so they are read-only
+        attributes and change only through here, which drops the uploads.
+        """
+        starts, dirs = self._validated_track_axes(track_start, track_dir)
+        starts = starts.copy()
+        starts.flags.writeable = False
+        dirs.flags.writeable = False
+        self._track_starts, self._track_dirs = starts, dirs
+        self._track_axes_device: dict[str, tuple[wp.array, wp.array]] = {}
+
+    def set_track_path(self, track_path) -> None:
+        """Replace the guidance routes, or pass ``None`` for the straight rail.
+
+        Accepts the same forms as the ``track_path`` constructor argument and
+        drops the per-device uploads of the previous routes.
+        """
+        path = self._validated_track_path(track_path)
+        self._require_single_anatomy_for_mesh(path=path)
+        self._track_path_host = path
+        self._track_path_device: dict[str, tuple[wp.array, wp.array]] = {}
+
+    @staticmethod
+    def _routes_differ(points: np.ndarray, offsets: np.ndarray) -> bool:
+        routes = [points[offsets[i] : offsets[i + 1]] for i in range(len(offsets) - 1)]
+        return any(route.shape != routes[0].shape or not np.array_equal(route, routes[0]) for route in routes[1:])
+
+    _UNSET = object()
+
+    def _require_single_anatomy_for_mesh(self, *, mesh=_UNSET, runtime=_UNSET, path=_UNSET) -> None:
+        """Refuse a vessel mesh alongside per-env anatomy.
+
+        ``collision_mesh`` is one ``wp.Mesh`` queried by every env, so it can
+        only describe a batch that shares one anatomy. Combined with per-env
+        vessels or routes, each env would be contained by the wrong patient.
+        Arguments default to the solver's current state.
+        """
+        if mesh is self._UNSET:
+            mesh = getattr(self, "collision_mesh", None)
+        if mesh is None:
+            return
+        if runtime is self._UNSET:
+            runtime = getattr(self, "centerline_runtime", None)
+        if path is self._UNSET:
+            path = getattr(self, "_track_path_host", None)
+        if runtime is not None and bool(getattr(runtime, "per_env_vessels", False)):
+            source = "a centerline runtime with per-env vessels"
+        elif path is not None and self._routes_differ(*path):
+            source = "different track_path routes per env"
+        else:
+            return
+        raise ValueError(
+            f"collision_mesh supports a single anatomy shared by every env, but the solver has {source}. "
+            "Pass collision_mesh=None and rely on centerline containment for per-env anatomy."
+        )
 
     def set_collision_projection_stage(self, stage: str) -> None:
         """Configure whether containment runs before or after rod constraints.
@@ -2185,6 +2259,7 @@ class CathRodSolver(XPBDRodSolver):
         """
         if runtime is None:
             return
+        self._require_single_anatomy_for_mesh(runtime=runtime)
         vessel_envs = int(getattr(runtime, "num_envs", 1))
         if vessel_envs != self._num_envs:
             raise ValueError(
