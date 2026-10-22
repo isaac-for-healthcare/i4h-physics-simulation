@@ -253,12 +253,15 @@ def held_catheter(mode):
     scene.allocate(model, state)
     systems = build(scene, cfg)
     ours = I4hSolver(model, scene, systems, state)
-    Stepper(ours, **sim_settings(cfg)).prepare()
+    stepper = Stepper(ours, **sim_settings(cfg))
+    stepper.prepare()
     cc = by_type(systems, "CatheterControl")
     rest_frame = tuple(float(x) for x in cc.mount_pose.numpy()[0, 0, 3:])
     mounts = Mounts(model, scene, systems, {"catheter": {"body": "driver", "offset": ((0.0, 0.0, 0.0), rest_frame)}},
                     mode == "two_way")
-    return systems, model, state, model.control(), CoupledSolver(model, newton.solvers.SolverMuJoCo(model), ours, mounts)
+    coupled = CoupledSolver(model, newton.solvers.SolverMuJoCo(model), ours, mounts)
+    coupled.stepper = stepper  # tests re-prepare after structural edits
+    return systems, model, state, model.control(), coupled
 
 
 def test_catheter_held_by_a_body_two_way():
@@ -307,3 +310,25 @@ def test_rigid_substeps_match_a_substepped_rigid_solver():
                                alone.scene.field("q", alone.scene.body("rod")).numpy(), atol=1e-6)
     with pytest.raises(ValueError, match="rigid_substeps"):
         CoupledSolver(model, coupled.rigid, ours, rigid_substeps=0)
+
+
+
+def test_a_disabled_catheter_driver_stops_its_reaction():
+    """Disabling catheter_control (then prepare) clears its published reaction, and the coupling no longer fills or
+    applies a stale one: the holder feels no force on the following steps."""
+    systems, model, state, control, coupled = held_catheter("two_way")
+    for _ in range(30):
+        state.body_f.zero_()
+        coupled.step(state, state, control, None, 1.0 / 60)
+    group = coupled.mounts.groups[0]
+    wp.synchronize()
+    assert np.abs(group.force.numpy()).max() > 0.1, "the rod's weight hangs on the holder"
+    cc = by_type(systems, "CatheterControl")
+    cc.enabled = False
+    coupled.stepper.prepare()
+    assert not cc.impulse.numpy().any() and not cc.moment.numpy().any(), "prepare clears the disabled driver's products"
+    for _ in range(3):
+        state.body_f.zero_()
+        coupled.step(state, state, control, None, 1.0 / 60)
+        wp.synchronize()
+        assert not group.force.numpy().any() and not group.torque.numpy().any(), "no stale reaction is filled"

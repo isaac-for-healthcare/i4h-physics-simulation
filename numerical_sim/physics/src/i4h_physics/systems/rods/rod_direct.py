@@ -118,13 +118,17 @@ class RodDirect(System):
         self.rot_corr = wp.zeros(n, dtype=wp.vec3, device=dev)
         if self.inertia not in ("unit", "physical"):
             raise ValueError(f"rod_direct.inertia must be 'unit' or 'physical', got {self.inertia!r}")
-        self.inertia_local = wp.array(cylinder_inv_inertia(scene, b, m.rest_len[0]), dtype=wp.vec3, device=dev)  # (P,)
+        # (E * P,) local inverse inertia from each env's own masses and radii, refreshed by prepare() (physical only)
+        self.inertia_local = wp.array(cylinder_inv_inertia(scene, b, m.rest_len[0]).reshape(-1, 3), dtype=wp.vec3,
+                                      device=dev)
         self.inv_inertia = wp.zeros(n if self.inertia == "physical" else 1, dtype=wp.mat33, device=dev)  # world, per node
         self.freeze("inertia")
         self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
 
     def prepare(self, scene):
         super().prepare(scene)
+        if self.inertia == "physical":  # per-env masses may have changed since construction (in place: graphs keep it)
+            self.inertia_local.assign(cylinder_inv_inertia(scene, self.body, self.rest_len.numpy()[0]).reshape(-1, 3))
         material = self.body.rod_material
         self.regional = material is not None and material.active
         self.preferred_rest = material.preferred_rest if self.regional else self.rest_darboux
@@ -191,15 +195,16 @@ class RodDirect(System):
 
 
 def cylinder_inv_inertia(scene, body, rest_len) -> np.ndarray:
-    """``(P, 3)`` float32 local inverse inertia per node for ``inertia: physical``: a cylinder of the node's mass, radius
-    and segment length, ``12 / (m (3 r² + L²))`` about the transverse axes and ``2 / (m r²)`` about the tangent (z),
-    as the workflow's catheter sets it (newton_catheter_physics._apply_physical_rotational_inertia). Zero for a node
-    without mass (the locked root)."""
-    rows = lambda name: scene.field(name, body).numpy()[0]  # noqa: E731  (one mesh variant: env 0's rows)
-    inv_mass, radius = rows("inv_mass").astype(np.float64), rows("radius").astype(np.float64)
+    """``(E, P, 3)`` float32 local inverse inertia per env and node for ``inertia: physical``: a cylinder of the node's
+    mass, radius and segment length, ``12 / (m (3 r² + L²))`` about the transverse axes and ``2 / (m r²)`` about the
+    tangent (z), as the workflow's catheter sets it (newton_catheter_physics._apply_physical_rotational_inertia). Each
+    env's own rows: one geometry variant may carry different masses or radii per env. Zero for a node without mass
+    (the locked root)."""
+    inv_mass = scene.field("inv_mass", body).numpy().astype(np.float64)  # (E, P)
+    radius = scene.field("radius", body).numpy().astype(np.float64)
     seg = np.asarray(rest_len, np.float64)
-    seg = np.concatenate([seg, seg[-1:]])  # node e takes edge e's length, the last node the last edge's
-    out = np.zeros((len(inv_mass), 3), np.float32)
+    seg = np.broadcast_to(np.concatenate([seg, seg[-1:]]), inv_mass.shape)  # node e: edge e's length (last: the last)
+    out = np.zeros(inv_mass.shape + (3,), np.float32)
     free = inv_mass > 0.0
     m = 1.0 / np.where(free, inv_mass, 1.0)
     out[free, 0] = out[free, 1] = (12.0 / (m * (3.0 * radius**2 + seg**2)))[free]

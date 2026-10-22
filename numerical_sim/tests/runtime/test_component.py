@@ -286,3 +286,40 @@ def test_views_read_after_the_physics_step_on_any_torch_stream(host):
                 env.step(actions)
                 counts.append(int(component.state()["push.pushes"][0, 0].clone().item()))
         assert counts == [counts[0] + k for k in range(4)], f"stale reads {counts} (rebuilt={rebuilt})"
+
+
+def test_configure_preserves_the_hosts_newton_settings():
+    """Adding the component swaps only the solver and the substep split: the host's shape contact defaults,
+    determinism, visual-shape loading and graph setting stay as the workflow set them."""
+    from isaaclab_newton.physics.newton_manager_cfg import NewtonShapeCfg
+
+    shape = NewtonShapeCfg(margin=0.015, gap=0.02, ke=1.0e4, kd=50.0, mu=0.25)
+    sim_cfg = SimulationCfg(dt=1.0 / 120, physics=NewtonCfg(solver_cfg=MJWarpSolverCfg(), num_substeps=2,
+                                                            deterministic_mode="run_to_run", default_shape_cfg=shape,
+                                                            load_visual_shapes=True, use_cuda_graph=False))
+    I4hComponent(component_cfg()).configure(sim_cfg)
+    physics = sim_cfg.physics
+    assert (physics.default_shape_cfg.mu, physics.default_shape_cfg.margin) == (0.25, 0.015)
+    assert physics.deterministic_mode == "run_to_run" and physics.load_visual_shapes is True
+    assert physics.use_cuda_graph is False and physics.num_substeps == 1
+    assert physics.solver_cfg.rigid_substeps == 2 and isinstance(physics.solver_cfg.rigid_solver_cfg, MJWarpSolverCfg)
+
+
+def test_configure_rejects_an_unsupported_rigid_backend():
+    """rigid=True needs NewtonCfg(MJWarpSolverCfg): a PhysX host would otherwise lose its rigid simulation silently.
+    i4h alone stays an explicit rigid=False."""
+    from isaaclab_physx.physics import PhysxCfg
+
+    host = SimulationCfg(dt=1.0 / 120, physics=PhysxCfg())
+    with pytest.raises(ValueError, match="NewtonCfg\\(solver_cfg=MJWarpSolverCfg"):
+        I4hComponent(component_cfg()).configure(host)
+    assert isinstance(host.physics, PhysxCfg), "a rejected configure leaves the host untouched"
+    I4hComponent(component_cfg()).configure(host, rigid=False)
+    assert host.physics.solver_cfg.rigid_solver_cfg is None
+    from isaaclab_newton.physics.newton_collision_cfg import NewtonCollisionPipelineCfg
+
+    collide = NewtonCfg(solver_cfg=MJWarpSolverCfg(use_mujoco_contacts=False), collision_cfg=NewtonCollisionPipelineCfg())
+    with pytest.raises(ValueError, match="use_mujoco_contacts=False"):
+        I4hComponent(component_cfg()).configure(SimulationCfg(dt=1.0 / 120, physics=collide))
+    with pytest.raises(ValueError, match="collision_cfg"):  # even without rigid bodies: no Newton pipeline runs
+        I4hComponent(component_cfg()).configure(SimulationCfg(dt=1.0 / 120, physics=collide), rigid=False)

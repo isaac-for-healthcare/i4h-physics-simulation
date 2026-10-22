@@ -27,6 +27,7 @@ binding raises.
 
 from __future__ import annotations
 
+import dataclasses
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
@@ -92,18 +93,32 @@ class I4hComponent:
 
     def configure(self, sim_cfg, *, rigid: bool = True, gravity_from_case: bool = True) -> None:
         """Make the host's ``SimulationCfg`` step this component: its Newton solver cfg (MuJoCo-Warp) becomes the rigid
-        solver beside ``I4hSolver``, keeping its ``num_substeps`` (run inside the coupled step); ``rigid=False`` for a
-        scene with no rigid bodies (i4h physics alone). ``sim.dt`` defaults to the host's physics dt. A case that declares
+        solver beside ``I4hSolver``, keeping its ``num_substeps`` (run inside the coupled step); every other host Newton
+        setting (shape contact defaults, determinism, visual shapes, CUDA graph) is kept. ``rigid=True`` requires
+        ``NewtonCfg(solver_cfg=MJWarpSolverCfg(...))``: any other host would lose its rigid simulation, so it raises;
+        ``rigid=False`` is i4h physics alone. ``sim.dt`` defaults to the host's physics dt. A case that declares
         ``sim.gravity`` sets the host's (``gravity_from_case``, as ``I4hEnvCfg``); otherwise the two must agree."""
         if self.cfg is None:
             raise RuntimeError("this handle wraps a configured I4hSolverCfg; configure() needs an I4hComponentCfg")
+        from i4h_isaaclab.coupling import check_rigid_solver_cfg
         from i4h_isaaclab.newton_manager import I4hSolverCfg
         from isaaclab_newton.physics import NewtonCfg
 
         host = sim_cfg.physics
-        host_solver = getattr(host, "solver_cfg", None) if isinstance(host, NewtonCfg) else None
+        newton_host = isinstance(host, NewtonCfg)
+        host_solver = getattr(host, "solver_cfg", None) if newton_host else None
         if isinstance(host_solver, I4hSolverCfg):
             raise ValueError("the host's physics already steps an i4h component")
+        if rigid and (not newton_host or str(getattr(host_solver, "solver_type", "")) != "mujoco_warp"):
+            raise ValueError(f"I4hComponent.configure(rigid=True) needs the host's physics to be NewtonCfg(solver_cfg="
+                             f"MJWarpSolverCfg(...)), got {type(host).__name__}"
+                             f"{'(' + type(host_solver).__name__ + ')' if newton_host else ''}; pass rigid=False to run "
+                             "i4h physics alone")
+        if rigid:
+            check_rigid_solver_cfg(host_solver, self.cfg.coupling_mode)
+        if newton_host and host.collision_cfg is not None:
+            raise ValueError("NewtonCfg.collision_cfg is not supported with an i4h component: the coupled step runs no "
+                             "Newton collision pipeline (MuJoCo-Warp collides with its own contacts)")
         rigid = host_solver if rigid else None
         case = self.cfg.case()
         case["sim"].setdefault("dt", float(sim_cfg.dt))
@@ -113,8 +128,11 @@ class I4hComponent:
                                        mounts=self.cfg.mounts, loaders=self.cfg.loaders,
                                        systems=self.cfg.systems_registry, pose=self.cfg.pose,
                                        rigid_substeps=int(getattr(host, "num_substeps", 1)) if rigid is not None else 1)
-        kwargs = {"use_cuda_graph": host.use_cuda_graph} if isinstance(host, NewtonCfg) else {}
-        sim_cfg.physics = NewtonCfg(solver_cfg=self.solver_cfg, num_substeps=1, **kwargs)  # our substeps run inside
+        # Every host setting kept; only the solver and the substep split change (our substeps run inside the step).
+        # class_type is derived from the solver cfg by NewtonCfg itself.
+        kept = {f.name: getattr(host, f.name) for f in dataclasses.fields(host)
+                if f.name not in ("class_type", "solver_cfg", "num_substeps")} if newton_host else {}
+        sim_cfg.physics = NewtonCfg(solver_cfg=self.solver_cfg, num_substeps=1, **kept)
 
     @contextmanager
     def construction(self, *, device, envs):
