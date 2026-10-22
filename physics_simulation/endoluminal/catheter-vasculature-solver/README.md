@@ -221,16 +221,16 @@ Mesh collision is single-anatomy only: `collision_mesh` is one `wp.Mesh` queried
 
 Routes of different lengths can get catheters of different lengths: `env_segment_lengths` on the solver sets each env's segment rest length while every rod keeps `num_segments` segments. Pass the same values to `add_catheter_rod_to_builder` so Newton's particle spacing and masses agree with the rod's. Default positions are then spaced by each env's length; explicit `positions` must already be, or the builder raises, because the bridge treats Newton positions as authoritative and a mismatched rod would snap to its rest length on the first step.
 
-Because the launch count is independent of `num_envs`, wall-clock time per step is nearly flat and env-steps/s scales close to linearly. Measured on one RTX A6000 with a 24-segment catheter against a 16-segment two-way vessel, two Cosserat iterations per step:
+The launch count is independent of `num_envs` (45 kernel launches per step here), so env-steps/s grows with the batch even though wall-clock time per step does not stay flat. Measured on one RTX A6000 with the configuration of `examples/multi_env_rl_vessels.py`: a 24-segment catheter against a 16-segment two-way vessel (`vessel_response=0.6`), two Cosserat iterations per step, 20 warm-up steps then the median of three 500-step runs:
 
 | `num_envs` | steps/s | env-steps/s | vs. 1 env |
 | --- | --- | --- | --- |
-| 1 | 847 | 847 | 1.0x |
-| 16 | 787 | 12 592 | 14.9x |
-| 64 | 786 | 50 324 | 59.4x |
-| 256 | 719 | 183 976 | 217.3x |
+| 1 | 961 | 961 | 1.0x |
+| 16 | 756 | 12 093 | 12.6x |
+| 64 | 637 | 40 787 | 42.4x |
+| 256 | 318 | 81 459 | 84.8x |
 
-Per-step cost is dominated by fixed CPU launch overhead here, because CUDA-graph capture is disabled while a vessel is attached (see `_can_use_cuda_graph`), which is precisely why adding envs is close to free.
+Small batches are bound by fixed CPU launch overhead, because CUDA-graph capture is disabled while a vessel is attached (see `_can_use_cuda_graph`), so adding envs there is nearly free. Large batches become GPU-bound: the catheter's block-tridiagonal solve (`solve` in `rod_linear_system.py`) runs one rod per thread in double precision and takes about 83% of GPU time at 256 envs. A mixed-patient batch (`from_trees` with per-env routes and rod lengths) runs at the same rate as a uniform one.
 
 ```python
 from catheter_vasculature_solver import VesselDeformationConfig
