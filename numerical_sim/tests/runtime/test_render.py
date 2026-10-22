@@ -394,7 +394,7 @@ def test_slang_offscreen_tree_skin():
     cfg = read_case("aorta_centreline")["render"]
     cfg.pop("backend")
     renderer = SlangRenderer(sim, **dict(cfg, size=(320, 180), window=False))
-    sim.prepare()  # not stepped: the catheter starts against the wall and deforms the tree on the first step
+    sim.prepare()  # not stepped: the tree is at rest
     renderer.publish()
     assert renderer.draw()
     frame = renderer.read_frame()

@@ -188,6 +188,10 @@ def test_grasp_and_pull_tugs_the_grasper_back():
 # --- the servo (app/haptics.py) ------------------------------------------------------------------------------------
 
 
+# SERVO_LOCK: make_haptics starts the servo thread, which calls ``_command`` on every device each period (1 ms here) under
+# ``servo._lock``; with no force sample staged it resets the device's conditioners ("no force sample yet"). A test that
+# drives ``_command`` by hand (prime a source, then expect the force) holds that lock across the calls, or a tick in
+# between resets the conditioner and the second call returns zero (NVBug 6940611, intermittent on a DGX Station).
 def make_haptics(path, capture_lock=None):
     from i4h_isaaclab.composition import read_case
     from i4h_standalone.app.haptics import HapticsConfig, HapticsDriver
@@ -423,12 +427,13 @@ def test_servo_keeps_the_force_in_the_sim_frame_under_a_rotation_offset(tmp_path
     try:
         from i4h_standalone.app.haptics import Sample
 
-        d = servo.devices["pad"]
-        d["status"].connected = True
-        sample = Sample(np.array([[400.0, 0.0, 0.0]], np.float32), np.zeros((1, 3), np.float32), np.zeros((1, 4), np.float32), 0, 0, {"pad": 0},
-                        __import__("time").perf_counter(), 0)
-        servo._command("pad", d, sample, sample.t_wall, 1e-3)  # first sample of the source: zero
-        f, handle_n = servo._command("pad", d, sample, sample.t_wall, 1e-3)
+        with servo._lock:  # the running servo ticks _command on this device every period (see SERVO_LOCK)
+            d = servo.devices["pad"]
+            d["status"].connected = True
+            sample = Sample(np.array([[400.0, 0.0, 0.0]], np.float32), np.zeros((1, 3), np.float32), np.zeros((1, 4), np.float32), 0, 0,
+                            {"pad": 0}, __import__("time").perf_counter(), 0)
+            servo._command("pad", d, sample, sample.t_wall, 1e-3)  # first sample of the source: zero
+            f, handle_n = servo._command("pad", d, sample, sample.t_wall, 1e-3)
         assert np.allclose(f, (0.4, 0.0, 0.0), atol=1e-6) and handle_n == 0.0, f  # 400 sim units * 1e-3: +x stays +x whatever the orientation offset
     finally:
         haptics.close()
@@ -816,17 +821,18 @@ def test_servo_zeroes_after_a_reset_until_fresh_data_and_counts_every_missed_per
     sim, driver, haptics = make_haptics(haptic_case(tmp_path))
     servo = haptics.servo
     try:
-        d = servo.devices["pad"]
-        d["status"].connected = True
-        old = Sample(np.array([[400.0, 0.0, 0.0]], np.float32), np.zeros((1, 3), np.float32), np.zeros((1, 4), np.float32), 0, 0, {"pad": 0},
-                     time.perf_counter(), haptics.mailbox.generation)
-        servo._command("pad", d, old, old.t_wall, 1e-3)
-        assert servo._command("pad", d, old, old.t_wall, 1e-3)[0][0] == pytest.approx(0.4)
-        haptics.reset()  # the drawn env: the generation bumps
-        assert servo._command("pad", d, old, old.t_wall, 1e-3) == ((0.0, 0.0, 0.0), 0.0) and d["status"].reason == "reset"
-        fresh = Sample(old.force, old.root, old.shaft, 1, 0, {"pad": 0}, time.perf_counter(), haptics.mailbox.generation)
-        servo._command("pad", d, fresh, fresh.t_wall, 1e-3)  # the conditioner restarted: the first sample is zero
-        assert servo._command("pad", d, fresh, fresh.t_wall, 1e-3)[0][0] == pytest.approx(0.4)
+        with servo._lock:  # the running servo ticks _command on this device every period (see SERVO_LOCK)
+            d = servo.devices["pad"]
+            d["status"].connected = True
+            old = Sample(np.array([[400.0, 0.0, 0.0]], np.float32), np.zeros((1, 3), np.float32), np.zeros((1, 4), np.float32), 0, 0,
+                         {"pad": 0}, time.perf_counter(), haptics.mailbox.generation)
+            servo._command("pad", d, old, old.t_wall, 1e-3)
+            assert servo._command("pad", d, old, old.t_wall, 1e-3)[0][0] == pytest.approx(0.4)
+            haptics.reset()  # the drawn env: the generation bumps (the mailbox's counter: no servo lock)
+            assert servo._command("pad", d, old, old.t_wall, 1e-3) == ((0.0, 0.0, 0.0), 0.0) and d["status"].reason == "reset"
+            fresh = Sample(old.force, old.root, old.shaft, 1, 0, {"pad": 0}, time.perf_counter(), haptics.mailbox.generation)
+            servo._command("pad", d, fresh, fresh.t_wall, 1e-3)  # the conditioner restarted: the first sample is zero
+            assert servo._command("pad", d, fresh, fresh.t_wall, 1e-3)[0][0] == pytest.approx(0.4)
     finally:
         haptics.close()
         driver.close()
@@ -935,26 +941,28 @@ def test_servo_sends_the_handle_force_last_in_the_tick_and_zeroes_it_with_the_po
         src = driver.manager.devices[1].source
         assert src.forces[-1][1][2] < 0.0 and src.handle_forces[-1][1] == 0.0 and stub_box.sent.get(0, 0.0) == 0.0
         # feed a synthetic jaw load through _command: gain 0.5 * 0.6 = 0.3 N, then the 0.4 N cap on 1.0
-        pad["status"].connected = True
-        sample = Sample(np.zeros((1, 3), np.float32), np.zeros((1, 3), np.float32), np.zeros((1, 4), np.float32), 0, 0, {"pad": 0},
-                        time.perf_counter(), haptics.mailbox.generation, np.float32([0.6]))
-        servo._command("pad", pad, sample, sample.t_wall, 1e-3)  # first sample of the source: zero
-        force, handle_n = servo._command("pad", pad, sample, sample.t_wall, 1e-3)
-        assert handle_n == pytest.approx(0.3) and force == (0.0, 0.0, 0.0)
-        sample.jaw[0] = 1.0
-        _, handle_n = servo._command("pad", pad, sample, sample.t_wall, 1e-3)
-        assert handle_n == pytest.approx(0.4) and pad["handle_saturated"]
-        servo.handles_enabled = False
-        assert servo._command("pad", pad, sample, sample.t_wall, 1e-3)[1] == 0.0
-        servo.handles_enabled = True
-        servo._command("pad", pad, sample, sample.t_wall, 1e-3)
-        assert servo._command("pad", pad, sample, sample.t_wall, 1e-3)[1] == pytest.approx(0.4)
-        haptics.pause(True)
-        assert servo._command("pad", pad, sample, sample.t_wall, 1e-3) == ((0.0, 0.0, 0.0), 0.0) and pad["status"].reason == "paused"
-        haptics.pause(False)
-        servo.set_handle_param("max_force_n", 0.05)
-        servo._command("pad", pad, sample, sample.t_wall, 1e-3)
-        assert servo._command("pad", pad, sample, sample.t_wall, 1e-3)[1] == pytest.approx(0.05)
+        with servo._lock:  # the running servo ticks _command on this device every period (see SERVO_LOCK)
+            pad["status"].connected = True
+            sample = Sample(np.zeros((1, 3), np.float32), np.zeros((1, 3), np.float32), np.zeros((1, 4), np.float32), 0, 0, {"pad": 0},
+                            time.perf_counter(), haptics.mailbox.generation, np.float32([0.6]))
+            servo._command("pad", pad, sample, sample.t_wall, 1e-3)  # first sample of the source: zero
+            force, handle_n = servo._command("pad", pad, sample, sample.t_wall, 1e-3)
+            assert handle_n == pytest.approx(0.3) and force == (0.0, 0.0, 0.0)
+            sample.jaw[0] = 1.0
+            _, handle_n = servo._command("pad", pad, sample, sample.t_wall, 1e-3)
+            assert handle_n == pytest.approx(0.4) and pad["handle_saturated"]
+            servo.handles_enabled = False
+            assert servo._command("pad", pad, sample, sample.t_wall, 1e-3)[1] == 0.0
+            servo.handles_enabled = True
+            servo._command("pad", pad, sample, sample.t_wall, 1e-3)
+            assert servo._command("pad", pad, sample, sample.t_wall, 1e-3)[1] == pytest.approx(0.4)
+            haptics.pause(True)
+            assert servo._command("pad", pad, sample, sample.t_wall, 1e-3) == ((0.0, 0.0, 0.0), 0.0) and pad["status"].reason == "paused"
+            haptics.pause(False)
+        servo.set_handle_param("max_force_n", 0.05)  # takes the servo's lock
+        with servo._lock:
+            servo._command("pad", pad, sample, sample.t_wall, 1e-3)
+            assert servo._command("pad", pad, sample, sample.t_wall, 1e-3)[1] == pytest.approx(0.05)
         # the tick order: a handle force queued on the box is transmitted by the same tick's box round trip
         stub_box.forces.clear()
         stub_box.sent.clear()
