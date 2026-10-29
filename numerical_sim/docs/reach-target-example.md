@@ -41,3 +41,18 @@ Both `model_0.pt` and `model_49.pt` were nonempty and all 506,994 tensor element
 in each were finite. The final checkpoint is 2,046,193 bytes, SHA256
 `a2a6d8c85e2ed19239bd1f3b56e827c69142ac1328c5cbb2c4fa31586af41d34`. The checkpoints
 precede the helper's extra checked iteration.
+
+## Evaluating a checkpoint, on either env
+
+`--policy checkpoint:<model.pt>` runs a checkpoint's deterministic policy for `--steps` policy steps and reports the
+episodes that ended, the procedure successes and the mean return. The manager-based task has the same observation and
+action layout, so a checkpoint trained on `-Direct` evaluates on `-Manager`:
+
+```bash
+I4H_DATA=/absolute/path/to/data "$LAB_PY" scripts/isaaclab_run.py --task I4h-ReachTarget-Manager --num_envs 64 --steps 1500 --seed 0 --visualizer none --policy checkpoint:/absolute/path/to/new-run/model_49.pt
+```
+
+On 2026-10-29, the `model_49.pt` of a `-Direct` 50-iteration run (trained on Isaac Lab 6864dd1, SHA256 `7ba558d6...672a83`)
+gave the same result on `I4h-ReachTarget-Direct` and `I4h-ReachTarget-Manager` on Isaac Lab v3.0.0: 2,112 episodes
+ended in 1500 steps of 64 envs, all 2,112 procedure successes, mean return 1.000.
+

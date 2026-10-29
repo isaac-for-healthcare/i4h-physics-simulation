@@ -7,6 +7,7 @@ CUDA-event timing, an optional nsys range, the rsl_rl PPO smoke run, and ``--che
     $PY scripts/isaaclab_run.py --check
     $PY scripts/isaaclab_run.py --task I4h-Chole-Direct --num_envs 64 --steps 300 --policy random
     $PY scripts/isaaclab_run.py --task I4h-Chole-Direct --num_envs 64 --train 5
+    $PY scripts/isaaclab_run.py --task I4h-ReachTarget-Manager --num_envs 64 --steps 2000 --policy checkpoint:/tmp/run/model_49.pt
     $PY scripts/isaaclab_run.py --task I4h-Chole-Direct --num_envs 64 --steps 300 --camera 128 --save-frame /tmp/chole.png
     $PY scripts/isaaclab_run.py --task I4h-Chole-Direct --num_envs 4 --steps 0 --render gl --policy walk
     $PY scripts/isaaclab_run.py --task I4h-Chole-Direct --num_envs 4 --policy replay:/tmp/session --render gl
@@ -17,6 +18,9 @@ one synchronize at the end; median and p95 ms per policy step. ``--sync-debug`` 
 host synchronisations (a correctness aid, not the evidence); ``--nsys-range`` brackets the timed loop with
 ``cudaProfilerStart/Stop`` for ``nsys --capture-range=cudaProfilerApi``. ``--train N`` runs N PPO learning
 iterations of ``num_steps_per_env`` policy steps each, then one explicitly checked rollout and update.
+``--policy checkpoint:<model.pt>`` evaluates an rsl_rl checkpoint (deterministic actions) for ``steps`` policy steps on
+any task with the same observation and action layout, e.g. one trained on ``-Direct`` run on ``-Manager``: episodes
+ended, procedure successes and the mean return of the ended episodes.
 Looking: ``--render gl`` opens the GL debug view (Newton's ViewerGL, mouse camera) on env ``--env`` and refreshes it
 after every step (host copies: not for timing; ``--steps 0`` runs until the window closes); ``--save-frame`` writes a
 contact sheet of every env's last camera frame; ``--policy replay:<base>`` replays a session recorded by the app
@@ -47,7 +51,8 @@ def parse(argv):
     parser.add_argument("--steps", type=int, default=200, help="timed policy steps")
     parser.add_argument("--warmup", type=int, default=20, help="untimed policy steps before the timed loop")
     parser.add_argument("--policy", default="random", help="random | walk | hold | replay:<base> (the app's --record base path) | "
-                                                           "replay_hdf5:<file>[:demo_N] (a teleop demo, isaaclab_teleop.py --record)")
+                                                           "replay_hdf5:<file>[:demo_N] (a teleop demo, isaaclab_teleop.py --record) | "
+                                                           "checkpoint:<model.pt> (an rsl_rl checkpoint, evaluated)")
     parser.add_argument("--check-replay", action="store_true", help="replay_hdf5: fail when env 0 leaves the recording by more "
                                                                      "than 1e-3 (relative); chaotic cases drift, see the printed curve")
     parser.add_argument("--render", choices=("none", "gl"), default="none", help="gl: live GL debug view of one env")
@@ -97,6 +102,8 @@ def main(argv=None):
             else:
                 if args.policy.startswith("replay_hdf5:"):
                     replay_loop(env, args)
+                elif args.policy.startswith("checkpoint:"):
+                    evaluate(env, args)
                 else:
                     policy_loop(env, args)
         finally:
@@ -399,17 +406,61 @@ def save_frame(camera, path):
     print(f"wrote {path}")
 
 
+def runner_cfg(u):
+    """The task's PPO configuration: the procedure tasks observe the ``task`` group too."""
+    from i4h_isaaclab.agents import I4hPPORunnerCfg, I4hProcedurePPORunnerCfg
+
+    procedure = u.i4h.procedure if hasattr(u, "i4h") else u.procedure  # -Manager envs hold it on the component
+    return I4hProcedurePPORunnerCfg() if procedure is not None else I4hPPORunnerCfg()
+
+
+def evaluate(env, args):
+    """``--policy checkpoint:<model.pt>``: the checkpoint's policy acts deterministically for ``--steps`` policy steps;
+    reports the episodes that ended, the procedure successes among them and the mean return of the ended episodes."""
+    import torch
+    from i4h_isaaclab.agents import runner_dict
+    from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
+    from rsl_rl.runners import OnPolicyRunner
+
+    path = Path(args.policy[len("checkpoint:"):]).expanduser().resolve()
+    if not path.is_file():
+        raise SystemExit(f"no checkpoint at {path}")
+    u = env.unwrapped
+    device = str(u.device)
+    wrapped = RslRlVecEnvWrapper(env)  # calls env.reset()
+    agent = runner_cfg(u)
+    agent.seed, agent.device = int(args.seed or 0), device
+    runner = OnPolicyRunner(wrapped, runner_dict(agent), log_dir=None, device=device)
+    runner.load(str(path), map_location=device)
+    policy = runner.get_inference_policy(device)
+    obs = wrapped.get_observations()
+    episode = torch.zeros(u.num_envs, device=device)
+    returns, successes = [], 0
+    with torch.inference_mode():
+        for _ in range(int(args.steps)):
+            obs, reward, dones, extras = wrapped.step(policy(obs))
+            episode += reward
+            done = dones.bool()
+            if "new_terminal" in extras:
+                successes += int((extras["new_terminal"] & (extras["terminal_task"][:, 11] == 1)).sum())
+            if done.any():
+                returns += episode[done].tolist()
+                episode[done] = 0.0
+    mean = sum(returns) / len(returns) if returns else float("nan")
+    print(f"{args.task}: checkpoint {path.name}, {u.num_envs} envs, {args.steps} steps: {len(returns)} episodes ended, "
+          f"{successes} procedure successes, mean return {mean:.3f}")
+
+
 def train(env, args):
     import torch
-    from i4h_isaaclab.agents import I4hPPORunnerCfg, I4hProcedurePPORunnerCfg, checked_iteration, runner_dict
+    from i4h_isaaclab.agents import checked_iteration, runner_dict
     from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
     from rsl_rl.runners import OnPolicyRunner
 
     u = env.unwrapped
     device = str(u.device)
     wrapped = RslRlVecEnvWrapper(env)  # calls env.reset()
-    procedure = u.i4h.procedure if hasattr(u, "i4h") else u.procedure  # -Manager envs hold it on the component
-    agent = I4hProcedurePPORunnerCfg() if procedure is not None else I4hPPORunnerCfg()
+    agent = runner_cfg(u)
     agent.seed, agent.device = int(args.seed or 0), device
     runner = OnPolicyRunner(wrapped, runner_dict(agent), log_dir=args.log_dir, device=device)
     torch.cuda.synchronize()
