@@ -23,7 +23,8 @@ with its own:
   one world per env for the component's particles.
 
 ``configure_case(cfg)`` fills an ``I4hManagerEnvCfg`` from its ``case``; ``I4hManagerBasedRLEnv`` calls it at
-construction, so a cfg can be edited (case, envs, decimation) after it was created, as ``I4hEnvCfg`` can.
+construction, so a cfg can be edited (case, envs, decimation) after it was created, as ``I4hEnvCfg`` can. A host with
+its own cfg class calls ``configure_physics(cfg.sim, case)`` and adds the terms it wants.
 """
 
 from __future__ import annotations
@@ -280,20 +281,33 @@ class I4hManagerEnvCfg(ManagerBasedRLEnvCfg):
     terminations: object = None
 
 
+def configure_physics(sim_cfg, case, *, gravity_from_case: bool = True, rigid_solver_cfg=None, mounts=None,
+                      coupling_mode: str = "one_way", use_cuda_graph: bool | None = None) -> dict:
+    """Make a host's ``SimulationCfg`` step a case (a name, path or mapping) as an i4h component with its procedure:
+    gravity resolved and dt checked as ``I4hEnv`` does, ``sim_cfg.physics`` a ``NewtonCfg`` whose rigid solver is
+    ``rigid_solver_cfg`` (None: i4h physics alone). Returns the case read. A host env (``I4hHostMixin``) then constructs
+    inside the component."""
+    from types import SimpleNamespace
+
+    case = read_case(case)
+    case = with_gravity(case, resolve_gravity(SimpleNamespace(gravity_from_case=gravity_from_case, sim=sim_cfg), case))
+    check_dt(sim_cfg.dt, sim_settings(case)["dt"])
+    if use_cuda_graph is None and isinstance(sim_cfg.physics, NewtonCfg):
+        use_cuda_graph = sim_cfg.physics.use_cuda_graph
+    graph = {} if use_cuda_graph is None else {"use_cuda_graph": bool(use_cuda_graph)}
+    rigid = {} if rigid_solver_cfg is None else {"solver_cfg": rigid_solver_cfg}
+    sim_cfg.physics = NewtonCfg(**rigid, **graph)  # the host's physics before the component wraps it
+    component = I4hComponent(I4hComponentCfg.from_case(case, procedure=True, mounts=mounts, coupling_mode=coupling_mode))
+    component.configure(sim_cfg, rigid=rigid_solver_cfg is not None, gravity_from_case=gravity_from_case)
+    return case
+
+
 def configure_case(cfg: I4hManagerEnvCfg) -> I4hManagerEnvCfg:
-    """Fill ``cfg`` from its case: gravity and dt checked as ``I4hEnv`` does, the component configured on ``cfg.sim``,
-    and the action, observation, reward and termination terms. Terms the cfg already sets are kept."""
-    case = read_case(cfg.case)
-    case = with_gravity(case, resolve_gravity(cfg, case))
-    check_dt(cfg.sim.dt, sim_settings(case)["dt"])
+    """Fill ``cfg`` from its case: the physics (``configure_physics``) and the action, observation, reward and
+    termination terms. Terms the cfg already sets are kept."""
+    case = configure_physics(cfg.sim, cfg.case, gravity_from_case=cfg.gravity_from_case,
+                             rigid_solver_cfg=cfg.rigid_solver_cfg, mounts=cfg.mounts, coupling_mode=cfg.coupling_mode)
     procedure = bool(case.get("procedure"))
-    component = I4hComponent(I4hComponentCfg.from_case(case, procedure=True, mounts=cfg.mounts,
-                                                       coupling_mode=cfg.coupling_mode))
-    # The host's physics before the component replaces it (again on a reused cfg): the rigid solver, if any
-    graph = {"use_cuda_graph": cfg.sim.physics.use_cuda_graph} if isinstance(cfg.sim.physics, NewtonCfg) else {}
-    rigid = {"solver_cfg": cfg.rigid_solver_cfg} if cfg.rigid_solver_cfg is not None else {}
-    cfg.sim.physics = NewtonCfg(**rigid, **graph)
-    component.configure(cfg.sim, rigid=cfg.rigid_solver_cfg is not None, gravity_from_case=cfg.gravity_from_case)
 
     if cfg.actions is None:
         cfg.actions = _ActionsCfg(i4h=I4hActionTermCfg(mode=cfg.action_mode, workspace=cfg.workspace))

@@ -52,6 +52,32 @@ manager orders torch after every physics call. Code outside the step calls `env.
 `_reset_idx` runs on automatic resets too. Isaac Lab reset events (`EventCfg`, `mode="reset"`) run after the physical
 reset, and the procedure resets after them.
 
+## Manager-based env
+
+Every task id also exists as `-Manager` (`I4h-ReachTarget-Manager`, ...): `i4h_isaaclab.manager.I4hManagerBasedRLEnv`,
+an Isaac Lab `ManagerBasedRLEnv` over the same case. It has the same `policy` and `task` observations, the same
+normalised actions (`workspace` 0.5), the same reward and dones, and uses the same PPO configs, so a checkpoint
+trained on `-Direct` runs on `-Manager`. `tests/runtime/test_manager_env.py` checks this parity: bitwise for the
+rod reach rollouts, and within the direct env's own run-to-run spread for tet tissue, whose float-atomic contact
+sums differ between any two runs.
+
+The pieces are ordinary manager terms for a host task that composes its own, such as a robot beside the tissue or
+an Arena embodiment:
+
+- `I4hActionTermCfg`;
+- the observation functions `i4h_policy` and `i4h_task`;
+- `procedure_reward`;
+- the termination functions `procedure_terminated` and `procedure_timeout`;
+- `I4hHostMixin`, mixed in front of any `ManagerBasedRLEnv` subclass. It constructs the env inside the component and
+  resets physics, Lab's reset events, then the procedure, as `I4hEnv` does.
+
+The scene needs the `I4H_ROOT` entry (an authored env root, no spawn), so that Lab replicates the worlds that hold
+the particles. Use `-Direct` for the tiled camera (`rgb`/`depth`), the `i4h` fallback backend, staggered
+episodes and session replay; the manager env has none of these.
+
+The manager env costs more per step: Isaac Lab's manager-based step calls `reset_buf.nonzero()` (a host sync) every
+step, which `I4hEnv` avoids with its mask reset.
+
 Teleoperation devices are not configured by default; `i4h_standalone.devices.configure_teleop(cfg)`
 installs the `i4h` device (requires `i4h-standalone`).
 

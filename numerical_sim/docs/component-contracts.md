@@ -116,6 +116,16 @@ They come from the feasibility spike recorded at the end, and every test of thos
 
 **Pose.** `pose` composes with Lab's env frame into `T_e`.
 
+**Procedure.** `I4hComponentCfg.procedure` (`from_case(case, procedure=True)`) makes the component own the case's
+assessment.
+
+- Every solver build constructs it with the host's `horizon_s`, set before construction to
+  `max_episode_length * step_dt`.
+- `I4hNewtonManager` updates it after every physics step and, as for `I4hEnv`, leaves decimation to the env loop.
+- `component.reset()` stays physical only. The host calls `reset_procedure()` after its reset events, so the
+  procedure samples the state those events left.
+- `i4h_isaaclab.manager` builds the manager-based env on this.
+
 ## 3c. Supported GPU state access
 
 For a hosted component, call `component.sync_views()` and then
