@@ -55,4 +55,3 @@ I4H_DATA=/absolute/path/to/data "$LAB_PY" scripts/isaaclab_run.py --task I4h-Rea
 On 2026-10-29, the `model_49.pt` of a `-Direct` 50-iteration run (trained on Isaac Lab 6864dd1, SHA256 `7ba558d6...672a83`)
 gave the same result on `I4h-ReachTarget-Direct` and `I4h-ReachTarget-Manager` on Isaac Lab v3.0.0: 2,112 episodes
 ended in 1500 steps of 64 envs, all 2,112 procedure successes, mean return 1.000.
-

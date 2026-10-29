@@ -99,4 +99,3 @@ The manager env costs 0.5–2.1%. ReachTarget reaches about 10,000 env-steps/s a
 0.58 and 0.59 s/iteration, the same logged mean reward at every iteration (0.00 for the first three, 0.94 by
 iteration 25, 0.93 at the end) and the same final losses (value 0.0001475, surrogate -0.003574, entropy 4.229). The
 two `model_49.pt` checkpoints are byte-identical (SHA256 `7ba558d6...672a83`).
-
