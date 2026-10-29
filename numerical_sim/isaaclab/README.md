@@ -75,8 +75,8 @@ The scene needs the `I4H_ROOT` entry (an authored env root, no spawn), so that L
 the particles. Use `-Direct` for the tiled camera (`rgb`/`depth`), the `i4h` fallback backend, staggered
 episodes and session replay; the manager env has none of these.
 
-The manager env costs more per step: Isaac Lab's manager-based step calls `reset_buf.nonzero()` (a host sync) every
-step, which `I4hEnv` avoids with its mask reset.
+Isaac Lab's manager-based step calls `reset_buf.nonzero()` (a host sync) every step, which `I4hEnv` avoids with its mask
+reset. At 64 envs the measured difference is below 2% (`docs/performance.md`).
 
 Teleoperation devices are not configured by default; `i4h_standalone.devices.configure_teleop(cfg)`
 installs the `i4h` device (requires `i4h-standalone`).

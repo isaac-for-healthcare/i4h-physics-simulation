@@ -63,3 +63,18 @@ for trial in 1 2 3; do
     done
 done
 ```
+
+## Direct and manager-based Isaac Lab envs
+
+`scripts/isaaclab_run.py --num_envs 64 --steps 300 --policy random --seed 0 --visualizer none`, one run per task on
+2026-10-29: Isaac Lab 6864dd1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition (x86_64), Warp 1.17.0, Newton 1.6.1.
+Median and p95 ms per policy step (decimation 2), timed with CUDA events after warm-up.
+
+| Task | `-Direct` median / p95 | `-Manager` median / p95 |
+| --- | --- | --- |
+| ReachTarget (aorta catheter) | 22.592 / 23.729 | 22.582 / 23.467 |
+| GraspTarget (chole tissue) | 174.158 / 221.695 | 176.934 / 220.776 |
+
+The manager env's per-step `reset_buf.nonzero()` host sync is not measurable against these step times. These are
+single development runs, not a qualification baseline; larger env counts are not measured here.
+
