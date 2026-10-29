@@ -47,6 +47,7 @@ import warp as wp
 from i4h_isaaclab.composition import check_dt, load_case, read_case, sim_settings
 from i4h_isaaclab.lab import require
 from i4h_isaaclab.physics import I4hPhysicsCfg, I4hPhysicsManager
+from i4h_isaaclab.terminal import ProcedureTorch
 from i4h_isaaclab.views import (
     action_bounds,
     action_views,
@@ -259,21 +260,13 @@ class I4hEnv(DirectRLEnv):
         else:
             sim.procedure = self.procedure  # NewtonSim is an Isaac Lab host, not Stepper
             sim.after_step = self._warp_to_torch
+        self.task = None
         if self.procedure is not None:
-            self.task_rows = wp.to_torch(self.procedure.rows)
-            self.task_completions = wp.to_torch(self.procedure.action_completions)
-            weights = np.asarray(self.cfg.step_weights or (1.0,) * self.procedure.step_count, dtype=np.float32)
-            if weights.shape != (self.procedure.step_count,) or not np.isfinite(weights).all():
-                raise ValueError("step_weights must contain one finite value per procedure step")
-            self.step_weights = torch.as_tensor(weights, device=self._torch_device)
-            self.task_progress = wp.to_torch(self.procedure.progress)
-            self.task_history = wp.to_torch(self.procedure.history)
-            self.terminal_task = torch.zeros_like(self.task_rows)
-            self.terminal_history = torch.full_like(self.task_history, -1)
-            self.task_metrics = self.task_progress[:, 3:4] if self.procedure.has_path else self.task_progress[:, 3:3]
-            self.terminal_metrics = torch.zeros_like(self.task_metrics)
-            self.new_terminal = torch.zeros(self.num_envs, dtype=torch.bool, device=self._torch_device)
-            self._terminal_recorded = torch.zeros_like(self.new_terminal)
+            self.task = task = ProcedureTorch(self.procedure, self.cfg.step_weights, self._torch_device)
+            self.task_rows, self.task_completions, self.step_weights = task.rows, task.completions, task.step_weights
+            self.task_progress, self.task_history, self.task_metrics = task.progress, task.history, task.metrics
+            self.terminal_task, self.terminal_history = task.terminal_task, task.terminal_history
+            self.terminal_metrics, self.new_terminal = task.terminal_metrics, task.new_terminal
         self.action_views = action_views(sim)
         low, high = action_bounds(sim, self.cfg.workspace)
         self.low, self.high = torch.as_tensor(low, device=self._torch_device), torch.as_tensor(high, device=self._torch_device)
@@ -310,13 +303,9 @@ class I4hEnv(DirectRLEnv):
     # DirectRLEnv hooks --------------------------------------------------------------------------------------
 
     def _pre_physics_step(self, actions: torch.Tensor):
-        if self.procedure is not None:
+        if self.task is not None:
             self._torch_to_warp()
-            self.procedure.begin_action()
-            self.new_terminal.zero_()
-            self.extras["new_terminal"] = self.new_terminal.clone()
-            self.extras["terminal_timeout_source"] = self.procedure.timeout_source
-            self.extras["terminal_timeout_s"] = self.procedure.timeout
+            self.task.begin_action(self.extras)
         if self.cfg.action_mode == "physical":  # the teleop rows (poses in sim units, quaternion, grip, energy, fire) as they are
             self._actions.copy_(actions)
         else:
@@ -334,26 +323,21 @@ class I4hEnv(DirectRLEnv):
             self.camera.render()  # Warp's stream, right after the step graph
         self._warp_to_torch()
         obs = {"policy": observation(self.obs_views, self.state_views)}  # torch.cat copies: earlier observations never mutate
-        if self.procedure is not None:
-            obs["task"] = self.task_rows[:, :8].clone()
-            if self.procedure.sequence:
-                obs["task"] = torch.cat((obs["task"],
-                                         self.task_progress[:, :1] / max(self.procedure.step_count - 1, 1),
-                                         self.task_rows[:, 9:10] / self.procedure.timeout), dim=1)
+        if self.task is not None:
+            obs["task"] = self.task.observation()
         if self.camera is not None:  # copies: a kept observation (replay buffer, terminal frame) survives the next render
             obs["rgb"], obs["depth"] = self.camera.rgb_t.clone(), self.camera.depth_t.clone()
         return obs
 
     def _get_rewards(self) -> torch.Tensor:
-        if self.procedure is not None:
-            return (self.task_completions * self.step_weights).sum(dim=1)
+        if self.task is not None:
+            return self.task.reward()
         return self._zero_reward
 
     def _get_dones(self):
-        if self.procedure is not None:
-            result = self.task_rows[:, 11]
-            time_out = (result == 2) | (self.episode_length_buf >= self.max_episode_length)  # the host's limit holds too
-            return (result == 1) | (result == 3), time_out
+        if self.task is not None:
+            time_out = self.task.timed_out() | (self.episode_length_buf >= self.max_episode_length)  # the host's limit holds too
+            return self.task.terminated(), time_out
         time_out = self.episode_length_buf >= self.max_episode_length
         return self._never_terminated, time_out  # DirectRLEnv copies both into its own buffers
 
@@ -364,9 +348,9 @@ class I4hEnv(DirectRLEnv):
             return super()._reset_envs_from_buffer()
         self._save_terminal_task(mask=self.reset_buf)
         self.simulator.reset(mask=self.reset_buf)  # select_envs orders Warp after torch's writes of reset_buf
-        if self.procedure is not None:
+        if self.task is not None:
             self.procedure.reset(mask=self.simulator._mask)
-            self._terminal_recorded.masked_fill_(self.reset_buf, False)
+            self.task.clear_recorded(mask=self.reset_buf)
         self.episode_length_buf.masked_fill_(self.reset_buf, 0)
         return None
 
@@ -378,34 +362,16 @@ class I4hEnv(DirectRLEnv):
         self._warp_to_torch()  # the events run on torch's stream, after the physical reset
         super()._reset_idx(env_ids)
         self._torch_to_warp()  # Warp (the procedure, the next step, the camera) consumes the events' writes
-        if reset and self.procedure is not None:
+        if reset and self.task is not None:
             self.procedure.reset(mask=self.simulator._mask)
-            self._terminal_recorded[env_ids] = False
+            self.task.clear_recorded(env_ids=env_ids)
 
     def _save_terminal_task(self, env_ids=None, mask=None):
-        if self.procedure is None:
+        if self.task is None:
             return
         self._warp_to_torch()
-        selected = mask if mask is not None else env_ids
         # Retain terminal rows across automatic masked reset; running/manual resets do not erase them.
-        valid = self.task_rows[:, 11] != 0
-        if mask is not None:
-            selection = mask
-        else:
-            selection = torch.zeros_like(valid)
-            selection[selected] = True
-        fresh = valid & selection & ~self._terminal_recorded
-        self.terminal_task.copy_(torch.where(fresh[:, None], self.task_rows, self.terminal_task))
-        self.terminal_history.copy_(torch.where(fresh[:, None, None], self.task_history, self.terminal_history))
-        self.terminal_metrics.copy_(torch.where(fresh[:, None], self.task_metrics, self.terminal_metrics))
-        self.new_terminal.logical_or_(fresh)
-        self._terminal_recorded.logical_or_(fresh)
-        self.extras["terminal_task"] = self.terminal_task.clone()
-        self.extras["terminal_history"] = self.terminal_history.clone()
-        self.extras["terminal_metrics"] = self.terminal_metrics.clone()
-        self.extras["new_terminal"] = self.new_terminal.clone()
-        self.extras["terminal_timeout_source"] = self.procedure.timeout_source
-        self.extras["terminal_timeout_s"] = self.procedure.timeout
+        self.task.save_terminal(self.extras, env_ids=env_ids, mask=mask)
         self._torch_to_warp()
 
     def reset(self, seed=None, options=None):

@@ -14,6 +14,7 @@ The host decides what exists and what success means; the component computes how 
         env = HostEnv(env_cfg)                # Lab builds the scene; our particles join every world
 
     component.reset(env_ids)                  # in the host's reset, after its own state
+    component.reset_procedure(env_ids)        # with a procedure: after the host's reset events
     component.write_actions(physical)         # (E, A) in the columns of component.action_bounds()
     component.sync_views()                    # torch after Warp, before reading views outside the step
     q = component.positions("tissue")         # (E, 3n) zero-copy torch view, component frame
@@ -23,6 +24,10 @@ host's observation, reward and termination functions read the step that just ran
 A hard rebuild (``sim.reset(soft=False)``) invalidates it: the handle rebinds
 (``on_rebuild`` callbacks run) and views taken before must be taken again; a method called on a closed or invalidated
 binding raises.
+
+A cfg with a ``procedure`` (``from_case(case, procedure=True)``) makes the component own the case's assessment: every
+solver build constructs it (``composition.build_procedure`` with the host's ``horizon_s``) as ``component.procedure``,
+the manager updates it after every physics step, and the host resets it with ``reset_procedure`` after its reset events.
 """
 
 from __future__ import annotations
@@ -53,14 +58,18 @@ class I4hComponentCfg:
     systems_registry: dict | None = None  # {system type: System subclass}
     mounts: dict | None = None  # {instrument or catheter: {"body": label, "offset": (pos, quat_xyzw)}}
     coupling_mode: str = "one_way"
+    procedure: dict | None = None  # the case's assessment (i4h-assessment), owned by the component when given
 
     @classmethod
-    def from_case(cls, case, **kwargs) -> I4hComponentCfg:
+    def from_case(cls, case, *, procedure: bool = False, **kwargs) -> I4hComponentCfg:
         """The physical part of a case (a name, path or mapping, ``composition.read_case``): its assets, systems,
-        instruments and ``sim``; an app's keys (procedure, render, inputs, ...) are left out."""
+        instruments and ``sim``, and with ``procedure`` its ``procedure:``; an app's other keys (render, inputs, ...)
+        are left out."""
         from i4h_isaaclab.composition import read_case
 
         cfg = read_case(case)
+        if procedure:
+            kwargs.setdefault("procedure", dict(cfg["procedure"]) if cfg.get("procedure") else None)
         return cls(assets=dict(cfg.get("assets") or {}), systems=list(cfg.get("systems") or []),
                    instruments=dict(cfg.get("instruments") or {}), sim=dict(cfg.get("sim") or {}), **kwargs)
 
@@ -68,6 +77,8 @@ class I4hComponentCfg:
         case = {"sim": dict(self.sim), "assets": dict(self.assets), "systems": [dict(s) for s in self.systems]}
         if self.instruments:
             case["instruments"] = dict(self.instruments)
+        if self.procedure:
+            case["procedure"] = dict(self.procedure)
         return case
 
 
@@ -80,6 +91,8 @@ class I4hComponent:
         self.cfg = cfg
         self.sim = None  # the current NewtonSim (rebound by every solver build)
         self.solver_cfg = solver_cfg
+        self.procedure = None  # the case's procedure, built with every solver build when the case has one
+        self.horizon_s = None  # the host's episode horizon (max_episode_length * step_dt), set before construction
         self._rebuild = []
         self._events = None
 
@@ -159,6 +172,13 @@ class I4hComponent:
     def _bind(self, sim) -> None:
         self.sim = sim
         self._events = None
+        self.procedure = None
+        case = self.solver_cfg.case or {}
+        if case.get("procedure"):
+            from i4h_isaaclab.composition import build_procedure
+
+            self.procedure = build_procedure(case, sim, horizon_s=self.horizon_s)
+        sim.procedure = self.procedure  # updated by the manager after every physics step
         sim.after_step = self.sync_views  # after every manager step: torch reads (observations, rewards) see it
         for callback in list(self._rebuild):
             callback(self)
@@ -218,6 +238,12 @@ class I4hComponent:
         """The selected worlds' physical state, now (``env_ids`` or an ``(E,)`` bool ``mask``, host or device)."""
         self._order("in")
         self._live().physics.reset(env_ids, mask=mask)
+
+    def reset_procedure(self, env_ids=None, *, mask=None) -> None:
+        """The selected worlds' procedure (no-op without one), after the host's reset events sampled the new state."""
+        self._live()
+        if self.procedure is not None:
+            self.procedure.reset(env_ids, mask=mask)  # select_envs orders Warp after torch's ids or mask
 
     def sync_views(self) -> None:
         """Torch's current stream waits for Warp's: before reading views outside the step."""
