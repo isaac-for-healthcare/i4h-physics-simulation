@@ -1,7 +1,7 @@
 # ReachTarget training example
 
-Run from `numerical_sim/` with the interpreter from a separate Isaac Lab
-`6864dd126fd8efd04aaebe06bc9d00c1b9b989dc` environment, Warp 1.17.0 and Newton
+Run from `numerical_sim/` with the interpreter from a separate Isaac Lab environment at the
+qualified revision (`i4h_isaaclab.lab.QUALIFIED`), Warp 1.17.0 and Newton
 1.6.1. Install the six built i4h member wheels into that environment without their
 optional USD extras; Lab supplies `pxr`. Supply the original external asset directory
 through `I4H_DATA`. The ordinary numerical workspace does not install Isaac Lab or
@@ -12,14 +12,14 @@ LAB_PY=/absolute/path/to/qualified-lab-venv/bin/python
 I4H_DATA=/absolute/path/to/data "$LAB_PY" scripts/isaaclab_run.py --task I4h-ReachTarget-Direct --num_envs 64 --train 50 --seed 0 --visualizer none --log_dir /absolute/path/to/new-run
 ```
 
-Lab 6864dd1 uses `--visualizer none` for headless execution and rejects the removed
+Isaac Lab 3.0 uses `--visualizer none` for headless execution and rejects the removed
 `--headless` flag. Use a new output directory to preserve existing checkpoints.
 The task is `aorta_static_reach`. The command performs 50 PPO learning iterations
 with 16 rollout steps per environment per iteration, then the helper's existing
 additional checked iteration verifies finite actions, observations, rewards and losses.
 It does not change the seed or settings based on observed reward.
 
-On 2026-10-15, the v0.9.0 package code completed this command on an NVIDIA
+On 2026-10-15, on Isaac Lab 6864dd1, the v0.9.0 package code completed this command on an NVIDIA
 GB300 (aarch64) and exited **0**. The separate Lab environment used Torch
 2.12.0+cu130 and RSL-RL 5.5.1. The GPU's hardware power-brake slowdown was active;
 this is not a healthy-hardware training-throughput baseline.

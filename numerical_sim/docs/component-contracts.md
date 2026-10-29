@@ -197,9 +197,8 @@ These bounds are fixed before any candidate is evaluated. `L` is the catheter le
 
 ## 5. Dependency-check exceptions
 
-`uv pip check` must be clean, apart from exactly these three messages, which come from Isaac Lab 6864dd1's own lockfile:
+`uv pip check` must be clean, apart from exactly these two messages, which come from Isaac Lab release/3.0.0 44044b0's own lockfile (6864dd1 also reported `open3d` requires `ipywidgets>=8.0.4`):
 
-- `open3d` requires `ipywidgets>=8.0.4`;
 - `numba` requires `numpy>=1.22,<2.5`;
 - `cmeel-boost` requires `numpy>=2.3,<2.4`.
 

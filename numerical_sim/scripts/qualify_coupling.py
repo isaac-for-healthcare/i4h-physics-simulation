@@ -3,7 +3,7 @@
 
 """Coupled-scene qualification (F2, docs/component-contracts.md section 3): i4h physics held by MuJoCo-Warp bodies.
 
-Run with the Isaac Lab 6864dd1 venv's python (MuJoCo-Warp, CUDA)::
+Run with the qualified Isaac Lab venv's python (i4h_isaaclab.lab.QUALIFIED) (MuJoCo-Warp, CUDA)::
 
     I4H_DATA=$PWD/data $PY scripts/qualify_coupling.py [--json coupling.json]
 
