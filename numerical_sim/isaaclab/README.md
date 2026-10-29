@@ -12,8 +12,8 @@ import i4h_isaaclab.tasks  # registers the preserved Gym task IDs
 ## Isaac Lab compatibility
 
 Isaac Lab is not a pip dependency; install it from source. This package targets
-`isaac-sim/IsaacLab` branch `release/3.0.0` at `44044b0963001962abe5701133427e37b003fffe`
-(`v3.0.0` GA plus 5 commits, torch 2.11; `i4h_isaaclab.lab.QUALIFIED`), with Newton 1.6.1 and Warp 1.17.0. The runtime test suite passes on that
+`isaac-sim/IsaacLab` tag `v3.0.0` (GA, on branch `release/3.0.0`) at `e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4`
+(torch 2.11; `i4h_isaaclab.lab.QUALIFIED`), with Newton 1.6.1 and Warp 1.17.0. The runtime test suite passes on that
 revision; the physics qualification (numerical parity, including the Newton 1.6.0 -> 1.6.1 change) is
 still pending on it. Inside Lab, install the domain packages without their `usd` extra: Lab's `usd-exchange`
 provides `pxr`, and `usd-core` would overwrite it (both ship `pxr`). It relies on Lab APIs that older

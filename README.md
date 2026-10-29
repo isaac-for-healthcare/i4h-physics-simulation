@@ -130,7 +130,7 @@ Shared / typical prerequisites (exact versions depend on the component):
 | Python | `numerical_sim`: `>=3.12,<3.13` (development pins 3.12.12); Cosmos-H-Dreams: 3.12+; the catheter solver supports 3.10+ |
 | GPU | NVIDIA GPU; Cosmos-H-Dreams recommends ≥12 GB VRAM. `numerical_sim` also steps on CPU for its examples and package tests |
 | Driver / CUDA | Cosmos-H-Dreams: driver **R580+** (CUDA 13.x). Newton / Warp stacks need a CUDA-capable driver matching the installed toolkit |
-| Simulation stack | `numerical_sim` pins Warp 1.17.0 and Newton 1.6.1. Its Isaac Lab tasks target Isaac Lab `release/3.0.0` at `44044b0` |
+| Simulation stack | `numerical_sim` pins Warp 1.17.0 and Newton 1.6.1. Its Isaac Lab tasks target Isaac Lab `v3.0.0` (`e3f7d9f`) |
 | Container | Docker + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for the generative sim image |
 
 Dependencies are declared in [`numerical_sim/pyproject.toml`](./numerical_sim/pyproject.toml) (with its `uv.lock`) and the catheter solver's [`pyproject.toml`](./physics_simulation/endoluminal/catheter-vasculature-solver/pyproject.toml).

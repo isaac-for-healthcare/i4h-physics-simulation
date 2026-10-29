@@ -10,7 +10,7 @@ until the suites are rerun. No Isaac Lab import here."""
 
 import dataclasses
 
-QUALIFIED = "isaac-sim/IsaacLab release/3.0.0 @ 44044b0963001962abe5701133427e37b003fffe"
+QUALIFIED = "isaac-sim/IsaacLab v3.0.0 (release/3.0.0) @ e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4"
 
 
 def require(owner, name: str) -> None:

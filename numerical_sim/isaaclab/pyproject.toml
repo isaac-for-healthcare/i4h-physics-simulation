@@ -9,8 +9,8 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12,<3.13"
-# Isaac Lab is installed from source, not pinned here: targets isaac-sim/IsaacLab release/3.0.0
-# @ 44044b0963001962abe5701133427e37b003fffe (README, i4h_isaaclab.lab.QUALIFIED).
+# Isaac Lab is installed from source, not pinned here: targets isaac-sim/IsaacLab v3.0.0
+# @ e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4 (README, i4h_isaaclab.lab.QUALIFIED).
 dependencies = ["i4h-physics==0.9.0", "torch>=2.10", "pillow>=10.0"]
 
 [project.optional-dependencies]
