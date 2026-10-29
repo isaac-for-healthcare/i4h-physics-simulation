@@ -87,7 +87,7 @@ def main(argv=None):
         t0 = time.perf_counter()
         env = make_env(args, cfg)
         torch.cuda.synchronize()
-        print(f"built ({cfg.backend} backend) in {time.perf_counter() - t0:.2f} s, "
+        print(f"built ({getattr(cfg, 'backend', 'newton')} backend) in {time.perf_counter() - t0:.2f} s, "
               f"device memory +{(free0 - torch.cuda.mem_get_info()[0]) / 2**20:.0f} MB")
         try:
             if args.train:
@@ -124,10 +124,23 @@ def make_cfg(args):
     elif args.case:
         cfg = I4hEnvCfg(case=args.case)
     else:
-        if args.task not in tasks.TASKS:
-            raise SystemExit(f"unknown task {args.task!r}; known: {sorted(tasks.TASKS)}")
+        known = {**tasks.TASKS, **tasks.MANAGER_TASKS}
+        if args.task not in known:
+            raise SystemExit(f"unknown task {args.task!r}; known: {sorted(known)}")
         cfg = load_cfg_from_registry(args.task, "env_cfg_entry_point")
     cfg.scene.num_envs = int(args.num_envs if args.num_envs is not None else 2)
+    if args.task in tasks.MANAGER_TASKS and not args.case:  # Isaac Lab's NewtonManager, no camera or staggering
+        if args.backend not in (None, "newton") or args.camera:
+            raise SystemExit("-Manager tasks run on the newton backend without the tiled camera")
+        if args.policy.startswith("replay:"):
+            raise SystemExit("replay: runs the -Direct tasks")
+        cfg.sim.device = args.device or "cuda:0"
+        cfg.seed = int(args.seed or 0)
+        if args.workspace is not None:
+            cfg.workspace = float(args.workspace)
+        if args.observe is not None:
+            cfg.observe = args.observe
+        return cfg
     cfg.backend = args.backend or "newton"
     cfg.sim.device = args.device or "cuda:0"
     cfg.seed = int(args.seed or 0)
@@ -347,7 +360,7 @@ def policy_loop(env, args):
     line = (f"{args.task if not args.case else args.case}: {E} envs, {args.steps} steps, policy={args.policy}, "
             f"median {med:.3f} ms/step, p95 {p95:.3f}, {E * 1000.0 / med:.0f} env-steps/s, finite={finite}, "
             f"episode ends ~{int(u.common_step_counter * E // period)}{extra}")
-    if u.camera is not None:
+    if getattr(u, "camera", None) is not None:
         cam = u.camera
         shape = wp.to_torch(cam.shape_index).view(torch.int32)  # torch has no CUDA compare for uint32: TRIANGLES -3, PARTICLES -2, MISS -1
         n = shape.numel()
@@ -395,7 +408,8 @@ def train(env, args):
     u = env.unwrapped
     device = str(u.device)
     wrapped = RslRlVecEnvWrapper(env)  # calls env.reset()
-    agent = I4hProcedurePPORunnerCfg() if u.procedure is not None else I4hPPORunnerCfg()
+    procedure = u.i4h.procedure if hasattr(u, "i4h") else u.procedure  # -Manager envs hold it on the component
+    agent = I4hProcedurePPORunnerCfg() if procedure is not None else I4hPPORunnerCfg()
     agent.seed, agent.device = int(args.seed or 0), device
     runner = OnPolicyRunner(wrapped, runner_dict(agent), log_dir=args.log_dir, device=device)
     torch.cuda.synchronize()
