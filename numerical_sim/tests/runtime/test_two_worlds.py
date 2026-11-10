@@ -158,6 +158,8 @@ def test_velocity_clip_before_contact():
     declare_tet(scene, 'p', system_id='tet')
     from i4h_physics import declare_surface
     declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
     declare_instruments(scene)
     declare_instrument_contact(scene)
     scene.allocate()

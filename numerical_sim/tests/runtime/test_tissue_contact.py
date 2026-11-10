@@ -161,6 +161,8 @@ def topology_fixture():
     declare_tet(scene, 'tissue', system_id='tet')
     from i4h_physics import declare_surface
     declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
     scene.allocate()
     tet = Tet(scene, body='tissue')
     surface = Surface(scene, tet=tet)

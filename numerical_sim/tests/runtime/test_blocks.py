@@ -10,10 +10,12 @@ import pytest
 import warp as wp
 from i4h_isaaclab.composition import load_case
 from i4h_physics import Scene, Stepper
+from i4h_physics.fluid_storage import declare_fluid
 from i4h_physics.loaders import add_fluid
 from i4h_physics.systems.fluids.fluid import Fluid
 from i4h_physics.systems.mechanics.bounds import Bounds
 from i4h_standalone.render.snapshots import Snapshots
+from i4h_surgical.interaction_storage import declare_emitter
 from i4h_surgical.systems.fluids.emitter import Emitter
 
 
@@ -71,6 +73,8 @@ def test_a_held_snapshot_keeps_its_own_data():
 def fluid_only(cuda_graph):
     scene = Scene("cuda:0", 2, (0.0, 0.0, -9.81))
     add_fluid(scene, "water", 64, mass=0.001, radius=0.003, interaction_radius=0.012, rest_distance=0.006)
+    declare_fluid(scene)
+    declare_emitter(scene)
     scene.allocate()
     fluid = Fluid(scene)
     systems = [fluid, Emitter(scene, fluid=fluid, body="water", position=(0.0, 0.0, 0.1), rate=600.0, speed=0.0),

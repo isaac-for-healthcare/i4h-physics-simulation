@@ -506,3 +506,38 @@ def test_vector_view_matches_a_natively_allocated_vector_array(device):
             vector_view(scalar, wp.vec3, bad)
     with pytest.raises(ValueError, match="contiguous scalar"):
         vector_view(view, wp.vec3, (6, 2))
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_uniform_defaults_on_world_rows_wide_rows_flat_vectors_and_empty_domains(device):
+    """The combinations tissue, fluid and containment history uses (C4.2)."""
+    world = Domain("system", "first", newton.Model.AttributeFrequency.WORLD, (2,))
+    declarations = declared(FIRST, EMPTY, world)
+    declarations.add(field(key="rest", owner=Owner.MODEL), np.arange(6).reshape(2, 3))
+    declarations.add(field(key="colour", dtype=wp.vec4f, shape=(6,)), default=0)  # flat over all rows
+    declarations.add(field(key="candidates", dtype=wp.int32, shape=(24,), row_width=4), default=-1)
+    declarations.add(field(domain=world, key="rebuild", dtype=wp.int32, shape=(2,)), default=1)
+    declarations.add(field(domain=world, key="built", dtype=wp.vec2, shape=(2,)), default=0)
+    declarations.add(field(domain=world, key="pair", dtype=wp.int32, shape=(2, 2), row_width=2), default=0)
+    declarations.add(field(domain=EMPTY, key="none", dtype=wp.vec4f, shape=(0,)), default=0)
+    b = newton.ModelBuilder()
+    for _ in range(2):
+        b.begin_world()
+        b.end_world()
+    declarations.register(b)
+    m = b.finalize(device=device)
+    s, other = m.state(), m.state()
+    v = declarations.bind(m, s, m.control())
+    colour, candidates = v.attr(FIRST, "colour"), v.attr(FIRST, "candidates")
+    native = wp.zeros(6, dtype=wp.vec4f, device=device)
+    assert (colour.shape, colour.strides, colour.dtype) == (native.shape, native.strides, native.dtype)
+    assert candidates.shape == (24,) and candidates.dtype == wp.int32 and (candidates.numpy() == -1).all()
+    assert (v.attr(world, "rebuild").numpy() == 1).all() and v.attr(world, "built").dtype == wp.vec2
+    assert not v.attr(world, "built").numpy().any() and v.attr(world, "pair").shape == (2, 2)
+    assert v.attr(EMPTY, "none").shape == (0,)
+    colour.fill_(wp.vec4f(1.0, 2.0, 3.0, 4.0))
+    candidates.fill_(7)
+    v.attr(world, "rebuild").zero_()
+    for container in (m, other):
+        assert not container.i4h.first_colour.numpy().any() and (container.i4h.first_candidates.numpy() == -1).all()
+        assert (container.i4h.first_rebuild.numpy() == 1).all()

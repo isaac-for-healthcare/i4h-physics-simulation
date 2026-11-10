@@ -57,6 +57,8 @@ def scissors_block(envs=2, trigger="closing", blood=1.0):
     declare_tet(scene, 'block', system_id='tet')
     from i4h_physics import declare_surface
     declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
     declare_instruments(scene)
     scene.allocate()
     ic = InstrumentControl(scene)

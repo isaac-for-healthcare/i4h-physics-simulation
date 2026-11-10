@@ -58,6 +58,11 @@ class Bleeding(System):
     refs = ("fluid", "centreline", "instruments", "clipping", "cutting")
     structural = System.structural + ("body", "instrument", "line", "max_spawn")
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_bleeding
+        return publish_bleeding(authoring.scene, declarations, spec.get("id", spec["type"]), centreline=spec["centreline"])
+
     def __post_init__(self):
         scene = self.scene
         self.max_spawn = check_int("bleeding.max_spawn", self.max_spawn)
@@ -99,12 +104,11 @@ class Bleeding(System):
         K = cl.positions.shape[1]
         self._live("direction")
         self._live("margin", "rate", "speed", "spawn_radius")
-        self.cut = wp.zeros((E, K), dtype=wp.int32, device=dev)
-        self.source = wp.zeros((E, K), dtype=wp.int32, device=dev)
-        self.acc = wp.zeros((E, K), dtype=wp.float32, device=dev)
+        # Newton State: cut, source, acc (E, K) per centreline node; serial (E,), the spawn random stream.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "bleeding", nodes=K, centreline=cl.id)
         self.sealed = wp.zeros(E, dtype=wp.int32, device=dev)
         self.sources = wp.zeros(E, dtype=wp.int32, device=dev)
-        self.serial = wp.zeros(E, dtype=wp.int32, device=dev)
         self.clipped = self.clipping.clipped if self.clipping is not None else wp.zeros((E, K), dtype=wp.int32, device=dev)
 
 

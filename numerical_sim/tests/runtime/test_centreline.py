@@ -22,6 +22,7 @@ from i4h_endoluminal.loaders.centreline import (
 )
 from i4h_endoluminal.rod_storage import declare_control_layout, declare_drag
 from i4h_physics import Scene, Stepper
+from i4h_physics.containment_storage import declare_graph_containment
 from i4h_physics.rod_storage import declare_rod_pbd
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.rod_pbd import RodPbd
@@ -168,7 +169,7 @@ from i4h_physics.systems.contact.graph_containment import (  # noqa: E402
 
 
 def lumen_scene(catheter, centreline, edges, radii, *, source_radius=0.05, catheter_inv_mass=None, tree_inv_mass=None,
-                root=0, open_root=False, envs=1):
+                root=0, open_root=False, envs=1, capacity=64):
     """A catheter body ``c`` and a tree body ``v``; the tree is fully pinned unless ``tree_inv_mass`` is given."""
     catheter = np.asarray(catheter, np.float32).reshape(-1, 3)
     n, P = len(catheter), len(centreline)
@@ -180,6 +181,7 @@ def lumen_scene(catheter, centreline, edges, radii, *, source_radius=0.05, cathe
     pinned = range(P) if tree_inv_mass is None else [i for i, w in enumerate(tree_inv_mass) if w == 0.0]
     tree = add_centreline_tree(scene, "v", np.asarray(centreline, np.float32), np.asarray(edges, np.int32), radii, root,
                                pinned_nodes=list(pinned), mass=1.0, open_root=open_root)
+    declare_graph_containment(scene, body="c", centreline="v", capacity=capacity)
     scene.allocate()
     if tree_inv_mass is not None:
         scene.view(scene.inv_mass, tree).assign(np.tile(np.asarray(tree_inv_mass, np.float32)[None], (envs, 1)))
@@ -189,7 +191,7 @@ def lumen_scene(catheter, centreline, edges, radii, *, source_radius=0.05, cathe
 def project(catheter, centreline, edges, radii, *, spline=False, max_distance=0.2, two_way=False, response=0.5, open_root=False,
             candidates=False, capacity=64, skin=0.04, **kw):
     """One projection (a single ``iteration`` with ``iterations 1`` and the motion clamps off): moved catheter, moved tree, system."""
-    scene, cath, tree = lumen_scene(catheter, centreline, edges, radii, open_root=open_root, **kw)
+    scene, cath, tree = lumen_scene(catheter, centreline, edges, radii, open_root=open_root, capacity=capacity, **kw)
     lc = GraphContainment(scene, body="c", centreline="v", iterations=1, spline=spline, two_way=two_way, open_root=open_root,
                           candidates=candidates, capacity=capacity, max_distance=max_distance, target_response=response, skin=skin,
                           source_max_delta=10.0, target_max_delta=10.0)

@@ -27,6 +27,8 @@ def contact(tmp_path, graph=False, pins=(), **kw):
     declare_tet(scene, 'wall', system_id='tet')
     from i4h_physics import declare_surface
     declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
     scene.allocate()
     tet = Tet(scene, body="wall")
     surf = Surface(scene, tet=tet)

@@ -9,8 +9,11 @@
     "physics/src/i4h_physics/checks.py": "f70d7c0a15acb92cfdea996d77d946a6b4b7c4242f981d6e4ef70b77877a8a59",
     "physics/src/i4h_physics/commands.py": "623e2e682486b5a8f9bb5e1d20d48699bb421d75b7a132638978e4f0f4c1b058",
     "physics/src/i4h_physics/config.py": "e338ca755028de52f2b61fb6c950742f7f3f55d86640a22d9bfe087047b27ed5",
+    "physics/src/i4h_physics/containment_storage.py": "624eb73df846e39d223804dd3a5b3a0cf84fc496e53eed20d4083b4a90bedd99",
     "physics/src/i4h_physics/coupling.py": "6b915addd9c48f6b434b73cc9814be1e7f977da48fe1e873a5ac59b4134bc118",
     "physics/src/i4h_physics/debug.py": "5e4df588252639710ad1d1976feae5007caffbe845a9304f46285aeb50401712",
+    "physics/src/i4h_physics/fluid_storage.py": "97be683549465d03896eb5ced05391bfed9410190cbe84bccac067580142513d",
+    "physics/src/i4h_physics/history_storage.py": "268d489475b84db243e8fdaf6dbddc96e212c412c6f5ef32be052203cfb42dcf",
     "physics/src/i4h_physics/loaders/__init__.py": "1a3c997550a9ef978f93063cc14cdbc71bce6b30ac950c55000e78caff126ba3",
     "physics/src/i4h_physics/loaders/fluid.py": "f60c2b67c6f54e87c9fd7e781352663981efd01171f4f079df920398902e54ea",
     "physics/src/i4h_physics/loaders/grid.py": "e226ca0919decca0049392f839e53d93c385c203762936fdfb974c511b3f0f1f",
@@ -38,14 +41,14 @@
     "physics/src/i4h_physics/systems/contact/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "physics/src/i4h_physics/systems/contact/fluid_contact.py": "1a48f3c47b0905ae0d25915ef5d3c89ddf22cf4fca0733186517d8801fdd5ee2",
     "physics/src/i4h_physics/systems/contact/geometry.py": "56cb6e6711fbb78bff3a1bb82d5bebe6dabe9430b5c07364a4c358251d26b1f0",
-    "physics/src/i4h_physics/systems/contact/graph_containment.py": "4be35d2de6587c069cc3ca61bd23cda8249c84cc6df3e7fb88255f80cc4ba6a0",
+    "physics/src/i4h_physics/systems/contact/graph_containment.py": "815a97f2887c82b6b98abe7134d02f1e30e39d20f688b5264bced83ea9d43522",
     "physics/src/i4h_physics/systems/contact/part_contact.py": "8ea71ea099691348d98d4eed52ac04edd91276236e1b97dadb128608bbc70423",
     "physics/src/i4h_physics/systems/contact/rod_containment.py": "c20ec92c5dae75a72310efb965d67db772aadb9930f047e814be9d0220d3d2c9",
     "physics/src/i4h_physics/systems/contact/shell_containment.py": "5fa3dcb09a172c66a3d414e55e26e64b06e72bcc33026f8afd6f3b80774fda76",
     "physics/src/i4h_physics/systems/contact/static_contact.py": "a66a2df7eb2285b89b993eb5e72fbd4da247ffaacae2d4459e599234cc944ae3",
     "physics/src/i4h_physics/systems/contact/tet_containment.py": "55162505bd1b68f5eea9a88ddcdb0e6324c6b27eb3225867f5bea8250b285e61",
     "physics/src/i4h_physics/systems/fluids/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
-    "physics/src/i4h_physics/systems/fluids/fluid.py": "2ca4c2ed9af4ab0274cd75ce0329b99f33cd4bacef3c9bc809cd528f2539cd23",
+    "physics/src/i4h_physics/systems/fluids/fluid.py": "d7373cb1042b6514c32b0116dc9d6c1b156aff5a0562818d45436a9b7cc5f123",
     "physics/src/i4h_physics/systems/fluids/fluid_kernels.py": "30fa8b255b4ed6b381eca5752bd0bd0b6cf5f44d2b4d3984a3cd99f77b9e176b",
     "physics/src/i4h_physics/systems/mechanics/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "physics/src/i4h_physics/systems/mechanics/attachments.py": "8285a6fb6632c040de2244b94b99fd26122d6b2eab467a8219e818f9ce09fa7d",
@@ -68,7 +71,7 @@
     "surgical/src/i4h_surgical/assessment.py": "c7f4816197a52e2de4b7b269ad219902291615c5ed4f35f4d4c08ce6e445fb66",
     "surgical/src/i4h_surgical/config.py": "b08f2deccc3e87e25b1dc2c2dd80550cb8b9252b858d68ce6cea79857d726dcf",
     "surgical/src/i4h_surgical/instrument_storage.py": "a904e649930ce4b4b4af39ab3283cbc38d582636fe9cf72a21dd33522b39aaa6",
-    "surgical/src/i4h_surgical/interaction_storage.py": "0ccbd170a2712fab3854e1baf6c50cc334152a1da49e580bf7d06909bc988351",
+    "surgical/src/i4h_surgical/interaction_storage.py": "b7a424aa0d9950f8ea95fa6f9fa5cd7dc57921b3c8b5d59fc3a63508c5c4940a",
     "surgical/src/i4h_surgical/loaders/__init__.py": "47731272d51a9473be64c10effaa4fad4e97a4c4c7fa7119e06cda50ba98435a",
     "surgical/src/i4h_surgical/loaders/instrument_usd.py": "48e3e387504ef304f65bc53726aedd6428e78aa9ce5781af1f2913fbe06c53ae",
     "surgical/src/i4h_surgical/loaders/presentation.py": "53342411e56b9073c4e60ed41f90c2052ec55beb41bee70c9116566ceb194c5a",
@@ -78,10 +81,10 @@
     "surgical/src/i4h_surgical/systems/contact/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "surgical/src/i4h_surgical/systems/contact/instrument_contact.py": "fe2a8a4377ff012bd30c066a8edd6082405213a9057fef03b79968e9e8000c36",
     "surgical/src/i4h_surgical/systems/fluids/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
-    "surgical/src/i4h_surgical/systems/fluids/bleeding.py": "9511d740dfe164ec4732b7bfcde78bc6014505828f0f1d360e6579ad27170db5",
-    "surgical/src/i4h_surgical/systems/fluids/emitter.py": "789475882ab55b542c3a6f1887dda410ddaa7a17107e00f232790dfb48e85161",
-    "surgical/src/i4h_surgical/systems/fluids/smoke.py": "112d45fd49b5bd919caeded5783b532446d0b60c9f10b7402d83e916f6007796",
-    "surgical/src/i4h_surgical/systems/fluids/suction.py": "0127fa6fb13bdd6844fc8857ad006febf59a1d89418d6f5ef73a921d2bc9c4c9",
+    "surgical/src/i4h_surgical/systems/fluids/bleeding.py": "8bbb82ed920c5e7d3b04b918f838c764ef6505626f89701fddd54beaee6a0c71",
+    "surgical/src/i4h_surgical/systems/fluids/emitter.py": "9a4e0c8e25dae6f408c29a0c0232a74bfa4c4f662003c90c89b6bc44012dacb5",
+    "surgical/src/i4h_surgical/systems/fluids/smoke.py": "706bac7b1d2495ac33675d25c161f8289ca948a0c480b15041bae64a2948d44c",
+    "surgical/src/i4h_surgical/systems/fluids/suction.py": "3fc68509171bcc1bb16d0f4f41ec2de123e76fd07274c7545c593df3c84c0cf9",
     "surgical/src/i4h_surgical/systems/instruments/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "surgical/src/i4h_surgical/systems/instruments/clipping.py": "4a002cd27732e63c3bd8307c9dfceb9bddfe63d128ffd49996b0fad0f79fcd84",
     "surgical/src/i4h_surgical/systems/instruments/contact_paint.py": "9c7aa0b3b7e653ca1656731b078a709d4203b041133888907cd171b384532011",
@@ -90,15 +93,15 @@
     "surgical/src/i4h_surgical/systems/instruments/grasp.py": "85e29f5496149274f778ead27f09367e2a5444d40fec9cf3cd23c2a65c4e7fd3",
     "surgical/src/i4h_surgical/systems/instruments/hook.py": "099fc3071a5305332f1c3ea58433b1336083c01e8a3f2150ccca44feae2fe0c8",
     "surgical/src/i4h_surgical/systems/instruments/instrument_control.py": "ae228cb19ca1b1f4b9085c4d15045629cc3afecf9d637d1e267179e41a2dbe02",
-    "surgical/src/i4h_surgical/systems/instruments/thermal.py": "0150152b129f5c505848219da1d287993f1c0f5c97337cad34424d75040a5ed0",
+    "surgical/src/i4h_surgical/systems/instruments/thermal.py": "9bf5edd170ce47af2071eb40c1b304a2c1507a37b74af65034ea4a5082e8d4ab",
     "surgical/src/i4h_surgical/systems/instruments/tool_force.py": "c5b51edf6513c8ac73dabc8a16abd5162b98ab6ea5df339b7ca28dc89df50675",
     "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py": "de711de2c14ec46aae7d4255e2b8f952dce51fc57219e1fda12196303d29fff1",
     "surgical/src/i4h_surgical/systems/mechanics/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "surgical/src/i4h_surgical/systems/mechanics/centreline.py": "d16af349cfe8ec2c7d3677a7bd4608c3f72b85984d6263bfda70e71d0334a31f",
     "surgical/src/i4h_surgical/systems/mechanics/stretch_breaking.py": "eb8efa811838becbf8557bd6285117de15e6a773c12e7a81b3332c1c4b018c0a",
-    "surgical/src/i4h_surgical/systems/mechanics/surface.py": "9e2602967ae0057dc5004a4a010013ab8980d4cf983584d5be8a6edf7e452449",
+    "surgical/src/i4h_surgical/systems/mechanics/surface.py": "e97987f2b091c94de059bcf69ef3ecb8bae62e1106df6acec35db8a85b2c50d0",
     "surgical/src/i4h_surgical/systems/mechanics/tool_delta.py": "4e92802198d84a6d94a8a51c72d2e67a55d7b703e2711ddbebcfe0ff2aaab428",
-    "surgical/src/i4h_surgical/tet_storage.py": "c82d2927406d77b74bdf8b26bd5932c03345f0d657b22877ef5e8817dfd8c87d",
+    "surgical/src/i4h_surgical/tet_storage.py": "56f2c7a9812f72b62dbdbaabb0693d2872f70b4c31d7d285d4dbe84dc3379f13",
     "endoluminal/src/i4h_endoluminal/__init__.py": "5abbe22980a4c50ccd65e61245f6f2b3bcf641198de319645c4681020ac93144",
     "endoluminal/src/i4h_endoluminal/assessment.py": "2bfb241fdbf59ecc75587f5cf8a5cffd013288444fefbc88b4d2a932c2e105a4",
     "endoluminal/src/i4h_endoluminal/bindings.py": "945b8b4755024fa9cdcbc8231df48da91e7a987494135a87ba422e530889ad02",
@@ -111,7 +114,7 @@
     "endoluminal/src/i4h_endoluminal/regions.py": "de38ce86645dfbd059bceeab242ccc3ac9fa4f6557903782698652b0a8d1dcb1",
     "endoluminal/src/i4h_endoluminal/rod_storage.py": "8452315bee3982808e44540c094930f52d0e8dcf33bc0031c90cc49a9e29b37f",
     "endoluminal/src/i4h_endoluminal/scene.py": "7c28be80c6330f50277b3170aa6c939497680ffe1947aea3250ef2a09f260d00",
-    "endoluminal/src/i4h_endoluminal/systems/__init__.py": "ccacb661d91d0cd4a68f13f72c3eab09382658cee88a2a95825911da2b8610fb",
+    "endoluminal/src/i4h_endoluminal/systems/__init__.py": "6c8bc94ff08f9b7a63769b5cb3bdc7163ea49cbb71d206b6668f49b62320cbb1",
     "endoluminal/src/i4h_endoluminal/systems/rods/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "endoluminal/src/i4h_endoluminal/systems/rods/catheter_control.py": "61444b6c21a46b7399bc45bde64a37c3b7a8a042174a8fba91df8198a4716d82",
     "endoluminal/src/i4h_endoluminal/systems/rods/control_layout.py": "aa87975a849af7c32e276af7c112d3a29a22cf3bd63b75b5f42471d06592ba8b",
@@ -2353,6 +2356,11 @@
       "section": "C4.1 Interaction history",
       "label": "Typed view of Newton-owned history",
       "text": "X, zero-copy view over a declared Newton State field (vector_view); allocates no storage"
+    },
+    "c42-assessment-state": {
+      "section": "C4.2 Tip evidence",
+      "label": "Host-owned assessment state",
+      "text": "A, per-action tip samples consumed by the assessment Procedure; created after binding by the host; excluded from the continuation claim with Procedure state (user decision 2026-11-10)"
     }
   },
   "sites": [
@@ -2794,7 +2802,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 108,
+      "line": 115,
       "expression": "wp.array(tree.edges[0], dtype=wp.vec2i, device=dev)",
       "target": "self.edges",
       "kind": "allocation",
@@ -2811,7 +2819,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 109,
+      "line": 116,
       "expression": "wp.array(tree.spline_controls[0], dtype=wp.vec4i, device=dev)",
       "target": "self.controls",
       "kind": "allocation",
@@ -2828,7 +2836,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 110,
+      "line": 117,
       "expression": "wp.array(tree.spline_neighbors[0], dtype=wp.vec2i, device=dev)",
       "target": "self.neighbors",
       "kind": "allocation",
@@ -2845,92 +2853,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 111,
-      "expression": "wp.full(E * n * self.capacity, -1, dtype=wp.int32, device=dev)",
-      "target": "self.cand_idx",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E * n * self.capacity",
-      "contracts": [
-        "b49a14667f2b"
-      ],
-      "expanded_fields": [
-        "GraphContainment.cand_idx"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
-      "scope": "GraphContainment.__post_init__",
-      "line": 112,
-      "expression": "wp.zeros(E * n, dtype=wp.int32, device=dev)",
-      "target": "self.cand_count",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E * n",
-      "contracts": [
-        "ae7425a02204"
-      ],
-      "expanded_fields": [
-        "GraphContainment.cand_count"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
-      "scope": "GraphContainment.__post_init__",
-      "line": 113,
-      "expression": "wp.zeros(E * n, dtype=wp.int32, device=dev)",
-      "target": "self.cand_overflow",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E * n",
-      "contracts": [
-        "ae7425a02204"
-      ],
-      "expanded_fields": [
-        "GraphContainment.cand_overflow"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
-      "scope": "GraphContainment.__post_init__",
-      "line": 114,
-      "expression": "wp.zeros(E * n, dtype=wp.vec3, device=dev)",
-      "target": "self.ref_samples",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "E * n",
-      "contracts": [
-        "4ee9bcf9b09a"
-      ],
-      "expanded_fields": [
-        "GraphContainment.ref_samples"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
-      "scope": "GraphContainment.__post_init__",
-      "line": 115,
-      "expression": "wp.zeros(E * Pt, dtype=wp.vec3, device=dev)",
-      "target": "self.ref_tree",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "E * Pt",
-      "contracts": [
-        "4ee9bcf9b09a"
-      ],
-      "expanded_fields": [
-        "GraphContainment.ref_tree"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
-      "scope": "GraphContainment.__post_init__",
-      "line": 116,
+      "line": 122,
       "expression": "wp.zeros(2 * E, dtype=wp.float32, device=dev)",
       "target": "self.max_disp",
       "kind": "allocation",
@@ -2947,41 +2870,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 117,
-      "expression": "wp.ones(E, dtype=wp.int32, device=dev)",
-      "target": "self.rebuild",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "aa684a3368a0"
-      ],
-      "expanded_fields": [
-        "GraphContainment.rebuild"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
-      "scope": "GraphContainment.__post_init__",
-      "line": 118,
-      "expression": "wp.zeros(E, dtype=wp.vec2, device=dev)",
-      "target": "self.built",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec2",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "aa684a3368a0"
-      ],
-      "expanded_fields": [
-        "GraphContainment.built"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
-      "scope": "GraphContainment.__post_init__",
-      "line": 119,
+      "line": 123,
       "expression": "wp.zeros(E * Pc, dtype=wp.vec3, device=dev)",
       "target": "self.cath_corr",
       "kind": "allocation",
@@ -2998,7 +2887,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 120,
+      "line": 124,
       "expression": "wp.zeros(E * Pc, dtype=wp.float32, device=dev)",
       "target": "self.cath_count",
       "kind": "allocation",
@@ -3015,7 +2904,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 121,
+      "line": 125,
       "expression": "wp.zeros(E * Pt, dtype=wp.vec3, device=dev)",
       "target": "self.tree_corr",
       "kind": "allocation",
@@ -3032,7 +2921,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 122,
+      "line": 126,
       "expression": "wp.zeros(E * Pt, dtype=wp.float32, device=dev)",
       "target": "self.tree_count",
       "kind": "allocation",
@@ -3049,7 +2938,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 123,
+      "line": 127,
       "expression": "wp.zeros(E, dtype=wp.float32, device=dev)",
       "target": "self.contact_depth",
       "kind": "allocation",
@@ -3066,7 +2955,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 124,
+      "line": 128,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.contact_count",
       "kind": "allocation",
@@ -3083,7 +2972,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 125,
+      "line": 129,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.overflow",
       "kind": "allocation",
@@ -3100,7 +2989,7 @@
     {
       "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
       "scope": "GraphContainment.__post_init__",
-      "line": 126,
+      "line": 130,
       "expression": "self._live(\"max_distance\", \"skin\", 'target_response', 'source_max_delta', 'target_max_delta')",
       "target": null,
       "kind": "live_helper",
@@ -3790,7 +3679,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__.ints",
-      "line": 111,
+      "line": 116,
       "expression": "wp.array(np.asarray(values, np.int32), dtype=wp.int32, device=dev)",
       "target": null,
       "kind": "allocation",
@@ -3812,7 +3701,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__.floats",
-      "line": 113,
+      "line": 118,
       "expression": "wp.array(np.asarray(values, np.float32), dtype=wp.float32, device=dev)",
       "target": null,
       "kind": "allocation",
@@ -3832,7 +3721,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 124,
+      "line": 129,
       "expression": "wp.full(span, -1, dtype=wp.int32, device=dev)",
       "target": "self.group",
       "kind": "allocation",
@@ -3849,7 +3738,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 125,
+      "line": 130,
       "expression": "wp.zeros(span, dtype=wp.float32, device=dev)",
       "target": "self.lam_span",
       "kind": "allocation",
@@ -3866,7 +3755,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 126,
+      "line": 131,
       "expression": "wp.zeros(span, dtype=wp.float32, device=dev)",
       "target": "self.density_span",
       "kind": "allocation",
@@ -3883,7 +3772,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 127,
+      "line": 132,
       "expression": "wp.zeros(span, dtype=wp.vec3, device=dev)",
       "target": "self.delta",
       "kind": "allocation",
@@ -3900,7 +3789,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 128,
+      "line": 133,
       "expression": "wp.zeros(span, dtype=wp.vec3, device=dev)",
       "target": "self.qd_scratch",
       "kind": "allocation",
@@ -3917,7 +3806,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 129,
+      "line": 134,
       "expression": "wp.zeros(int(nbr_base[-1]), dtype=wp.int32, device=dev)",
       "target": "self.nbr",
       "kind": "allocation",
@@ -3934,7 +3823,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 130,
+      "line": 135,
       "expression": "wp.zeros(span, dtype=wp.int32, device=dev)",
       "target": "self.nbr_count",
       "kind": "allocation",
@@ -3951,24 +3840,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 137,
-      "expression": "wp.zeros((E, nf), dtype=wp.int32, device=dev)",
-      "target": "self.cursor",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, nf)",
-      "contracts": [
-        "91017e3dd901"
-      ],
-      "expanded_fields": [
-        "Fluid.cursor"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
-      "scope": "Fluid.__post_init__",
-      "line": 138,
+      "line": 146,
       "expression": "wp.zeros((E, nf), dtype=wp.int32, device=dev)",
       "target": "self.alive_count",
       "kind": "allocation",
@@ -3985,24 +3857,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 139,
-      "expression": "wp.zeros((E, nf), dtype=wp.int32, device=dev)",
-      "target": "self.overflow",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, nf)",
-      "contracts": [
-        "5683d43b5e7c"
-      ],
-      "expanded_fields": [
-        "Fluid.overflow"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
-      "scope": "Fluid.__post_init__",
-      "line": 140,
+      "line": 147,
       "expression": "live(scene, [r.relaxation for r in recs])",
       "target": "self.relaxation",
       "kind": "live_helper",
@@ -4019,7 +3874,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 142,
+      "line": 149,
       "expression": "live(scene, [r.viscosity for r in recs])",
       "target": "self.viscosity",
       "kind": "live_helper",
@@ -4036,7 +3891,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 144,
+      "line": 151,
       "expression": "live(scene, [r.cohesion for r in recs])",
       "target": "self.cohesion",
       "kind": "live_helper",
@@ -4053,7 +3908,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 146,
+      "line": 153,
       "expression": "self._live(\"damping\")",
       "target": null,
       "kind": "live_helper",
@@ -4071,7 +3926,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 147,
+      "line": 154,
       "expression": "self._live(\"max_velocity\")",
       "target": null,
       "kind": "live_helper",
@@ -4089,7 +3944,7 @@
     {
       "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
       "scope": "Fluid.__post_init__",
-      "line": 151,
+      "line": 158,
       "expression": "wp.HashGrid(dim, dim, dim, device=dev)",
       "target": "self.grid",
       "kind": "acceleration_structure",
@@ -5276,7 +5131,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
       "scope": "Bleeding.__post_init__",
-      "line": 100,
+      "line": 105,
       "expression": "self._live(\"direction\")",
       "target": null,
       "kind": "live_helper",
@@ -5293,7 +5148,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
       "scope": "Bleeding.__post_init__",
-      "line": 101,
+      "line": 106,
       "expression": "self._live(\"margin\", \"rate\", \"speed\", \"spawn_radius\")",
       "target": null,
       "kind": "live_helper",
@@ -5313,58 +5168,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
       "scope": "Bleeding.__post_init__",
-      "line": 102,
-      "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
-      "target": "self.cut",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, K)",
-      "contracts": [
-        "ad811ad75b06"
-      ],
-      "expanded_fields": [
-        "Bleeding.cut"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
-      "scope": "Bleeding.__post_init__",
-      "line": 103,
-      "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
-      "target": "self.source",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, K)",
-      "contracts": [
-        "ad811ad75b06"
-      ],
-      "expanded_fields": [
-        "Bleeding.source"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
-      "scope": "Bleeding.__post_init__",
-      "line": 104,
-      "expression": "wp.zeros((E, K), dtype=wp.float32, device=dev)",
-      "target": "self.acc",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "(E, K)",
-      "contracts": [
-        "da023463596a"
-      ],
-      "expanded_fields": [
-        "Bleeding.acc"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
-      "scope": "Bleeding.__post_init__",
-      "line": 105,
+      "line": 110,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.sealed",
       "kind": "allocation",
@@ -5381,7 +5185,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
       "scope": "Bleeding.__post_init__",
-      "line": 106,
+      "line": 111,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.sources",
       "kind": "allocation",
@@ -5398,24 +5202,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
       "scope": "Bleeding.__post_init__",
-      "line": 107,
-      "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
-      "target": "self.serial",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "6898efa33e81"
-      ],
-      "expanded_fields": [
-        "Bleeding.serial"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
-      "scope": "Bleeding.__post_init__",
-      "line": 108,
+      "line": 112,
       "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
       "target": "self.clipped",
       "kind": "allocation",
@@ -5432,7 +5219,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
       "scope": "Emitter.__post_init__",
-      "line": 67,
+      "line": 72,
       "expression": "live(scene, self.position if self.position is not None else (0.0, 0.0, 0.0))",
       "target": "self.position",
       "kind": "live_helper",
@@ -5449,7 +5236,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
       "scope": "Emitter.__post_init__",
-      "line": 69,
+      "line": 74,
       "expression": "self._live(\"direction\")",
       "target": null,
       "kind": "live_helper",
@@ -5468,7 +5255,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
       "scope": "Emitter.__post_init__",
-      "line": 70,
+      "line": 75,
       "expression": "self._live(\"rate\", \"speed\", \"spawn_radius\", \"threshold\", \"enabled_env\")",
       "target": null,
       "kind": "live_helper",
@@ -5491,41 +5278,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
       "scope": "Emitter.__post_init__",
-      "line": 71,
-      "expression": "wp.zeros(E, dtype=wp.float32, device=dev)",
-      "target": "self.acc",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "8905bb113bc7"
-      ],
-      "expanded_fields": [
-        "Emitter.acc"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
-      "scope": "Emitter.__post_init__",
-      "line": 72,
-      "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
-      "target": "self.serial",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "8905bb113bc7"
-      ],
-      "expanded_fields": [
-        "Emitter.serial"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
-      "scope": "Emitter.__post_init__",
-      "line": 73,
+      "line": 79,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.spawned",
       "kind": "allocation",
@@ -5542,7 +5295,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
       "scope": "Smoke.__post_init__",
-      "line": 72,
+      "line": 78,
       "expression": "wp.array(np.int32((owners == k) & ~chain), dtype=wp.int32, device=scene.device)",
       "target": "self.source_prim",
       "kind": "allocation",
@@ -5559,7 +5312,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
       "scope": "Smoke.__post_init__",
-      "line": 78,
+      "line": 84,
       "expression": "self._live(\"rate\", \"lifetime\", \"speed\", \"upward\", \"spawn_radius\")",
       "target": null,
       "kind": "live_helper",
@@ -5580,92 +5333,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
       "scope": "Smoke.__post_init__",
-      "line": 81,
-      "expression": "wp.zeros(E * n, dtype=wp.vec4f, device=dev)",
-      "target": "self.pos_age",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec4f",
-      "shape_or_source_expression": "E * n",
-      "contracts": [
-        "d39216e296c5"
-      ],
-      "expanded_fields": [
-        "Smoke.pos_age"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
-      "scope": "Smoke.__post_init__",
-      "line": 82,
-      "expression": "wp.zeros(E * n, dtype=wp.vec4f, device=dev)",
-      "target": "self.vel_life",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec4f",
-      "shape_or_source_expression": "E * n",
-      "contracts": [
-        "d39216e296c5"
-      ],
-      "expanded_fields": [
-        "Smoke.vel_life"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
-      "scope": "Smoke.__post_init__",
-      "line": 83,
-      "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
-      "target": "self.cursor",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "0d42c4fe08f5"
-      ],
-      "expanded_fields": [
-        "Smoke.cursor"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
-      "scope": "Smoke.__post_init__",
-      "line": 84,
-      "expression": "wp.zeros(E, dtype=wp.float32, device=dev)",
-      "target": "self.acc",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "f2589f77fba1"
-      ],
-      "expanded_fields": [
-        "Smoke.acc"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
-      "scope": "Smoke.__post_init__",
-      "line": 85,
-      "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
-      "target": "self.serial",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "0d42c4fe08f5"
-      ],
-      "expanded_fields": [
-        "Smoke.serial"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
-      "scope": "Smoke.__post_init__",
-      "line": 86,
+      "line": 89,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.hot",
       "kind": "allocation",
@@ -5682,7 +5350,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
       "scope": "Smoke.__post_init__",
-      "line": 87,
+      "line": 90,
       "expression": "wp.zeros(E, dtype=wp.vec3, device=dev)",
       "target": "self.centre",
       "kind": "allocation",
@@ -5699,7 +5367,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
       "scope": "Smoke.__post_init__",
-      "line": 88,
+      "line": 91,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.alive_count",
       "kind": "allocation",
@@ -5716,7 +5384,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/fluids/suction.py",
       "scope": "Suction.__post_init__",
-      "line": 51,
+      "line": 55,
       "expression": "self._live(\"radius\", \"removal_radius\", \"power\")",
       "target": null,
       "kind": "live_helper",
@@ -5731,23 +5399,6 @@
         "Suction.power"
       ],
       "basis": "expanded live helper"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/fluids/suction.py",
-      "scope": "Suction.__post_init__",
-      "line": 52,
-      "expression": "wp.zeros((scene.envs, self.fluid.nf), dtype=wp.int32, device=scene.device)",
-      "target": "self.removed",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(scene.envs, self.fluid.nf)",
-      "contracts": [
-        "f87b23be0722"
-      ],
-      "expanded_fields": [
-        "Suction.removed"
-      ],
-      "basis": "scoped named field"
     },
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
@@ -6141,24 +5792,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
       "scope": "Thermal.__post_init__",
-      "line": 85,
-      "expression": "wp.zeros((E, T), dtype=wp.float32, device=dev)",
-      "target": "self.heat",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "(E, T)",
-      "contracts": [
-        "31dec8369fae"
-      ],
-      "expanded_fields": [
-        "Thermal.heat"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
-      "scope": "Thermal.__post_init__",
-      "line": 86,
+      "line": 90,
       "expression": "wp.zeros((E, T), dtype=wp.float32, device=dev)",
       "target": "self.heat_next",
       "kind": "allocation",
@@ -6175,41 +5809,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
       "scope": "Thermal.__post_init__",
-      "line": 87,
-      "expression": "wp.zeros((E, T), dtype=wp.float32, device=dev)",
-      "target": "self.burn",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "(E, T)",
-      "contracts": [
-        "31dec8369fae"
-      ],
-      "expanded_fields": [
-        "Thermal.burn"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
-      "scope": "Thermal.__post_init__",
-      "line": 88,
-      "expression": "wp.zeros(n, dtype=wp.float32, device=dev)",
-      "target": "self.coag",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "n",
-      "contracts": [
-        "7520da49b00c"
-      ],
-      "expanded_fields": [
-        "Thermal.coag"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
-      "scope": "Thermal.__post_init__",
-      "line": 89,
+      "line": 91,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self._no_hook",
       "kind": "allocation",
@@ -6552,23 +6152,6 @@
       "basis": "expanded live helper"
     },
     {
-      "path": "surgical/src/i4h_surgical/systems/mechanics/surface.py",
-      "scope": "Appearance.__init__",
-      "line": 13,
-      "expression": "wp.zeros(scene.envs * count, dtype=wp.vec4f, device=scene.device)",
-      "target": "self.visual",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec4f",
-      "shape_or_source_expression": "scene.envs * count",
-      "contracts": [
-        "186c7bd0ed77"
-      ],
-      "expanded_fields": [
-        "Appearance.visual"
-      ],
-      "basis": "scoped named field"
-    },
-    {
       "path": "endoluminal/src/i4h_endoluminal/loaders/centreline.py",
       "scope": "bind_skin",
       "line": 617,
@@ -6749,12 +6332,12 @@
       "dtype_expression": "wp.vec3",
       "shape_or_source_expression": "shape",
       "contracts": [
-        "79032e11c59c"
+        "c42-assessment-state"
       ],
       "expanded_fields": [
         "TipEvidence.positions"
       ],
-      "basis": "scoped named field"
+      "basis": "C4.2 reclassification by user decision"
     },
     {
       "path": "endoluminal/src/i4h_endoluminal/systems/tip_evidence.py",
@@ -6766,12 +6349,12 @@
       "dtype_expression": "int",
       "shape_or_source_expression": "shape",
       "contracts": [
-        "79032e11c59c"
+        "c42-assessment-state"
       ],
       "expanded_fields": [
         "TipEvidence.active"
       ],
-      "basis": "scoped named field"
+      "basis": "C4.2 reclassification by user decision"
     },
     {
       "path": "endoluminal/src/i4h_endoluminal/systems/tip_evidence.py",
@@ -6783,12 +6366,12 @@
       "dtype_expression": "int",
       "shape_or_source_expression": "catheter.envs",
       "contracts": [
-        "62dc1e68710f"
+        "c42-assessment-state"
       ],
       "expanded_fields": [
         "TipEvidence.count"
       ],
-      "basis": "scoped named field"
+      "basis": "C4.2 reclassification by user decision"
     },
     {
       "path": "endoluminal/src/i4h_endoluminal/systems/tip_evidence.py",
@@ -6800,12 +6383,12 @@
       "dtype_expression": null,
       "shape_or_source_expression": "self.count",
       "contracts": [
-        "62dc1e68710f"
+        "c42-assessment-state"
       ],
       "expanded_fields": [
         "TipEvidence.overflow"
       ],
-      "basis": "scoped named field"
+      "basis": "C4.2 reclassification by user decision"
     },
     {
       "path": "isaaclab/src/i4h_isaaclab/agents.py",
@@ -10511,7 +10094,7 @@
   },
   "certificate": {
     "scope": "Static source inventory for the recorded source hashes; no migration or dynamic continuation certification",
-    "site_count": 475,
+    "site_count": 450,
     "runtime_gates": "Scratch poisoning, reset/restore byte checks and fresh-runtime replay remain mandatory in C2-C4.",
     "boundary": "External native Newton allocations are accounted by container/template byte reports; external renderer factories are source-linked but excluded from physics continuation.",
     "residue_evidence": ".tmp_tests/stage-c-inventory-20261105/tool-residue.json",
@@ -10523,7 +10106,8 @@
     "c32_scope": "Rod ownership and catheter command views; frozen gates determine disposition independently of C3.1 acceptance.",
     "c33_scope": "Mount ownership only; frozen gates determine disposition independently of C3.2 progression acceptance.",
     "c40_scope": "Import-order-only formatting; sites re-anchored by line, no classification change. Baseline for C4.",
-    "c41_scope": "Interaction history (centreline, tool-share residue, hook, grasp, volumetric grasp, clipping) as Newton State; frozen gates determine disposition."
+    "c41_scope": "Interaction history (centreline, tool-share residue, hook, grasp, volumetric grasp, clipping) as Newton State; frozen gates determine disposition.",
+    "c42_scope": "Tissue, fluid and containment history (thermal, appearance, fluid counters, bleeding, emitter, smoke, suction, graph containment) as Newton State; frozen gates determine disposition."
   },
   "c2_migration": {
     "slice": "C2.4",
@@ -13296,5 +12880,444 @@
     "line_moves": 52,
     "ownership": "36 system-owned State arrays become declared Newton State; resets unchanged; one constructor reset mask removed with the Centreline constructor reset",
     "residue": "the six residue arrays are Newton State columns of existing particle rows"
+  },
+  "c42_migration": {
+    "slice": "C4.2",
+    "removed_sites": [
+      {
+        "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
+        "scope": "GraphContainment.__post_init__",
+        "line": 111,
+        "expression": "wp.full(E * n * self.capacity, -1, dtype=wp.int32, device=dev)",
+        "target": "self.cand_idx",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E * n * self.capacity",
+        "contracts": [
+          "b49a14667f2b"
+        ],
+        "expanded_fields": [
+          "GraphContainment.cand_idx"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
+        "scope": "GraphContainment.__post_init__",
+        "line": 112,
+        "expression": "wp.zeros(E * n, dtype=wp.int32, device=dev)",
+        "target": "self.cand_count",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E * n",
+        "contracts": [
+          "ae7425a02204"
+        ],
+        "expanded_fields": [
+          "GraphContainment.cand_count"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
+        "scope": "GraphContainment.__post_init__",
+        "line": 113,
+        "expression": "wp.zeros(E * n, dtype=wp.int32, device=dev)",
+        "target": "self.cand_overflow",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E * n",
+        "contracts": [
+          "ae7425a02204"
+        ],
+        "expanded_fields": [
+          "GraphContainment.cand_overflow"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
+        "scope": "GraphContainment.__post_init__",
+        "line": 114,
+        "expression": "wp.zeros(E * n, dtype=wp.vec3, device=dev)",
+        "target": "self.ref_samples",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "E * n",
+        "contracts": [
+          "4ee9bcf9b09a"
+        ],
+        "expanded_fields": [
+          "GraphContainment.ref_samples"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
+        "scope": "GraphContainment.__post_init__",
+        "line": 115,
+        "expression": "wp.zeros(E * Pt, dtype=wp.vec3, device=dev)",
+        "target": "self.ref_tree",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "E * Pt",
+        "contracts": [
+          "4ee9bcf9b09a"
+        ],
+        "expanded_fields": [
+          "GraphContainment.ref_tree"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
+        "scope": "GraphContainment.__post_init__",
+        "line": 117,
+        "expression": "wp.ones(E, dtype=wp.int32, device=dev)",
+        "target": "self.rebuild",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "aa684a3368a0"
+        ],
+        "expanded_fields": [
+          "GraphContainment.rebuild"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/contact/graph_containment.py",
+        "scope": "GraphContainment.__post_init__",
+        "line": 118,
+        "expression": "wp.zeros(E, dtype=wp.vec2, device=dev)",
+        "target": "self.built",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec2",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "aa684a3368a0"
+        ],
+        "expanded_fields": [
+          "GraphContainment.built"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
+        "scope": "Fluid.__post_init__",
+        "line": 137,
+        "expression": "wp.zeros((E, nf), dtype=wp.int32, device=dev)",
+        "target": "self.cursor",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, nf)",
+        "contracts": [
+          "91017e3dd901"
+        ],
+        "expanded_fields": [
+          "Fluid.cursor"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "physics/src/i4h_physics/systems/fluids/fluid.py",
+        "scope": "Fluid.__post_init__",
+        "line": 139,
+        "expression": "wp.zeros((E, nf), dtype=wp.int32, device=dev)",
+        "target": "self.overflow",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, nf)",
+        "contracts": [
+          "5683d43b5e7c"
+        ],
+        "expanded_fields": [
+          "Fluid.overflow"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
+        "scope": "Bleeding.__post_init__",
+        "line": 102,
+        "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
+        "target": "self.cut",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, K)",
+        "contracts": [
+          "ad811ad75b06"
+        ],
+        "expanded_fields": [
+          "Bleeding.cut"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
+        "scope": "Bleeding.__post_init__",
+        "line": 103,
+        "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
+        "target": "self.source",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, K)",
+        "contracts": [
+          "ad811ad75b06"
+        ],
+        "expanded_fields": [
+          "Bleeding.source"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
+        "scope": "Bleeding.__post_init__",
+        "line": 104,
+        "expression": "wp.zeros((E, K), dtype=wp.float32, device=dev)",
+        "target": "self.acc",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "(E, K)",
+        "contracts": [
+          "da023463596a"
+        ],
+        "expanded_fields": [
+          "Bleeding.acc"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/bleeding.py",
+        "scope": "Bleeding.__post_init__",
+        "line": 107,
+        "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
+        "target": "self.serial",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "6898efa33e81"
+        ],
+        "expanded_fields": [
+          "Bleeding.serial"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
+        "scope": "Emitter.__post_init__",
+        "line": 71,
+        "expression": "wp.zeros(E, dtype=wp.float32, device=dev)",
+        "target": "self.acc",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "8905bb113bc7"
+        ],
+        "expanded_fields": [
+          "Emitter.acc"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/emitter.py",
+        "scope": "Emitter.__post_init__",
+        "line": 72,
+        "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
+        "target": "self.serial",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "8905bb113bc7"
+        ],
+        "expanded_fields": [
+          "Emitter.serial"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
+        "scope": "Smoke.__post_init__",
+        "line": 81,
+        "expression": "wp.zeros(E * n, dtype=wp.vec4f, device=dev)",
+        "target": "self.pos_age",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec4f",
+        "shape_or_source_expression": "E * n",
+        "contracts": [
+          "d39216e296c5"
+        ],
+        "expanded_fields": [
+          "Smoke.pos_age"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
+        "scope": "Smoke.__post_init__",
+        "line": 82,
+        "expression": "wp.zeros(E * n, dtype=wp.vec4f, device=dev)",
+        "target": "self.vel_life",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec4f",
+        "shape_or_source_expression": "E * n",
+        "contracts": [
+          "d39216e296c5"
+        ],
+        "expanded_fields": [
+          "Smoke.vel_life"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
+        "scope": "Smoke.__post_init__",
+        "line": 83,
+        "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
+        "target": "self.cursor",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "0d42c4fe08f5"
+        ],
+        "expanded_fields": [
+          "Smoke.cursor"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
+        "scope": "Smoke.__post_init__",
+        "line": 84,
+        "expression": "wp.zeros(E, dtype=wp.float32, device=dev)",
+        "target": "self.acc",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "f2589f77fba1"
+        ],
+        "expanded_fields": [
+          "Smoke.acc"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/smoke.py",
+        "scope": "Smoke.__post_init__",
+        "line": 85,
+        "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
+        "target": "self.serial",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "0d42c4fe08f5"
+        ],
+        "expanded_fields": [
+          "Smoke.serial"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/fluids/suction.py",
+        "scope": "Suction.__post_init__",
+        "line": 52,
+        "expression": "wp.zeros((scene.envs, self.fluid.nf), dtype=wp.int32, device=scene.device)",
+        "target": "self.removed",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(scene.envs, self.fluid.nf)",
+        "contracts": [
+          "f87b23be0722"
+        ],
+        "expanded_fields": [
+          "Suction.removed"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
+        "scope": "Thermal.__post_init__",
+        "line": 85,
+        "expression": "wp.zeros((E, T), dtype=wp.float32, device=dev)",
+        "target": "self.heat",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "(E, T)",
+        "contracts": [
+          "31dec8369fae"
+        ],
+        "expanded_fields": [
+          "Thermal.heat"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
+        "scope": "Thermal.__post_init__",
+        "line": 87,
+        "expression": "wp.zeros((E, T), dtype=wp.float32, device=dev)",
+        "target": "self.burn",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "(E, T)",
+        "contracts": [
+          "31dec8369fae"
+        ],
+        "expanded_fields": [
+          "Thermal.burn"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/thermal.py",
+        "scope": "Thermal.__post_init__",
+        "line": 88,
+        "expression": "wp.zeros(n, dtype=wp.float32, device=dev)",
+        "target": "self.coag",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "n",
+        "contracts": [
+          "7520da49b00c"
+        ],
+        "expanded_fields": [
+          "Thermal.coag"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/mechanics/surface.py",
+        "scope": "Appearance.__init__",
+        "line": 13,
+        "expression": "wp.zeros(scene.envs * count, dtype=wp.vec4f, device=scene.device)",
+        "target": "self.visual",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec4f",
+        "shape_or_source_expression": "scene.envs * count",
+        "contracts": [
+          "186c7bd0ed77"
+        ],
+        "expanded_fields": [
+          "Appearance.visual"
+        ],
+        "basis": "scoped named field"
+      }
+    ],
+    "added_sites": [],
+    "line_moves": 45,
+    "reclassified": [
+      "self.positions",
+      "self.active",
+      "self.count",
+      "self.overflow"
+    ],
+    "ownership": "25 system-owned State arrays become declared Newton State; resets and hooks unchanged; TipEvidence stays host-owned assessment state by user decision"
   }
 }

@@ -83,7 +83,8 @@ def poison(sim, seed=7):
     wp.synchronize()
 
 
-# Systems with history that C4.2 migrates; resume fixtures keep them out of the step.
+# Tissue and fluid systems; the interaction resume fixtures keep them out of the step (test_tissue_owned_storage
+# resumes with them).
 LATER = ("thermal", "bleeding", "emitter", "suction", "smoke", "fluid", "fluid_contact")
 
 

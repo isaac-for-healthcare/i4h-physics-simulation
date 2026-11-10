@@ -38,8 +38,12 @@ class Suction(System):
     refs = ("fluid", "instruments")
     structural = System.structural + ("instrument",)
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_suction
+        return publish_suction(authoring.scene, declarations, spec.get("id", spec["type"]), fluid=spec["fluid"])
+
     def __post_init__(self):
-        scene = self.scene
         if not isinstance(self.fluid, Fluid):
             raise TypeError("suction.fluid must name a fluid system")
         if not isinstance(self.instruments, InstrumentControl):
@@ -49,7 +53,9 @@ class Suction(System):
         self.k = self.instruments.names.index(self.instrument)
         self.freeze("instrument")
         self._live("radius", "removal_radius", "power")
-        self.removed = wp.zeros((scene.envs, self.fluid.nf), dtype=wp.int32, device=scene.device)
+        # Newton State: removed (E, nf), particles taken out per pool since reset, on the fluid's pool rows.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "suction", pools=self.fluid.nf, fluid=self.fluid.id)
 
 
     def substep_end(self, scene, dt):

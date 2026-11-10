@@ -136,6 +136,8 @@ def held_probe(mode):
     declare_tet(scene, "block")
     from i4h_physics import declare_surface
     declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
     from i4h_surgical.instrument_storage import declare_instruments
     declare_instruments(scene)
     from i4h_surgical.interaction_storage import declare_instrument_contact

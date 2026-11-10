@@ -79,6 +79,11 @@ class Fluid(System):
 
     structural = System.structural + ("grid_dim",)
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.fluid_storage import publish_fluid
+        return publish_fluid(authoring.scene, declarations, spec.get("id", spec["type"]))
+
     def __post_init__(self):
         scene = self.scene
         E, dev = scene.envs, scene.device
@@ -134,9 +139,11 @@ class Fluid(System):
         self.q_prev_b = [pool.q_prev[b.offset : b.offset + E * b.count] for b in self.bodies]
         self.flags_b = [pool.flags[b.offset : b.offset + E * b.count] for b in self.bodies]
         self.density = [self.density_span[o : o + E * n] for o, n in zip(base, counts)]
-        self.cursor = wp.zeros((E, nf), dtype=wp.int32, device=dev)  # ring cursor per pool (emitters' live input)
+        # Newton State: cursor (E, nf), ring cursor per pool (emitters' live input); overflow (E, nf), neighbour-list
+        # overflows since reset.
+        from i4h_physics.history_storage import bind_history
+        bind_history(self, "fluid", pools=nf)
         self.alive_count = wp.zeros((E, nf), dtype=wp.int32, device=dev)
-        self.overflow = wp.zeros((E, nf), dtype=wp.int32, device=dev)  # neighbour-list overflows since reset
         self.relaxation = live(scene, [r.relaxation for r in recs])
         self.register_live("relaxation")
         self.viscosity = live(scene, [r.viscosity for r in recs])

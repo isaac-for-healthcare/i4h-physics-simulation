@@ -206,9 +206,12 @@ def test_templates_identities_and_independent_containers(device, captured):
         else:
             assert (values == FILLS.get(key, 0)).all(), key
     records = scene.interaction_domains
-    assert {r["kind"] for r in records.values()} == {"centreline", "instrument_contact", "hook", "grasp", "volumetric_grasp", "clipping"}
+    kinds = {"centreline", "instrument_contact", "hook", "grasp", "volumetric_grasp", "clipping"}
+    assert {r["kind"] for r in records.values()} >= kinds  # tissue and fluid history has its own module
     names = set()
     for sid, record in records.items():
+        if record["kind"] not in kinds:
+            continue
         owner = next(s for s in sim.systems if s.id == sid)
         for key, (f, vector, shape) in record["fields"].items():
             backing, live = getattr(state.i4h, f.name), getattr(owner, key)
@@ -377,7 +380,9 @@ def test_runtimes_on_separate_containers_do_not_touch_each_other(device, capture
     for sid, record in resumed.scene.interaction_domains.items():
         for key, (f, _, _) in record["fields"].items():
             for bound, container in ((resumed, saved_state), (sim, state)):
-                assert getattr(next(x for x in bound.systems if x.id == sid), key).ptr == getattr(container.i4h, f.name).ptr
+                owner = next(x for x in bound.systems if x.id == sid)
+                owner = owner.appearance if record["kind"] == "appearance" else owner  # the surface's colour object
+                assert getattr(owner, key).ptr == getattr(container.i4h, f.name).ptr
     first = snapshot(state, control)
     other.run(3, True)
     assert snapshot(state, control) == first, first_difference(snapshot(state, control), first)

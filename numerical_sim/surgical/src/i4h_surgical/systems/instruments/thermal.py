@@ -53,10 +53,10 @@ class Thermal(System):
 
     @classmethod
     def declare_storage(cls, authoring, declarations, spec, records):
-        from i4h_surgical.tet_storage import declare_thermal_tet_fields
+        from i4h_surgical.interaction_storage import publish_thermal
         body = records[spec["surface"]]["body"]
-        domain = declare_thermal_tet_fields(declarations, body, spec.get("id", spec["type"]), lambda: authoring.particle_starts(body))
-        return {"body": body, "state": domain}
+        return publish_thermal(authoring.scene, declarations, spec.get("id", spec["type"]), surface=spec["surface"],
+                               starts=lambda: authoring.particle_starts(body))
 
     def __post_init__(self):
         scene = self.scene
@@ -80,12 +80,14 @@ class Thermal(System):
         self.body = b = sf.body
         E, dev = scene.envs, scene.device
         T, n = sf.tet_fields.tets.shape[1], E * b.count
-        scene.check_memory({"heat": 3 * E * T * 4, "coag": n * 4})
+        scene.check_memory({"heat": E * T * 4})
         self._live("power", "diffusion", "cooling", "burn_rate", "coag_heat", "delete_heat", "delete_burn")
-        self.heat = wp.zeros((E, T), dtype=wp.float32, device=dev)
+        # Newton State: heat, burn (E, T) per tet; coag (E * count,), body-local per particle: max burn / delete_burn seen.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "thermal", body=b, surface=sf.id)
+        if self.heat.shape != (E, T) or self.coag.shape != (n,):
+            raise RuntimeError("thermal declaration does not match its surface; reconstruct the model")
         self.heat_next = wp.zeros((E, T), dtype=wp.float32, device=dev)
-        self.burn = wp.zeros((E, T), dtype=wp.float32, device=dev)
-        self.coag = wp.zeros(n, dtype=wp.float32, device=dev)  # body-local per particle: max burn / delete_burn seen
         self._no_hook = wp.zeros(E, dtype=wp.int32, device=dev)
 
 

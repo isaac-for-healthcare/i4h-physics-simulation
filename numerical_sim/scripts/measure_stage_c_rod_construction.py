@@ -145,6 +145,7 @@ report = dict(
     host_peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
     declared_bytes=scene.storage.allocated_bytes(),
     rod_and_control_storage=records,
+    interaction_storage=account.interaction_accounting(scene),
     pointers=pointers,
     container_bytes={
         k: account.byte_count(v.values())

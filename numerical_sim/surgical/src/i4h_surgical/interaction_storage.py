@@ -1,63 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: Apache-2.0
-"""Host-only declarations for surgical interaction history.
+"""Host-only declarations for surgical interaction and tissue history.
 
-Centreline nodes, hook anchors, grasp and clip slots and the tool-share residue are Newton State. Templates
+Centreline nodes, hook anchors, grasp and clip slots, the tool-share residue, heat, burn, coagulation, surface
+colour, bleeding, emission and smoke are Newton State. Templates
 carry each array's construction value; the systems' own resets are unchanged and clear only what they cleared.
 Capacities come from the authored scene and the system settings, never from system instances.
 """
-import newton
 import numpy as np
 import warp as wp
-from i4h_physics.storage import Domain, Field, Owner, defer_declaration, vector_view
+from i4h_physics.history_storage import RECORDS, Layout, bind_history, published
+from i4h_physics.storage import defer_declaration
 from i4h_physics.surface_storage import support_domain
-
-RECORDS = "interaction_domains"
-
-
-class Layout:
-    """One system's fields: ``attribute -> (Field, vector dtype or None, exposed shape)``."""
-
-    def __init__(self, scene, declarations, system_id, kind):
-        self.scene, self.declarations, self.id, self.kind = scene, declarations, system_id, kind
-        self.fields, self.domains = {}, {}
-
-    def domain(self, label, shape, reference, owners):
-        E = self.scene.envs
-        d = Domain("system", f"{self.id}_{label}", f"i4h:{self.id}_{label}_rows", shape, reference)
-        worlds = np.broadcast_to(np.arange(E, dtype=np.int32).reshape((E,) + (1,) * (len(shape) - 1)), shape)
-        self.declarations.domain(d, worlds=worlds, owners=owners)
-        self.domains[label] = d
-        return d
-
-    def world(self):
-        d = Domain("system", self.id, newton.Model.AttributeFrequency.WORLD, (self.scene.envs,))
-        self.declarations.domain(d)
-        self.domains["world"] = d
-        return d
-
-    def add(self, key, d, dtype, *, default=None, values=None):
-        """A State field on ``d``. On another system's rows the name says whose history it is: the instrument
-        rows already hold the control's own ``grasp_pending``."""
-        name = f"{self.id}_{key}" if d in self.domains.values() else f"{self.id}_history_{key}"
-        f = Field(d, name, Owner.STATE, dtype, d.shape, "world, local row", "the system's existing selected-world reset",
-                  attribute_name=name)
-        self.declarations.add(f, values, default=default)
-        self.fields[key] = (f, None, d.shape)
-
-    def residue(self, d, rows, tools):
-        """The per-tool vec3 shares of the body's particles, as scalar columns of existing particle rows."""
-        for key in ("delta_k", "delta_jaw"):
-            name = f"{self.id}_{key}"
-            f = Field(d, name, Owner.STATE, wp.float32, d.shape + (3 * tools,), "world, body-local particle, tool",
-                      "never cleared by reset; the apply kernel clears what it reduced", row_width=3 * tools, attribute_name=name)
-            self.declarations.add(f, default=0.0)
-            self.fields[key] = (f, wp.vec3, (rows, tools))
-
-    def publish(self, **settings):
-        record = dict(kind=self.kind, fields=self.fields, domains=self.domains, envs=self.scene.envs, **settings)
-        self.declarations.register_package(records=((self.scene, RECORDS, {self.id: record}),))
-        return record
 
 
 def tools(scene):
@@ -240,23 +194,101 @@ def declare_clipping(scene, *, instrument, centreline="centreline", instruments=
                       dict(centreline=centreline, instruments=instruments, instrument=instrument, slots=slots))
 
 
+# --- thermal and appearance ----------------------------------------------------------------------------------
+
+def surface_record(scene, surface, user):
+    record = getattr(scene, "surface_domains", {}).get(surface)
+    if record is None:
+        raise ValueError(f"{user}: {surface!r} is not a declared surface; declare it first")
+    return record
+
+
+def publish_thermal(scene, declarations, system_id, *, surface, starts=None):
+    """Heat and burn per tet on the system's own tet rows; coagulation on the surface's particle rows."""
+    from i4h_surgical.tet_storage import declare_thermal_tet_fields
+    record = surface_record(scene, surface, "thermal")
+    body = record["body"]
+    layout = Layout(scene, declarations, system_id, "thermal")
+    tet = layout.domains["tet"] = declare_thermal_tet_fields(declarations, body, system_id, starts or particle_starts(scene, body))
+    for key in ("heat", "burn"):
+        layout.fields[key] = (declarations.fields[tet, key], None, tet.shape)
+    layout.add("coag", record["domains"][4], wp.float32, default=0.0, flat=True)
+    return layout.publish(body=body, surface=surface)
+
+
+def declare_thermal(scene, *, surface="surface", system_id="thermal"):
+    defer_declaration(scene, system_id, publish_thermal, dict(surface=surface))
+
+
+def publish_appearance(scene, declarations, system_id):
+    """The surgical surface's colour per particle, on that surface's own particle rows."""
+    record = surface_record(scene, system_id, "appearance")
+    layout = Layout(scene, declarations, system_id, "appearance")
+    layout.domains["support"] = record["domains"][4]
+    layout.add("visual", record["domains"][4], wp.vec4f, default=0.0, flat=True)
+    return layout.publish(body=record["body"])
+
+
+def declare_appearance(scene, *, system_id="surface"):
+    """For a surgical Surface built on a Scene directly; call after ``declare_surface``."""
+    defer_declaration(scene, f"{system_id}:appearance", lambda scene, declarations, key: publish_appearance(scene, declarations, system_id), {})
+
+
+# --- bleeding, emitter, smoke, suction ------------------------------------------------------------------------
+
+def publish_bleeding(scene, declarations, system_id, *, centreline):
+    centre = published(scene, centreline, "centreline", "bleeding")
+    layout = Layout(scene, declarations, system_id, "bleeding")
+    node = centre["domains"]["node"]
+    for key, dtype in (("cut", wp.int32), ("source", wp.int32), ("acc", wp.float32)):
+        layout.add(key, node, dtype, default=0)
+    layout.add("serial", layout.world(), wp.int32, default=0)
+    return layout.publish(nodes=centre["nodes"], centreline=centreline)
+
+
+def declare_bleeding(scene, *, centreline="centreline", system_id="bleeding"):
+    defer_declaration(scene, system_id, publish_bleeding, dict(centreline=centreline))
+
+
+def publish_emitter(scene, declarations, system_id):
+    layout = Layout(scene, declarations, system_id, "emitter")
+    world = layout.world()
+    layout.add("acc", world, wp.float32, default=0)
+    layout.add("serial", world, wp.int32, default=0)
+    return layout.publish()
+
+
+def declare_emitter(scene, *, system_id="emitter"):
+    defer_declaration(scene, system_id, publish_emitter, {})
+
+
+def publish_smoke(scene, declarations, system_id, *, count=512):
+    E, n = scene.envs, int(count)
+    layout = Layout(scene, declarations, system_id, "smoke")
+    particle = layout.domain("particle", (E, n), "world", np.full((E, n), -1, np.int32))
+    for key in ("pos_age", "vel_life"):
+        layout.add(key, particle, wp.vec4f, default=0, flat=True)
+    world = layout.world()
+    for key, dtype in (("cursor", wp.int32), ("acc", wp.float32), ("serial", wp.int32)):
+        layout.add(key, world, dtype, default=0)
+    return layout.publish(count=n)
+
+
+def declare_smoke(scene, *, count=512, system_id="smoke"):
+    defer_declaration(scene, system_id, publish_smoke, dict(count=count))
+
+
+def publish_suction(scene, declarations, system_id, *, fluid):
+    pools = published(scene, fluid, "fluid", "suction")
+    layout = Layout(scene, declarations, system_id, "suction")
+    layout.add("removed", pools["domains"]["pool"], wp.int32, default=0)
+    return layout.publish(pools=pools["pools"], fluid=fluid)
+
+
+def declare_suction(scene, *, fluid="fluid", system_id="suction"):
+    defer_declaration(scene, system_id, publish_suction, dict(fluid=fluid))
+
+
 # --- binding -------------------------------------------------------------------------------------------------
 
-def bind_interaction(system, kind, **expected):
-    """Alias the system's declared history; binding writes nothing. ``expected`` are the capacities it was built for."""
-    scene = system.scene
-    system.id = system.id or kind
-    record = getattr(scene, RECORDS, {}).get(system.id)
-    if record is None or record["kind"] != kind:
-        raise RuntimeError(f"{kind} {system.id!r} storage missing; call declare_{kind} before allocation and reconstruct the model")
-    scene.storage.check()
-    for key, value in expected.items():
-        if record[key] != value and record[key] is not value:
-            raise ValueError(f"{kind} {system.id!r}: {key} changed after declaration; reconstruct the model")
-    for key, (f, vector, shape) in record["fields"].items():
-        array = scene.attr(f.domain, f.key)
-        if vector is not None:
-            array = vector_view(array, vector, shape)
-        setattr(system, key, array)
-        scene.storage.register_package(identities=((system, key, array),))
-    return record
+bind_interaction = bind_history
