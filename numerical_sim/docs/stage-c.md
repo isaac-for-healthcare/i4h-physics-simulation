@@ -1,3 +1,17 @@
+**C4.1 status — 2026-11-10: implemented; campaign complete, certificate open on two retained `aorta_shell` failures.**
+36 interaction history arrays (Centreline, tool-share residue, Hook, Grasp, VolumetricGrasp,
+Clipping) are Newton State; kernels, hooks and resets are unchanged. The single frozen campaign
+on `dbd5f3c` passed **34/36 groups, 45/48 replays, 17/18 chole trials** and core **1,150**, Lab main
+**122**, Lab 3.0 **121** with zero failures. Chole, the only case holding the migrated State, passed
+in all six groups. Both failed groups are standalone `aorta_shell` catheter impulse; world 0 of the
+captured run repeats the C3.1 and C2.3 failing value `1.504814008512767e-05` to all digits. Chole
+at 64 worlds gains 142,470,400 retained bytes (templates and identity columns), explained to the
+byte, with no construction-time growth. A restored runtime steps bitwise equal on the CPU, also
+with a mounted tool holding tissue; CUDA stepping of this case is not bitwise repeatable, so the
+bitwise claim is CPU-only. See [stage-c41.md](stage-c41.md). **Stop before C4.2.** No push.
+
+---
+
 **C4.0 disposition — 2026-11-10.** The user accepted the C4.0 timing result as a stated
 limitation: `tissue_contact` at 64 worlds is +7.54% (Lab 3.0) and +7.74% (Lab main) over
 the Stage B references, with `aorta_static` 4% to 7% faster. No tuning or attribution is
