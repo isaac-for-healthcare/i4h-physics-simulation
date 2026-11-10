@@ -107,3 +107,39 @@ def test_monitored_child_contamination_is_retained(campaign, monkeypatch):
                                                args.out / "observations.jsonl", args.workspace)
     assert code == 0 and contaminated
     assert observations == [(123,), (123,), (123,)]
+
+
+def test_reference_campaign_replaces_prechange_timing(campaign, monkeypatch):
+    """Later stages gate on a completed campaign's own references; nothing pre-change is re-timed."""
+    module, args = campaign
+    args.replacement_env_root = Path("pins")
+    args.lab_root = Path("pins")
+    for lab in ("lab-main", "lab30"):
+        (args.workspace / "pins" / lab / "source" / "isaaclab").mkdir(parents=True)
+    args.reference_dir = Path("stage-b")
+    reference = args.workspace / "stage-b"
+    reference.mkdir()
+    for case in ("tissue_contact", "aorta_static"):
+        for worlds in (1, 64):
+            (reference / f"prechange-lab30-{case}-{worlds}.json").write_text(json.dumps({"step_ms_p50": 1.0}))
+            (reference / f"lab30-{case}-{worlds}.json").write_text(json.dumps({"step_ms_p50": 1.02}))
+    calls = []
+    def fake_worker(command, env, log_path, sample, observations, workspace):
+        calls.append((command, env))
+        log_path.touch()
+        if "--worker" in command:
+            Path(command[command.index("--out") + 1]).write_text(json.dumps({"step_ms_p50": 1.04, "replay_allocation_bytes": 0}))
+            return 0, False
+        junit = Path(next(arg.split("=", 1)[1] for arg in command if arg.startswith("--junitxml=")))
+        junit.write_text("<testsuites><testsuite><testcase/></testsuite></testsuites>")
+        return 0, False
+    monkeypatch.setattr(module, "monitored_run", fake_worker)
+    assert module.campaign(args) == 0
+    workers = [c for c, _ in calls if "--worker" in c]
+    assert len(workers) == 16 and not any("prechange" in " ".join(c) for c in workers)
+    assert all(str(args.workspace / "pins") in env["PYTHONPATH"] for c, env in calls if "--worker" in c)
+    decision = json.loads((args.out / "decision.json").read_text())
+    row = decision["comparisons"]["aorta_static-64"]
+    assert row["lab30_percent"] == pytest.approx(4.0) and row["lab30_reference"].endswith("prechange-lab30-aorta_static-64.json")
+    assert row["lab30_percent_vs_reference_campaign_result"] == pytest.approx(100 * (1.04 / 1.02 - 1))
+    assert "main_percent_vs_reference_campaign_result" not in row and decision["status"] == "passed"

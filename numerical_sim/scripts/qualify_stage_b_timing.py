@@ -105,9 +105,16 @@ def campaign(args):
     if not replacement.is_absolute():
         replacement = w / replacement
     replacement = replacement.resolve()
+    # Later stages gate against a completed campaign's references instead of re-timing the
+    # preserved pre-change source: Lab 3.0 uses that campaign's prechange-lab30 results.
+    reference = getattr(args, "reference_dir", None)
+    reference = reference and (reference if reference.is_absolute() else w / reference).resolve()
+    labs = getattr(args, "lab_root", None)
+    labs = labs and (labs if labs.is_absolute() else w / labs).resolve()
     args.out.mkdir(parents=True, exist_ok=False)
     (args.out / "environment-roots.json").write_text(json.dumps({
-        "prechange": str(w / ".tmp_tests/newton18"), "replacement": str(replacement)}, indent=2) + "\n")
+        "prechange": str(w / ".tmp_tests/newton18"), "replacement": str(replacement),
+        "reference_dir": reference and str(reference), "lab_root": labs and str(labs)}, indent=2) + "\n")
     observations = args.out / "process-observations.jsonl"
     def sample(allowed=()):
         procs = processes()
@@ -119,11 +126,14 @@ def campaign(args):
         print("Pending: unrelated GPU compute workloads are active; left untouched.")
         return 2
     results = {}
-    for version in ("prechange-lab30", "lab30", "main", "lab30-exports", "main-exports"):
+    versions = ("prechange-lab30", "lab30", "main", "lab30-exports", "main-exports")
+    for version in versions[1:] if reference else versions:
         main = version.startswith("main")
         exports = version.endswith("exports")
         source = w / ".tmp_tests/stage-b-v3/prechange" if version.startswith("prechange") else w
         lab = w / (".tmp_tests/newton18/lab-main" if main else ".tmp_tests/stage-b-followup-20261104/lab30-cloner")
+        if labs:
+            lab = labs / ("lab-main" if main else "lab30")
         runtime = w / ".tmp_tests/newton18" if version.startswith("prechange") else replacement
         py = runtime / f'{"main" if main else "lab30"}-env/bin/python'
         paths = [source / m / "src" for m in ("physics", "isaaclab", "surgical", "endoluminal", "assessment", "standalone")]
@@ -154,7 +164,8 @@ def campaign(args):
     for case in ("tissue_contact", "aorta_static"):
         for worlds in (1, 64):
             suffix = f"{case}-{worlds}"
-            old = results[f"prechange-lab30-{suffix}"]["step_ms_p50"]
+            lab30_ref = reference / f"prechange-lab30-{suffix}.json" if reference else None
+            old = (json.loads(lab30_ref.read_text()) if reference else results[f"prechange-lab30-{suffix}"])["step_ms_p50"]
             new = results[f"lab30-{suffix}"]["step_ms_p50"]
             main_ref = w / f".tmp_tests/stage-b-host/perf-main-{suffix}.json"
             main_old = json.loads(main_ref.read_text())["step_ms_p50"]
@@ -162,6 +173,10 @@ def campaign(args):
                 "lab30_percent": 100 * (new / old - 1),
                 "main_percent_vs_host_reference": 100 * (results[f"main-{suffix}"]["step_ms_p50"] / main_old - 1),
                 "main_reference": str(main_ref), "main_reference_sha256": hashlib.sha256(main_ref.read_bytes()).hexdigest(),
+                **({"lab30_reference": str(lab30_ref), "lab30_reference_sha256": hashlib.sha256(lab30_ref.read_bytes()).hexdigest(),
+                    **{f"{host}_percent_vs_reference_campaign_result":
+                       100 * (results[f"{host}-{suffix}"]["step_ms_p50"] / json.loads((reference / f"{host}-{suffix}.json").read_text())["step_ms_p50"] - 1)
+                       for host in ("lab30", "main") if (reference / f"{host}-{suffix}.json").is_file()}} if reference else {}),
                 **{f"{host}_export_overhead_percent": 100 * (results[f"{host}-exports-{suffix}"]["step_ms_p50"] / results[f"{host}-{suffix}"]["step_ms_p50"] - 1)
                    for host in ("lab30", "main")}}
             passed &= comparisons[suffix]["lab30_percent"] <= 5.0
@@ -199,6 +214,9 @@ def main():
     parser.add_argument("--workspace", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--replacement-env-root", type=Path,
                         help="directory containing qualified replacement core/lab30/main-env; pre-change stays preserved")
+    parser.add_argument("--reference-dir", type=Path,
+                        help="completed campaign whose prechange-lab30 results are the Lab 3.0 gate reference; skips re-timing pre-change source")
+    parser.add_argument("--lab-root", type=Path, help="directory containing the pinned lab-main and lab30 checkouts")
     parser.add_argument("--worker", action="store_true")
     parser.add_argument("--case", choices=("tissue_contact", "aorta_static"))
     parser.add_argument("--worlds", type=int)
