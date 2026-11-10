@@ -1,3 +1,15 @@
+**C3.3 disposition and C4 entry — 2026-11-10.** The user accepted C3.3 for
+progression with retained gaps: its follow-up source (public storage registration,
+`Control.clear` rejection) has focused verification only, and HDF5 recording/replay
+stays deferred by user choice. Stages A to C3.3 are committed as `04d057e`, made
+without the pre-commit hooks so the source stayed byte-identical to the certificates.
+[The C4 plan](stage-c4-plan.md) is approved. C4.0 (hook exclusions, formatting-only
+import ordering, one frozen campaign that fully qualifies the C3.3 follow-up source,
+one exclusive timing campaign and the remaining-State inventory) is in progress.
+Historical statuses below remain unchanged.
+
+---
+
 **Current C3.3 review follow-up — 2026-11-10.** All four approved post-freeze
 construction samples passed once each: corrected chole and rod-bearing
 `aorta_shell`, each at 1 and 64 worlds. The original failed construction attempts
