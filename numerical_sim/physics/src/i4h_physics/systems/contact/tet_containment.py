@@ -36,6 +36,10 @@ class TetContainment(System):
 
     structural = System.structural + ("iterations", "two_sided", "two_way")
 
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"depth": [(0,)]}
+
     def __post_init__(self):
         scene = self.scene
         E, dev = scene.envs, scene.device
@@ -69,7 +73,7 @@ class TetContainment(System):
 
     def _liveness(self, scene):
         s = self.surface
-        return [s.tri_tet, s.active, scene.field("flags", self.wall), s.support, self.wall.count]
+        return [s.tri_tet, s.tet_fields.active, scene.field("flags", self.wall), s.support, self.wall.count]
 
     def _bounds(self, scene):
         wp.launch(tet_bounds, dim=(scene.envs, self.F),

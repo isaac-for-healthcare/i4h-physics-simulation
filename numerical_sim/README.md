@@ -37,7 +37,7 @@ sim.reset([1])  # physical reset only
 There is no `i4h_sim` compatibility package. Assessment is constructed and advanced by the host after each completed physics sample, before rewards or terminations. Episode reset explicitly resets both physical state and the assessment object. Constructor maps are passed explicitly; systems may receive ordinary sidecars from factories without registration or a sidecar lifecycle framework.
 
 Build members with `uv build --all-packages`. Use Python `>=3.12,<3.13`; development
-continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton 1.6.1.
+continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton 1.8.0rc1; coupling uses MuJoCo and MuJoCo-Warp 3.17.0.
 
 Camera observations are owned by Isaac Lab and do not require standalone. Teleoperation
 adapters now import from `i4h_standalone.devices` and `i4h_standalone.teleop`.

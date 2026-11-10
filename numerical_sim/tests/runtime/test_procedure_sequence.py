@@ -173,6 +173,7 @@ def test_real_grasp_and_mixed_sequence(mixed):
     from i4h_physics.loaders import add_rod, add_tet_grid
     from i4h_physics.systems.mechanics.tet import Tet
     from i4h_surgical.loaders.instrument_usd import add_instrument
+    from i4h_surgical.instrument_storage import declare_instruments
     from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
     from i4h_surgical.systems.instruments.volumetric_grasp import VolumetricGrasp
     from test_volumetric_grasp import GRASPER, servo
@@ -183,6 +184,9 @@ def test_real_grasp_and_mixed_sequence(mixed):
     )
     add_rod(scene, "wire", [1, 0, 0], [1, 0, 0], 3, 0.05, 0.01)
     add_instrument(scene, "grasper", **GRASPER)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'block', system_id='tet')
+    declare_instruments(scene)
     scene.allocate()
     control = InstrumentControl(scene)
     grasp = VolumetricGrasp(scene, instruments=control, body="block", capacity=64)

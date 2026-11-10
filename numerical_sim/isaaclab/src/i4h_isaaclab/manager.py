@@ -84,6 +84,9 @@ class I4hHostMixin:
         try:
             with self.i4h.construction(device=cfg.sim.device, envs=cfg.scene.num_envs):
                 super().__init__(cfg, *args, **kwargs)
+                if "startup" in self.event_manager.available_modes:
+                    self.i4h.initialize_particle_history()
+                    self.i4h.sync_views()
         except BaseException:
             self.i4h.detach()
             if SimulationContext.instance() is not None:
@@ -117,6 +120,7 @@ class I4hHostMixin:
         self.i4h.reset(env_ids)  # Warp waits for torch's ids and extras first
         self.i4h.sync_views()  # the events run on torch's stream, after the physical reset
         super()._reset_idx(env_ids)
+        self.i4h.initialize_particle_history(env_ids)  # complete event position writes before procedure consumers
         if task is not None:
             self.i4h.reset_procedure(env_ids)  # select_envs orders Warp after the events' writes
             task.clear_recorded(env_ids=env_ids)

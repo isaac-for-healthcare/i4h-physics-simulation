@@ -36,51 +36,31 @@ class Surface(System):
 
     refs = ("tet",)
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.surface_storage import publish_surface
+        tet_id = spec["tet"]
+        if tet_id not in authoring.scene.tet_domains:
+            raise ValueError("Surface.tet must reference a declared Tet; reconstruct the model")
+        body = authoring.scene.tet_domains[tet_id]["body"]
+        return publish_surface(authoring.scene, declarations, spec.get("id", spec["type"]), tet_id,
+                               lambda: authoring.particle_starts(body))
+
     def __post_init__(self):
-        scene = self.scene
+        from i4h_physics.surface_storage import SURFACE_FIELDS, surface_fields
+        from i4h_physics.tet_storage import alias_tet_fields
         if not isinstance(self.tet, Tet):
             raise TypeError("surface.tet must name a tet system")
-        self.body = b = self.tet.body
-        m = b.tet
-        E, dev = scene.envs, scene.device
-        S, F, P = m.edges.shape[1], m.tris.shape[1], len(b.parts)
-        n = E * b.count
-        if F < P:
-            raise ValueError(f"surface: body {b.name!r} has fewer triangle slots ({F}) than parts ({P})")
-        scene.check_memory({
-            "variants": m.tet_edges.nbytes + m.face_neighbor.nbytes + m.face_tri.nbytes + m.tris.nbytes + m.tri_tet.nbytes
-                        + m.support0.nbytes + m.edge_support0.nbytes,
-            "tris": E * F * 16,
-            "support": n * 4 + E * S * 4,
-        })
-        t = self.tet
-        # The same arrays as the tet system: the masks the deleters flip and the topology they read.
-        self.variant, self.active, self.edge_active = t.variant, t.active, t.edge_active
-        self.tets, self.tet_part, self.edges, self.edge_rest, self.edge_part = t.tets, t.tet_part, t.edges, t.edge_rest, t.edge_part
-        def i32(a):
-            return wp.array(a, dtype=wp.int32, device=dev)
-        self.tet_edges = i32(m.tet_edges)  # (V, T, 6)
-        self.face_neighbor = i32(m.face_neighbor)  # (V, T, 4)
-        self.face_tri = i32(m.face_tri)  # (V, T, 4)
-        self.tris0 = wp.array(m.tris, dtype=wp.vec3i, device=dev)  # (V, F) authored skin plus degenerate padding
-        self.tri_tet0 = i32(m.tri_tet)  # (V, F)
-        self.tri_part = i32(m.tri_part)  # (F,)
-        self.support0 = i32(m.support0)  # (V, count)
-        self.edge_support0 = i32(m.edge_support0)  # (V, S)
-        self.heat_enabled = i32(m.heat)  # (P,) parts that conduct and burn
-        self.deletable = i32(m.deletable)  # (P,)
-        self.cut_start = i32(m.cut_start)  # (P,)
-        self.cut_capacity = i32(m.cut_capacity)  # (P,)
-        # Per-env live state.
-        self.tris = wp.empty((E, F), dtype=wp.vec3i, device=dev)  # body-local particle indices
-        self.tri_tet = wp.empty((E, F), dtype=wp.int32, device=dev)  # owning tet, -1 for degenerate slots
-        self.support = wp.empty(n, dtype=wp.int32, device=dev)  # body-local (E*count,), live tets per particle
-        self.edge_support = wp.empty((E, S), dtype=wp.int32, device=dev)
-        self.cut_count = wp.zeros((E, P), dtype=wp.int32, device=dev)  # exposed faces per part after the last rebuild (may exceed the cut capacity: overflow latches)
-        self.overflow = wp.zeros(E, dtype=wp.int32, device=dev)  # latched once a part ran out of cut slots
-        self.deleted = wp.zeros(E, dtype=wp.int32, device=dev)  # tets removed since the last reset
-        self.dirty = wp.zeros(E, dtype=wp.int32, device=dev)  # a deletion happened this step
-        self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
+        self.id = self.id or "surface"
+        fields = surface_fields(self.scene, self.id)
+        if fields.body is not self.tet.body or fields.tet_id != self.tet.id:
+            raise RuntimeError("Surface declaration does not match its referenced Tet; reconstruct the model")
+        self.body, self.fields = fields.body, fields
+        self.tet_fields = fields.tet_fields
+        self.scene.storage.register_package(identities=((self, "fields", fields), (self, "tet_fields", self.tet_fields)))
+        alias_tet_fields(self.scene, self, fields, SURFACE_FIELDS)
+        alias_tet_fields(self.scene, self, self.tet_fields,
+                         ("variant", "active", "edge_active", "tets", "tet_part", "edges", "edge_rest", "edge_part"))
 
     def step_end(self, scene, dt):
         E, dev = scene.envs, scene.device
@@ -96,7 +76,7 @@ class Surface(System):
         self.dirty.zero_()  # capture-safe memset: the next step starts clean
 
     def reset(self, scene, mask):
-        """Selected envs get their variant's authored surface, support counts and a clean visual state."""
+        """Selected envs get their variant's authored surface, support counts and zero physical bookkeeping."""
         E, dev, count = scene.envs, scene.device, self.body.count
         for src, dst in ((self.tris0, self.tris), (self.tri_tet0, self.tri_tet), (self.support0, self.support.reshape((E, count))),
                          (self.edge_support0, self.edge_support)):

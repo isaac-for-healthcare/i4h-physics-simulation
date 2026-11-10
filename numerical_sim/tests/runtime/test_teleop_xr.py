@@ -25,7 +25,7 @@ from isaaclab.sim import SimulationContext  # noqa: E402
 from xr_fakes import install_fake_xr  # noqa: E402
 
 
-@pytest.mark.parametrize("backend", ["newton", "i4h"])
+@pytest.mark.parametrize("backend", ["newton"])
 def test_xr_teleop_render_thread_and_controller(monkeypatch, tmp_path, backend):
     from i4h_standalone.render.xr import XrRenderer
     from i4h_standalone.xr import hands

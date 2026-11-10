@@ -45,14 +45,19 @@ class Centreline(System):
         self.positions = wp.empty((E, K), dtype=wp.vec3, device=dev)
         self.active_count = wp.zeros((E, K), dtype=wp.int32, device=dev)  # live clamp particles per node
         self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
+        self.refresh(scene, None)  # a host may bind an already moved state
 
     def step_end(self, scene, dt):
+        self.refresh(scene, None)
+
+    def refresh(self, scene, mask):
+        """Recompute live clamp geometry; retain the last position of a completely removed ring."""
         b = self.body
         K = self.positions.shape[1]
         if K == 0:
             return
         wp.launch(update_centreline, dim=(scene.envs, K),
-                  inputs=[scene.field("q", b), scene.field("flags", b), self.variant, self.clamp_start, self.clamp_count, self.clamp],
+                  inputs=[scene.field("q", b), scene.field("flags", b), self.variant, self.clamp_start, self.clamp_count, self.clamp, mask],
                   outputs=[self.positions, self.active_count], device=scene.device)
 
     def reset(self, scene, mask):
@@ -71,10 +76,13 @@ def update_centreline(
     clamp_start: wp.array2d(dtype=wp.int32),
     clamp_count: wp.array2d(dtype=wp.int32),
     clamp: wp.array2d(dtype=wp.int32),
+    mask: wp.array(dtype=wp.bool),
     positions: wp.array2d(dtype=wp.vec3),
     active_count: wp.array2d(dtype=wp.int32),
 ):
     env, k = wp.tid()
+    if mask and not mask[env]:
+        return
     v = variant[env]
     s = clamp_start[v, k]
     total = wp.vec3(0.0, 0.0, 0.0)

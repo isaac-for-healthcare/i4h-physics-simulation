@@ -25,6 +25,7 @@ from i4h_surgical.loaders.instrument_usd import (
 )
 from i4h_surgical.systems.fluids.bleeding import Bleeding
 from i4h_surgical.systems.instruments.cutting import Cutting
+from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.mechanics.centreline import Centreline
 from i4h_surgical.systems.mechanics.surface import Surface
@@ -52,6 +53,11 @@ def scissors_block(envs=2, trigger="closing", blood=1.0):
     block = add_tet_grid(scene, "block", [6, 6, 4], 0.02, origin=(-0.06, -0.06, 0.0), fix_top=True,
                          parts={"block": {"spring": 1.0, "volume": 1.0, "deletable": True}})
     add_instrument(scene, "scissors", trocar=[0.0, 0.0, -2.0], initial={"position": [0.0, 0.0, -0.3]}, **SCISSORS)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'block', system_id='tet')
+    from i4h_physics import declare_surface
+    declare_surface(scene)
+    declare_instruments(scene)
     scene.allocate()
     ic = InstrumentControl(scene)
     tet = Tet(scene, body="block")
@@ -95,6 +101,7 @@ def test_scissors_loader():
     with pytest.raises(ValueError, match="jaw_left and jaw_right"):
         add_instrument(scene, "s3", kind="scissors", mesh=SCISSORS["mesh"], scale=0.0075,
                        prims={"shaft": SCISSORS["prims"]["shaft"], "body": SCISSORS["prims"]["body"]})
+    declare_instruments(scene)
     scene.allocate()
     ic = InstrumentControl(scene)
     tet_free = Cutting.__dataclass_fields__  # the system takes trigger and blood
@@ -403,6 +410,7 @@ def test_clip_applier_device_squeeze_fires():
                    trocar=[3.0, 5.0, 3.0], initial={"position": [1.1, 1.2, -3.0]}, input="primary")
     add_instrument(scene, "grasper", kind="grasper", mesh=str(ASSETS / "pgrasp.usdc"), prims=GRASPER_PRIMS, scale=0.0075,
                    trocar=[-1.0, 5.0, 3.0], initial={"position": [0.3, 1.2, -3.0]}, input="secondary")
+    declare_instruments(scene)
     scene.allocate()
     control = InstrumentControl(scene)
     sim = Stepper.create(scene, [control], dt=1.0 / 60.0, substeps=1, iterations=1)
@@ -436,6 +444,7 @@ def test_squeeze_fires_only_on_the_hardware_backend():
     scene = Scene("cuda:0", 1)
     add_instrument(scene, "applier", kind="clip_applier", mesh=str(ASSETS / "pgrasp.usdc"), prims=GRASPER_PRIMS, scale=0.0075,
                    trocar=[3.0, 5.0, 3.0], initial={"position": [1.1, 1.2, -3.0]}, input="primary")
+    declare_instruments(scene)
     scene.allocate()
     control = InstrumentControl(scene)
     sim = Stepper.create(scene, [control], dt=1.0 / 60.0, substeps=1, iterations=1)

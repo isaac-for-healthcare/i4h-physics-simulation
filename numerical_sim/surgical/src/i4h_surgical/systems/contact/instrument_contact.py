@@ -63,6 +63,14 @@ class InstrumentContact(System):
     refs = ("instruments", "surface")
     structural = System.structural + ("iterations", "sweep_samples", "records", "front_side_only", "suppress_prim")
 
+    @classmethod
+    def output_layout(cls, scene, spec):
+        layout = scene.instrument_layout
+        capacity = check_int("instrument_contact.records", spec.get("records", 8))
+        capsules = [(p, layout.prim_owner[p], spec["instruments"], spec["surface"]) for p in range(layout.prim_count)]
+        return {"capsule": [(*row, capacity) for row in capsules],
+                "record": [(*row, r) for row in capsules for r in range(capacity)]}
+
     def __post_init__(self):
         scene = self.scene
         if not isinstance(self.instruments, InstrumentControl) or not isinstance(self.surface, Surface):

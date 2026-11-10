@@ -254,6 +254,8 @@ def gravity_rod(backend, **stiffness):
     """A 9-node cantilever under gravity, root locked, on either backend (two_worlds runs the PBD one)."""
     scene = Scene("cuda:0", 2, (0.0, 0.0, -9.81))
     add_rod(scene, "rod", [0.0, 0.0, 0.2], [1.0, 0.0, 0.0], 9, 0.02, 0.004, mass=0.01)
+    from i4h_physics.rod_storage import declare_rod_direct, declare_rod_pbd
+    (declare_rod_direct if backend is RodDirect else declare_rod_pbd)(scene, 'rod', **stiffness)
     scene.allocate()
     rod = backend(scene, body="rod", **stiffness)
     return Stepper.create(scene, [Particles(scene, max_velocity=5.0), rod], dt=1 / 60, substeps=4, iterations=8), rod
@@ -441,10 +443,21 @@ def test_structural_and_live_settings():
     ctl.track_length.fill_(0.5)
     sim.step()
     assert sim.graph is graph
+    ctl.actions.fill_(0.25)
+    ctl.targets.fill_(wp.vec3(0.1, 0.2, 0.3))
+    rod.bend_offset.fill_(wp.vec3(0.4, 0.5, 0.6))
+    commands = ctl.actions.numpy().copy(), ctl.targets.numpy().copy()
     ctl.tip_edges = 4  # structural: baked into the launches
     with pytest.raises(RuntimeError, match="structural"):
         sim.step()
     sim.prepare()  # nothing is sized by it: the recapture picks the new value up
+    np.testing.assert_array_equal(ctl.actions.numpy(), commands[0])
+    np.testing.assert_array_equal(ctl.targets.numpy(), commands[1])
+    expected = np.tile(np.float32([0.4, 0.5, 0.6]), (sim.scene.envs, rod.bend_count, 1))
+    expected[:, rod.bend_count-8:rod.bend_count-4] = 0
+    np.testing.assert_array_equal(rod.bend_offset.numpy(), expected)
+    sim.prepare()
+    np.testing.assert_array_equal(rod.bend_offset.numpy(), expected)
     sim.step()
     with pytest.raises(ValueError, match="tip_edges"):
         free_rod(tip_edges=40)

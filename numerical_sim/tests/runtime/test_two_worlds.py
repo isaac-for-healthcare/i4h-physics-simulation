@@ -21,6 +21,7 @@ from i4h_physics.systems.mechanics.tet import Tet
 from i4h_standalone.app.instruments import scripted_actions
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
+from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.thermal import Thermal
 from i4h_surgical.systems.mechanics.surface import Surface
@@ -152,6 +153,11 @@ def test_velocity_clip_before_contact():
     scene = Scene("cuda:0", 1, (0.0, 0.0, 0.0))
     add_tet_grid(scene, "p", dim=(1, 1, 1), cell=0.02, origin=(-0.01, -0.01, 0.24), parts={"p": {"spring": 1.0, "volume": 1.0}})
     add_instrument(scene, "ball", "sphere", radius=0.2, initial={"position": (0.0, 0.0, 0.0)})
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'p', system_id='tet')
+    from i4h_physics import declare_surface
+    declare_surface(scene)
+    declare_instruments(scene)
     scene.allocate()
     scene.qd.assign(np.tile(np.float32([0.0, 0.0, -20.0]), (scene.particle_count, 1)))  # 0.33 per step, past the centre
     particles = Particles(scene, damping=1.0, max_velocity=6.0)  # allows 0.1 per step
@@ -376,9 +382,12 @@ def test_estimate_bytes(case):
     scene = sim.scene
     n = scene.particle_count
     estimate = scene.estimate_bytes()
-    # The main block is Newton's model and state (q0, inv_mass, radius, flags on the model; q, qd, f on the state) plus the
-    # scene-owned q_prev and flags0; the pools are the private block.
-    assert estimate["q_prev"] == n * 12 and estimate["flags0"] == n * 4
+    # Exact defaults, mutable history/flags and initialization templates now
+    # belong to Newton; private pools remain on the legacy block.
+    assert estimate["newton_particle_defaults"] == n * 8
+    assert estimate["newton_particle_history"] == n * 16
+    assert estimate["newton_particle_templates"] == n * 16
+    assert "q_prev" not in estimate and "flags0" not in estimate
     assert estimate["newton_state"] == n * 36 and estimate["newton_model"] == n * 44 and "newton_grid" not in estimate
     assert scene.estimate_bytes(construction=True)["newton_grid"] > 0  # finalize allocates it; build_model drops it
     assert estimate["pool_q"] == scene.pool_count * 12 and "q" not in estimate
@@ -497,8 +506,11 @@ def test_two_bodies_keep_their_offsets():
     origin_a, origin_b = (-0.04, -0.04, 0.05), (0.26, -0.04, 0.05)
     a = add_tet_grid(scene, "a", [4, 4, 4], 0.02, origin=origin_a, fix_top=True)
     b = add_tet_grid(scene, "b", [4, 4, 4], 0.02, origin=origin_b, fix_top=True)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'a', system_id='a')
+    declare_tet(scene, 'b', system_id='b')
     scene.allocate()
-    systems = [Particles(scene), Tet(scene, "a"), Tet(scene, "b"),
+    systems = [Particles(scene), Tet(scene, "a", id="a"), Tet(scene, "b", id="b"),
                Bounds(scene, lower=(-1.0, -1.0, 0.0), upper=(1.0, 1.0, 1.0))]
     sim = Stepper.create(scene, systems, dt=1.0 / 60.0, substeps=4, iterations=8)
     for _ in range(100):
@@ -564,11 +576,12 @@ def allocate(self):
     wp.synchronize()
     peak, steady = wp.get_mempool_used_mem_high(dev) - base, wp.get_mempool_used_mem_current(dev) - base
     est, est_steady = self.estimate_bytes(construction=True), self.estimate_bytes()
-    newton = lambda e: sum(v for k, v in e.items() if k.startswith("newton"))
-    print(peak, steady, newton(est), newton(est_steady))
+    # C2.2 finalizes pool fields/templates and Scene metadata on Newton too.
+    # Count every declared Scene allocation, regardless of its historical key.
+    print(peak, steady, sum(est.values()), sum(est_steady.values()))
     raise SystemExit(0)
-S.Scene.allocate = allocate
-load_case(read_case(sys.argv[1]), envs=int(sys.argv[2]))
+from i4h_isaaclab.composition import load_scene
+allocate(load_scene(read_case(sys.argv[1]), envs=int(sys.argv[2])))
 """
 
 

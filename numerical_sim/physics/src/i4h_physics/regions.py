@@ -15,20 +15,18 @@ class RegionMembership:
     sources: tuple = ()  # source branch IDs per welded edge; empty for artificial stitching
 
 
+@dataclass
 class RodControls:
-    def __init__(self, scene, segments, pairs):
-        self.stretch_scale = wp.ones((scene.envs, segments), dtype=float, device=scene.device)
-        self.bend_scale = wp.ones((scene.envs, pairs), dtype=float, device=scene.device)
-        self.bend_offset = wp.zeros((scene.envs, pairs), dtype=wp.vec3, device=scene.device)
+    """Checked aliases of one body's selected live Newton Control allocation."""
+    stretch_scale: wp.array
+    bend_scale: wp.array
+    bend_offset: wp.array
 
 
 class RegionProperties:
-    def __init__(self, scene, membership, fields, rest_len=None, rest_darboux=None):
-        self.membership = membership
-        self.edge = wp.array(membership.edge, dtype=wp.int32, device=scene.device)
-        self.tables = {name: wp.full((scene.envs, len(membership.names)), default, dtype=float, device=scene.device)
-                       for name, default in fields.items()}
-        self.defaults = fields.copy()
+    def __init__(self, membership, edge, tables, defaults, rest_len=None, rest_darboux=None):
+        self.membership, self.edge, self.tables = membership, edge, tables
+        self.defaults = defaults.copy()
         self.rest_len, self.rest_darboux = rest_len, rest_darboux
 
     def validate(self, values):

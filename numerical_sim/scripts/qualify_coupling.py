@@ -43,13 +43,15 @@ ITERATIONS = 32  # converged Jacobi XPBD: the settled sag agrees within 0.3% ove
 def build(cfg, holder_z, target, mounts_for, mode):
     """Per world a holder on a vertical slide driven to ``target`` from ``holder_z``, then the component's particles."""
     import newton
-    from i4h_isaaclab.composition import build_systems, load_scene, sim_settings
-    from i4h_isaaclab.coupling import CoupledSolver, Mounts
-    from i4h_physics.newton_model import add_env_particles
+    from i4h_isaaclab.composition import maps, load_scene, sim_settings
+    from i4h_physics import author_case
+    from i4h_physics.coupling import CoupledSolver, Mounts
     from i4h_physics.sim import I4hSolver
     from i4h_physics.stepper import Stepper
 
-    scene = load_scene(cfg)
+    cfg, loaders, constructors = maps(cfg)
+    specs = mounts_for(load_scene(cfg))
+    authored = author_case(cfg, loaders, constructors, mounts=specs, coupling_mode=mode)
     b = newton.ModelBuilder()
     for e, (pos, quat) in enumerate(ENV_XFORMS):
         env = wp.transform(wp.vec3(*pos), wp.quat(*quat))
@@ -60,17 +62,17 @@ def build(cfg, holder_z, target, mounts_for, mode):
         joint = b.add_joint_prismatic(-1, link, parent_xform=at, axis=(0.0, 0.0, 1.0), target_ke=KE, target_kd=100.0,
                                       armature=0.0)
         b.add_articulation([joint])
-        add_env_particles(b, scene, e, xform=(np.float32(pos), np.float32(quat)))
+        authored.add_world(b, e, xform=(np.float32(pos), np.float32(quat)))
         b.end_world()
+    authored.complete(b)
     model = b.finalize(device="cuda:0")
     state = model.state()
     newton.eval_fk(model, state.joint_q, state.joint_qd, state)
-    scene.allocate(model, state)
-    systems = build_systems(scene, cfg)
+    scene, systems = authored.bind(model, state, model.control())
     ours = I4hSolver(model, scene, systems, state)
     Stepper(ours, **sim_settings(cfg)).prepare()
-    mounts = Mounts(model, scene, systems, mounts_for(systems), mode == "two_way")
-    control = model.control()
+    mounts = Mounts(model, scene, systems, specs, mode == "two_way")
+    control = ours.control
     control.joint_target_q.assign(np.full(model.joint_dof_count, target, np.float32))
     return systems, model, state, control, CoupledSolver(model, newton.solvers.SolverMuJoCo(model), ours, mounts)
 
@@ -122,7 +124,7 @@ def catheter_case(dt):
 
 def probe(dt, mode):
     offset = ((0.01, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
-    setup = build(probe_case(dt), -0.1, 0.14, lambda systems: {"probe": {"body": "holder", "offset": offset}}, mode)
+    setup = build(probe_case(dt), -0.1, 0.14, lambda scene: {"probe": {"body": "holder", "offset": offset}}, mode)
     systems, model, state, coupled, mean = run(setup, dt, 4.0, average=1.0)  # the block settles, the probe lifts into it
     group = coupled.mounts.groups[0]
     bodies = group.body.numpy()[:, 0]
@@ -132,8 +134,8 @@ def probe(dt, mode):
 
 
 def catheter(dt, mode):
-    def mounts_for(systems):
-        frame = tuple(float(x) for x in by_type(systems, "CatheterControl").mount_pose.numpy()[0, 0, 3:])
+    def mounts_for(scene):
+        frame = tuple(float(x) for x in scene.body("catheter").rod.frames[0, 0])
         return {"catheter": {"body": "holder", "offset": ((0.0, 0.0, 0.0), frame)}}
 
     systems, model, state, coupled, _ = run(build(catheter_case(dt), 1.0, 0.0, mounts_for, mode), dt, 2.0)

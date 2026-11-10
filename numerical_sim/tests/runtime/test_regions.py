@@ -16,6 +16,9 @@ from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
 from i4h_isaaclab.composition import read_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.regions import RegionMembership
+from i4h_physics.rod_storage import (declare_rod_direct, declare_rod_pbd,
+                                    declare_rod_direct_material, declare_rod_pbd_material)
+from i4h_endoluminal.rod_storage import declare_catheter_control, declare_control_layout
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.material import RodDirectMaterial, RodPbdMaterial
 from i4h_physics.systems.rods.rod_direct import RodDirect
@@ -29,10 +32,15 @@ INSTRUMENT = {'schema_version': 1, 'default': 'unassigned', 'regions': [
     {'name': 'shaft', 'interval': [0, .8]}, {'name': 'transition', 'interval': [.8, .9]}, {'name': 'tip', 'interval': [.9, 1]}]}
 
 
-def rod_sim(regional=True, graph=True):
+def rod_sim(regional=True, graph=True, catheter=False):
     scene = Scene('cuda:0', 2, (0, 0, 0))
     body = add_rod(scene, 'wire', [0, 0, 0], [1, 0, 0], 21, .02, .002,
                    regions=INSTRUMENT if regional else None)
+    if regional:
+        declare_rod_direct_material(scene, 'wire', system_id='material')
+    declare_rod_direct(scene, 'wire', system_id='rod', angular_damping=.05)
+    if catheter:
+        declare_catheter_control(scene, 'rod', track_length=.1)
     scene.allocate()
     materials = [RodDirectMaterial(scene, body='wire', id='material')] if regional else []
     rod = RodDirect(scene, body='wire', id='rod', angular_damping=.05)
@@ -121,7 +129,7 @@ def test_curvature_relaxation_steering_and_reset_geometry():
 
 
 def test_insertion_does_not_change_material_membership():
-    sim, rod, body = rod_sim()
+    sim, rod, body = rod_sim(catheter=True)
     control = CatheterControl(sim.scene, rod=rod, track_length=.1)
     sim.systems.append(control)
     sim.prepare()
@@ -132,12 +140,17 @@ def test_insertion_does_not_change_material_membership():
     np.testing.assert_array_equal(body.regions.edge, membership)
 
 
-def pbd_sim(radius_scale=1, anatomical_scale=1):
+def pbd_sim(radius_scale=1, anatomical_scale=1, layouts=None):
     scene = Scene('cuda:0', 2, (0, 0, 0))
     positions = np.array([[0, 0, 0], [1, 0, 0], [2, 0, 0]], np.float32)
     body = add_centreline_tree(scene, 'vessel', positions, [[0, 1], [1, 2]], np.array([1, 2, 3])*radius_scale, 0)
     body.tree.material_radius = np.array([[1, 2, 3]], np.float32)*anatomical_scale
     body.regions = RegionMembership(('a', 'b'), np.array([0, 1], np.int32))
+    declare_rod_pbd_material(scene, 'vessel', system_id='material')
+    declare_rod_pbd(scene, 'vessel', system_id='pbd')
+    if layouts is not None:
+        body.anatomy.layouts = layouts
+        declare_control_layout(scene, 'vessel')
     scene.allocate()
     material = RodPbdMaterial(scene, body='vessel', id='material')
     rod = RodPbd(scene, body='vessel', id='pbd')
@@ -221,10 +234,10 @@ def test_workspace_validation_and_wrapper():
 
 def test_layout_disable_and_masked_reset_preserve_regions():
     from i4h_endoluminal.systems.rods.control_layout import ControlLayout
-    sim, rod, body = pbd_sim()
-    body.anatomy.layouts = [[{'pid': 1, 'position': [1, 0, 0], 'rotation': [0, 0, 0, 1],
+    layouts = [[{'pid': 1, 'position': [1, 0, 0], 'rotation': [0, 0, 0, 1],
                           'stiffness': 0, 'falloff': 0, 'rest_bend': [0, 0], 'active': True,
                           'bend_stiffness_multiplier': 2, 'stretch_stiffness_multiplier': .5}]]
+    sim, rod, body = pbd_sim(layouts=layouts)
     control = ControlLayout(sim.scene, centreline='vessel')
     sim.systems.append(control)
     body.region_properties.edit({'bend': 3, 'stretch': 4}, 'a', [1])
@@ -235,10 +248,11 @@ def test_layout_disable_and_masked_reset_preserve_regions():
     control.enabled = False
     sim.prepare()
     sim.step()
-    np.testing.assert_allclose(rod.effective_bend.numpy()[:, 0], [1, 1.5])
+    # Disabling and cache-only preparation preserve the last layout commands.
+    np.testing.assert_allclose(rod.effective_bend.numpy()[:, 0], [2, 3])
     sim.reset([1])
     assert body.region_properties.tables['bend'].numpy()[1, 0] == 3
-    np.testing.assert_array_equal(rod.bend_scale.numpy(), 1)
+    np.testing.assert_array_equal(rod.bend_scale.numpy(), [[2], [1]])
     # Legacy references still receive construction-time validation.
     with pytest.raises(TypeError):
         ControlLayout(sim.scene, centreline='vessel', rod=object())
@@ -272,6 +286,8 @@ def test_pbd_unit_regions_match_existing_path(tmp_path):
 def test_radius_weighting_without_region_configuration():
     scene = Scene('cuda:0', 2, (0, 0, 0))
     body = add_centreline_tree(scene, 'vessel', [[0, 0, 0], [1, 0, 0], [2, 0, 0]], [[0, 1], [1, 2]], [1, 2, 3], 0)
+    declare_rod_pbd_material(scene, 'vessel', system_id='material')
+    declare_rod_pbd(scene, 'vessel')
     scene.allocate()
     material = RodPbdMaterial(scene, body='vessel', id='material')
     rod = RodPbd(scene, body='vessel')
@@ -330,6 +346,8 @@ def test_material_disable_enable_persistence(backend, graph):
 def test_explicit_material_validation_before_capture():
     scene = Scene('cuda:0', 2, (0, 0, 0))
     body = add_rod(scene, 'wire', [0, 0, 0], [1, 0, 0], 5, .02, .002, regions=INSTRUMENT)
+    declare_rod_direct_material(scene, 'wire', system_id='material')
+    declare_rod_direct(scene, 'wire', system_id='rod')
     scene.allocate()
     with pytest.raises(ValueError, match='requires'):
         RodDirect(scene, body='wire')
@@ -346,7 +364,7 @@ def test_explicit_material_validation_before_capture():
         assert sim.graph is None
     sim = Stepper.create(scene, [provider, rod])
     body.rod_material.bend_multiplier = wp.ones((2, 1), dtype=float, device=scene.device)
-    with pytest.raises(ValueError, match='dimensions'):
+    with pytest.raises(RuntimeError, match='replaced'):
         sim.prepare()
 
 

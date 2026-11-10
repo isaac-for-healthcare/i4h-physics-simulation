@@ -157,6 +157,10 @@ def topology_fixture():
     scene = Scene('cuda:0', 2, (0,0,0))
     materials, visuals = parse_materials({n: {'spring': 0, 'volume': 0, 'deletable': True} for n in variants[0]})
     body = pack_tet_body(scene, 'tissue', variants, materials, .01, visuals)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'tissue', system_id='tet')
+    from i4h_physics import declare_surface
+    declare_surface(scene)
     scene.allocate()
     tet = Tet(scene, body='tissue')
     surface = Surface(scene, tet=tet)

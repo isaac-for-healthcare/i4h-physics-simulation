@@ -49,6 +49,10 @@ class ShellContainment(System):
 
     structural = System.structural + ("iterations", "two_sided", "two_way")
 
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"depth": [(0,)]}
+
     def __post_init__(self):
         scene = self.scene
         E, dev = scene.envs, scene.device

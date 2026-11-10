@@ -43,7 +43,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
 import warp as wp
 from i4h_physics.checks import check_bool, check_int
 from i4h_physics.scene import ACTIVE
@@ -69,9 +68,21 @@ class CatheterControl(System):
     # polyline turns by the angle: sin(angle / (2 tip_edges - 1)) per edge, the workflow's tip_bend_rest_component)
 
     is_control = True
+    command_view_spec = {"actions": (0, 3), "insertion": (0, 1), "rotation": (1, 2), "bend": (2, 3)}
+
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_endoluminal.rod_storage import publish_catheter_control
+        return publish_catheter_control(authoring.scene, declarations, spec.get('id', spec['type']),
+                                        rod=spec['rod'], settings=spec)
+
 
     refs = ("rod",)
     structural = System.structural + ("tip_edges", "tip_axis", "tip_mapping", "guide_tip")
+
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"tool": [(0, spec["rod"])]}
 
     def __post_init__(self):
         scene = self.scene
@@ -94,27 +105,17 @@ class CatheterControl(System):
             raise ValueError("catheter_control.tip_axis is a 3-vector")
         if self.tip_mapping not in ("per_edge", "polyline"):
             raise ValueError(f"catheter_control.tip_mapping must be 'per_edge' or 'polyline', got {self.tip_mapping!r}")
-        self._live("track_length", "track_stiffness", "max_delta", "rates", "lower", "upper")
-        for name in ("rates", "lower", "upper"):
-            if getattr(self, name).shape != (E, 3):
-                raise ValueError(f"catheter_control.{name} must have 3 entries")
-        self.track_start = wp.array(m.start, dtype=wp.vec3, device=dev)  # (V,)
-        self.track_direction = wp.array(m.direction, dtype=wp.vec3, device=dev)  # (V,) unit
-        self.base_orientation = wp.array(np.ascontiguousarray(m.frames[:, 0]), dtype=wp.quat, device=dev)  # (V,)
-        self.actions = wp.zeros((E, 3), dtype=wp.float32, device=dev)  # normalised rates, written from outside step()
-        self.targets = wp.zeros(E, dtype=wp.vec3, device=dev)  # (insertion, rotation, tip angle)
+        from i4h_endoluminal.rod_storage import bind_endoluminal, CATHETER_LIVE
+        bind_endoluminal(self, 'catheter_control')
+        self.register_live(*CATHETER_LIVE)
+        self._prepared_tip_edges = self.tip_edges
+        self.freeze("id", "P", "F", "B", "rod")
         # Mount interface (i4h_isaaclab.coupling): one "instrument", the catheter's driver.
         self.names, self.count = [b.name], 1
-        self.mounted = wp.zeros(1, dtype=wp.int32, device=dev)
-        v = rod.variant.numpy()
-        self.mount_pose = wp.array(np.concatenate([m.start[v], m.frames[v, 0]], axis=1).reshape(E, 1, 7).astype(np.float32),
-                                   dtype=wp.transform, device=dev)
-        self.root = wp.array(m.start[v].reshape(E, 1, 3).astype(np.float32), dtype=wp.vec3, device=dev)
         self.impulse = wp.zeros((E, 1), dtype=wp.vec3, device=dev)  # product: sum of m * dx the driver imposed this step
         self.moment = wp.zeros((E, 1), dtype=wp.vec3, device=dev)  # product: its moment about the root
         self._lambda = getattr(rod, "lambda_sum", None)  # rod_direct's multipliers: the root's hold
         self._jacobian = getattr(rod, "jacobian_rot", None)
-        self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
 
     def action_bounds(self, workspace: float) -> tuple[list, list]:
         """Normalised insertion, rotation and tip-bend rates: [-1, 1] each (``rates`` scales them)."""
@@ -133,10 +134,18 @@ class CatheterControl(System):
 
 
     def prepare(self, scene):
+        scene.storage.check()
         super().prepare(scene)
-        if not self.enabled:  # step_start no longer clears them: the coupling must not read the last reaction again
-            self.zero(None, "impulse", "moment")
-        self.controls.bend_offset.zero_()  # only the last ``tip_edges`` entries are written from here on (or none when disabled)
+        new = check_int("catheter_control.tip_edges", self.tip_edges)
+        if not 0 <= new < self.B:
+            raise ValueError(f"catheter_control.tip_edges must be in [0, {self.B})")
+        if len(self.tip_axis) != 3 or self.tip_mapping not in ("per_edge", "polyline"):
+            raise ValueError("invalid catheter tip axis or mapping")
+        old = self._prepared_tip_edges
+        if new < old:
+            for world in range(scene.envs):
+                self.controls.bend_offset[world][self.B-old:self.B-new].zero_()
+        self._prepared_tip_edges = new
 
     def step_start(self, scene, dt):
         self.impulse.zero_()

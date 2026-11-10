@@ -135,9 +135,10 @@ def test_missing_lab_api_names_the_qualified_revision():
         compute_final_obs: list = dataclasses.field(default_factory=list)  # a field with no class attribute
 
     require(Cfg, "compute_final_obs")
-    with pytest.raises(RuntimeError, match="_invalidate_graph.*e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4"):
+    with pytest.raises(RuntimeError, match="_invalidate_graph.*4cfdfcfa52d7cb64eb83ab293b2fcfc92452aaf1"):
         require(type("NewtonManager", (), {}), "_invalidate_graph")
-    assert "v3.0.0" in QUALIFIED
+    assert "e53cd288727a5ca3dae7187d1d415b4d32b67e11" in QUALIFIED
+    assert "newton18-lab30-cloner.patch" in QUALIFIED
 
 
 def test_overflow_readouts_warn_once_from_host_copies():

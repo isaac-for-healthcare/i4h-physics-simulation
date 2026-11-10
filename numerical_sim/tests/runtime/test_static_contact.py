@@ -32,6 +32,8 @@ def test_block_stays_inside_the_cavity():
     centre = np.float32([0.53, 1.32, -3.71])  # the chole gallbladder centroid: 13 cm from the nearest wall
     add_tet_grid(scene, "block", dim=(2, 2, 2), cell=0.02, origin=tuple(centre - 0.02), density=1000.0, radius=0.005,
                  parts={"block": {"spring": 1.0, "volume": 1.0}})
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'block', system_id='tet')
     scene.allocate()
     static = StaticContact(scene, body="block", mesh="cavity", margin=0.01)
     sim = Stepper.create(scene, [Particles(scene, max_velocity=5.0), Tet(scene, body="block"), static], dt=1 / 60, substeps=4, iterations=8)

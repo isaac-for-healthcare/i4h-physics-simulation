@@ -69,7 +69,7 @@ class Cutting(System):
         else:
             self.sphere_start, self.sphere_count = base, int((own == CHAIN_FIXED).sum())  # fixed chains come first (instrument_control.py:74)
         self.freeze("instrument", "trigger")
-        T, count = sf.tets.shape[1], sf.body.count
+        T, count = sf.tet_fields.tets.shape[1], sf.body.count
         scene.check_memory({"cut_tets": E * T * 4, "blood": E * count * 4})
         self.cut_on = wp.zeros((E, ic.count), dtype=wp.int32, device=dev)  # product: 1 where the tool cuts this step
         self.cut_tets = wp.zeros((E, T), dtype=wp.int32, device=dev)  # tets this step's cut removed (the blood's neighbours)
@@ -94,20 +94,20 @@ class Cutting(System):
 
     def substep_end(self, scene, dt):
         sf, ic, b, E, dev = self.surface, self.instruments, self.surface.body, scene.envs, scene.device
-        T = sf.tets.shape[1]
+        T = sf.tet_fields.tets.shape[1]
         if not self._last or T == 0 or self.sphere_count == 0:
             return
         wp.launch(
             cut_tets,
             dim=(E, T),
-            inputs=[scene.field("q", b), self.cut_on, self.k, sf.variant, sf.tets, sf.tet_part, sf.deletable, sf.tet_edges, ic.sphere_q,
+            inputs=[scene.field("q", b), self.cut_on, self.k, sf.tet_fields.variant, sf.tet_fields.tets, sf.tet_fields.tet_part, sf.deletable, sf.tet_edges, ic.sphere_q,
                     ic.sphere_radius, ic.sphere_active, self.sphere_start, self.sphere_count, self.radius_scale, self.margin,
                     b.count],
-            outputs=[sf.active, sf.edge_active, sf.support, sf.edge_support, scene.field("flags", b), sf.deleted, sf.dirty, self.cut_tets],
+            outputs=[sf.tet_fields.active, sf.tet_fields.edge_active, sf.support, sf.edge_support, scene.field("flags", b), sf.deleted, sf.dirty, self.cut_tets],
             device=dev,
         )
         wp.launch(neighbour_blood, dim=(E, T, 4),
-                  inputs=[sf.variant, sf.tets, sf.face_neighbor, sf.active, self.cut_tets, self.blood, b.count],
+                  inputs=[sf.tet_fields.variant, sf.tet_fields.tets, sf.face_neighbor, sf.tet_fields.active, self.cut_tets, self.blood, b.count],
                   outputs=[self.blood_acc], device=dev)
         wp.launch(apply_blood, dim=(E, b.count), inputs=[scene.field("flags", b), b.count],
                   outputs=[self.blood_acc, sf.appearance.visual], device=dev)

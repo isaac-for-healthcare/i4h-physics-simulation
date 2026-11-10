@@ -1,0 +1,22 @@
+diff --git a/source/isaaclab_newton/isaaclab_newton/cloner/replicate.py b/source/isaaclab_newton/isaaclab_newton/cloner/replicate.py
+index ff1a45063..0208458f0 100644
+--- a/source/isaaclab_newton/isaaclab_newton/cloner/replicate.py
++++ b/source/isaaclab_newton/isaaclab_newton/cloner/replicate.py
+@@ -269,9 +269,9 @@ def _replicate_newton(
+         geometry = expand_deformable_entries(entries, plan, env_ids, positions, imported_sources=source_builders)
+         ranges = {
+             label: start
+-            for family in ("cloth", "soft")
++            for family in ("surface", "volume")
+             for label, start in zip(
+-                getattr(builder, f"_{family}_label"), getattr(builder, f"_{family}_particle_start"), strict=True
++                getattr(builder, f"{family}_label"), getattr(builder, f"_{family}_particle_start"), strict=True
+             )
+         }
+         offsets = [ranges[entry.root_path] for entry in geometry]
+diff --git a/source/isaaclab_newton/changelog.d/stage-b-rc1-cloner.fixed.rst b/source/isaaclab_newton/changelog.d/stage-b-rc1-cloner.fixed.rst
+new file mode 100644
+--- /dev/null
++++ b/source/isaaclab_newton/changelog.d/stage-b-rc1-cloner.fixed.rst
+@@ -0,0 +1 @@
++* Read Newton RC1 surface and volume particle ranges when replicating environments.

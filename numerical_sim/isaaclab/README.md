@@ -1,7 +1,7 @@
 # i4h-isaaclab
 
 Version 0.9.0, import `i4h_isaaclab`, Python `>=3.12,<3.13`.
-Dependencies: i4h-physics, Torch and Pillow; compatible Isaac Lab runtime. The adapter (`newton_manager`, `physics`, `views`, `env`) builds and steps physics cases with nothing else; cases with a `procedure:` (rewards, terminations, the procedure tasks) need i4h-assessment, the `apps` extra (`uv pip install './numerical_sim/isaaclab[apps]'`). Add the `surgical`/`endoluminal` extras for those domains. Install locally with `uv pip install ./numerical_sim/isaaclab`
+Dependencies: i4h-physics, Torch and Pillow; compatible Isaac Lab runtime. The adapter (`newton_manager`, `newton_solver` / `lab30`, `views`, `env`) builds and steps physics cases with nothing else; cases with a `procedure:` (rewards, terminations, the procedure tasks) need i4h-assessment, the `apps` extra (`uv pip install './numerical_sim/isaaclab[apps]'`). Add the `surgical`/`endoluminal` extras for those domains. Install locally with `uv pip install ./numerical_sim/isaaclab`
 or use the workspace lockfile for development.
 
 ```python
@@ -11,17 +11,23 @@ import i4h_isaaclab.tasks  # registers the preserved Gym task IDs
 
 ## Isaac Lab compatibility
 
-Isaac Lab is not a pip dependency; install it from source. This package targets
-`isaac-sim/IsaacLab` tag `v3.0.0` (GA, on branch `release/3.0.0`) at `e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4`
-(torch 2.11; `i4h_isaaclab.lab.QUALIFIED`), with Newton 1.6.1 and Warp 1.17.0. The runtime test suite passes on that
-revision; the physics qualification (numerical parity, including the Newton 1.6.0 -> 1.6.1 change) is
-still pending on it. Inside Lab, install the domain packages without their `usd` extra: Lab's `usd-exchange`
-provides `pxr`, and `usd-core` would overwrite it (both ship `pxr`). It relies on Lab APIs that older
-3.0 checkouts lack: `NewtonManager._invalidate_graph`, `isaaclab_newton.cloner.newton_builder_world_hook`,
-`DirectRLEnvCfg.compute_final_obs` and `DirectRLEnv._reset_envs_from_buffer`. Importing
-`i4h_isaaclab.env` or `i4h_isaaclab.newton_manager` against a Lab without them fails with an error
-naming the target revision. Other Lab revisions are untested until the runtime suite and the
-physics qualification are rerun on them.
+Isaac Lab is installed from source. The Stage A dependency probes qualify Newton
+1.8.0rc1 (`91fb115d685a96311b2f1bac5527754ee4e9c21b`), Warp 1.17.0,
+MuJoCo/MuJoCo-Warp 3.17.0, Lab main `dc01ec356052f2acd04246752a92a55162f6cd68`,
+and patched Lab 3.0 `e53cd288727a5ca3dae7187d1d415b4d32b67e11`.
+Stage B now supplies main pure/coupled solver adapters and a narrow release 3.0
+manager bridge over the same authoring, binding and numerical core. Lab owns
+allocation, stepping and capture; component bindings own views and episode
+restoration. The alternate backend and `NewtonSim` have been removed.
+
+Patched 3.0 additionally needs the explicit
+[cloner compatibility delta](../docs/newton18-lab30-cloner.patch): RC1 uses public
+`surface_label` / `volume_label` and their corresponding private particle starts.
+The supplied checkout remains unchanged; qualification uses an isolated worktree
+based on e53cd288 with that patch. See [adapter evidence](../docs/stage-b-host.md)
+and [Stage B status](../docs/stage-b.md) for current checks and remaining gates.
+Inside Lab use its `usd-exchange` provider; do not install a competing `usd-core`
+package over its `pxr` module.
 
 ## Custom tasks
 
@@ -72,7 +78,7 @@ an Arena embodiment:
   resets physics, Lab's reset events, then the procedure, as `I4hEnv` does.
 
 The scene needs the `I4H_ROOT` entry (an authored env root, no spawn), so that Lab replicates the worlds that hold
-the particles. Use `-Direct` for the tiled camera (`rgb`/`depth`), the `i4h` fallback backend, staggered
+the particles. Use `-Direct` for the tiled camera (`rgb`/`depth`), staggered
 episodes and session replay; the manager env has none of these.
 
 Isaac Lab's manager-based step calls `reset_buf.nonzero()` (a host sync) every step, which `I4hEnv` avoids with its mask

@@ -49,8 +49,32 @@ def test_centreline_loader():
         add_tet_bundle(Scene("cuda:0", 1), "t", str(CHOLE), PARTS, centrelines=[{**LINES[0], "part": "spleen"}])
 
 
-def test_tracker_and_clip():
+@pytest.fixture
+def retain_clipping_failure(request, tmp_path):
+    def retain(sim):
+        request.node._clipping_sim = sim
+    yield retain
+    report = getattr(request.node, "rep_call", None)
+    sim = getattr(request.node, "_clipping_sim", None)
+    if report is not None and report.failed and sim is not None:
+        arrays = {"scene/q": sim.scene.q.numpy()}
+        for system in sim.systems:
+            if isinstance(system, (InstrumentControl, Centreline, Clipping)):
+                for key, value in vars(system).items():
+                    if isinstance(value, wp.array):
+                        arrays[f"{system.id}/{key}"] = value.numpy()
+        body = sim.scene.body("tissue")
+        for key, value in vars(body.centrelines).items():
+            if isinstance(value, np.ndarray):
+                arrays[f"centreline_host/{key}"] = value
+        path = tmp_path / "clipping-failure.npz"
+        np.savez_compressed(path, **arrays)
+        print(f"retained clipping endpoint arrays: {path}")
+
+
+def test_tracker_and_clip(retain_clipping_failure):
     sim = load_case("chole_tet_med", envs=2)
+    retain_clipping_failure(sim)
     scene, body = sim.scene, sim.scene.body('tissue')
     control, centreline, clipping = find(sim, InstrumentControl), find(sim, Centreline), find(sim, Clipping)
     ka = clipping.k  # the applier's instrument index
@@ -128,6 +152,71 @@ def test_clipping_structural():
         sim.step()
     with pytest.raises(ValueError, match="fixed at construction"):
         sim.prepare()
+
+
+def test_cache_refresh_tracks_host_edits_without_restoring_history():
+    """Clipping reads the tracker before step_end; host edits must be visible at reset(flags=0)."""
+    sim = load_case("chole_tet_med", envs=2, device="cpu")
+    scene, body = sim.scene, sim.scene.body("tissue")
+    tracker = find(sim, Centreline)
+    control, clipping = find(sim, InstrumentControl), find(sim, Clipping)
+    before = tracker.positions.numpy().copy()
+    counts = tracker.active_count.numpy().copy()
+    q = scene.field("q", body)
+    moved = q.numpy()
+    shift = np.float32([1.0, 2.0, 3.0])
+    moved += shift
+    q.assign(moved)
+    flags = scene.field("flags", body)
+    alive = flags.numpy()
+    c = body.centrelines
+    dead_ring = c.clamp[0, c.clamp_start[0, 0]:c.clamp_start[0, 0] + c.clamp_count[0, 0]]
+    alive[0, dead_ring] = 0
+    flags.assign(alive)
+    history = [scene.q_prev, control.actions, control.sphere_q_prev, clipping.node, clipping.count]
+    saved = [a.numpy().copy() for a in history]
+    empty = wp.zeros(3, dtype=wp.bool, device=scene.device)
+    selected = wp.array([True, False, False], dtype=wp.bool, device=scene.device)
+    sim.solver.reset(sim.state, empty, flags=0)
+    np.testing.assert_array_equal(tracker.positions.numpy(), before)
+    np.testing.assert_array_equal(tracker.active_count.numpy(), counts)
+    for _ in range(2):
+        sim.solver.reset(sim.state, selected, flags=0)
+        # The other vessel has disjoint clamp particles; an entirely removed ring keeps its last position.
+        duct = int(np.flatnonzero(c.line == 1)[0])
+        np.testing.assert_allclose(tracker.positions.numpy()[0, duct], before[0, duct] + shift, atol=1e-6)
+        np.testing.assert_array_equal(tracker.positions.numpy()[0, 0], before[0, 0])
+        assert tracker.active_count.numpy()[0, 0] == 0
+        np.testing.assert_array_equal(tracker.positions.numpy()[1], before[1])
+        np.testing.assert_array_equal(tracker.active_count.numpy()[1], counts[1])
+        np.testing.assert_array_equal(q.numpy(), moved)
+        np.testing.assert_array_equal(flags.numpy(), alive)
+        for a, expected in zip(history, saved):
+            np.testing.assert_array_equal(a.numpy(), expected)
+
+
+def test_centreline_binding_uses_current_host_positions():
+    import newton
+    from i4h_isaaclab.composition import maps, read_case
+    from i4h_physics import author_case
+
+    cfg, loaders, systems = maps(read_case("chole_tet_med"))
+    authoring = author_case(cfg, loaders, systems, device="cpu", envs=1)
+    builder = newton.ModelBuilder()
+    builder.begin_world()
+    authoring.add_world(builder, 0)
+    builder.end_world()
+    authoring.complete(builder)
+    model = builder.finalize(device="cpu")
+    model.set_gravity(authoring.scene.gravity_vector)
+    state, control = model.state(), model.control()
+    state.particle_q.fill_(wp.vec3(2.0, 3.0, 4.0))
+    before = state.particle_q.numpy().copy()
+    scene, bound = authoring.bind(model, state, control)
+    tracker = next(s for s in bound if isinstance(s, Centreline))
+    np.testing.assert_array_equal(state.particle_q.numpy(), before)
+    np.testing.assert_array_equal(tracker.positions.numpy(), np.broadcast_to([2.0, 3.0, 4.0], tracker.positions.numpy().shape))
+    assert not np.array_equal(scene.q.numpy(), scene.q0.numpy())
 
 
 def test_clip_attaches_before_the_first_substep():

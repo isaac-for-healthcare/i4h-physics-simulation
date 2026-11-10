@@ -20,6 +20,7 @@ def compatible(constructor):
                 kwargs[new] = kwargs.pop(old)
         return constructor(scene, **kwargs)
     factory.refs = constructor.refs
+    factory.author = constructor.author
     return factory
 
 SYSTEMS = {

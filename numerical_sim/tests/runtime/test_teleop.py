@@ -23,7 +23,7 @@ from isaaclab.scene import InteractiveSceneCfg  # noqa: E402
 from isaaclab.sim import SimulationContext  # noqa: E402
 
 
-@pytest.fixture(params=["newton", "i4h"])
+@pytest.fixture(params=["newton"])
 def backend(request):
     return request.param
 

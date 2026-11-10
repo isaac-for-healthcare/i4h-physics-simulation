@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 import warp as wp
 from i4h_physics.scene import ACTIVE, restore_variant_rows
-from i4h_physics.systems.base import System, live
+from i4h_physics.systems.base import System
 
 
 @dataclass(eq=False)
@@ -32,7 +32,16 @@ class Tet(System):
 
     structural = System.structural + ("iterations", "model")
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.tet_storage import publish_tet
+        body = authoring.scene.body(spec["body"])
+        return publish_tet(authoring.scene, declarations, body, spec.get("id", spec["type"]),
+                           lambda: authoring.particle_starts(body))
+
     def prepare(self, scene):
+        if hasattr(self, "fields"):
+            scene.storage.check()
         super().prepare(scene)  # model sizes the multipliers: fixed at construction
         if not isinstance(self.iterations, int) or self.iterations < 1:
             raise ValueError("tet.iterations must be a positive integer")
@@ -48,34 +57,14 @@ class Tet(System):
         m = b.tet
         E, dev = scene.envs, scene.device
         n = E * b.count  # scratch is body-local: index env * count + local
-        scene.check_memory({
-            "variants": m.tets.nbytes + m.active0.nbytes + m.rest_volume.nbytes + m.edges.nbytes
-                        + m.edge_active0.nbytes + m.edge_rest.nbytes + m.part.nbytes + m.edge_part.nbytes,
-            "active": E * (m.active0.shape[1] + m.edge_active0.shape[1]) * 4,
-            "materials": 4 * E * len(m.spring) * 4,
-            "delta": n * 12 + n * 4,
-        })
-        self.variant = b.variant  # (E,) int32, shared by the body's systems
-        self.tets = wp.array(m.tets, dtype=wp.vec4i, device=dev)  # (V, T)
-        self.active0 = wp.array(m.active0, dtype=wp.int32, device=dev)  # (V, T)
-        self.active = wp.empty((E, m.active0.shape[1]), dtype=wp.int32, device=dev)  # (E, T); cutting flips this
-        self.rest_volume = wp.array(m.rest_volume, dtype=wp.float32, device=dev)  # (V, T)
-        self.tet_part = wp.array(m.part, dtype=wp.int32, device=dev)
-        self.edges = wp.array(m.edges, dtype=wp.vec2i, device=dev)  # (V, S)
-        self.edge_active0 = wp.array(m.edge_active0, dtype=wp.int32, device=dev)  # (V, S)
-        self.edge_active = wp.empty((E, m.edge_active0.shape[1]), dtype=wp.int32, device=dev)  # (E, S)
-        self.edge_rest = wp.array(m.edge_rest, dtype=wp.float32, device=dev)  # (V, S)
-        self.edge_part = wp.array(m.edge_part, dtype=wp.int32, device=dev)
-        self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))  # live masks start as their variant's masks
-        # Live (E, parts) materials, named after their YAML keys.
-        self.spring = live(scene, m.spring)
-        self.register_live("spring")
-        self.spring_damping = live(scene, m.spring_damping)
-        self.register_live("spring_damping")
-        self.volume = live(scene, m.volume)
-        self.register_live("volume")
-        self.volume_damping = live(scene, m.volume_damping)
-        self.register_live("volume_damping")
+        from i4h_physics.tet_storage import MATERIAL_FIELDS, TET_FIELDS, alias_tet_fields, tet_fields
+        self.id = self.id or "tet"
+        fields = self.fields = tet_fields(scene, self.id)
+        if fields.body is not b:
+            raise ValueError("Tet declaration resolves to a different body; reconstruct the model")
+        scene.check_memory({"delta": n * 16})
+        alias_tet_fields(scene, self, fields, (*TET_FIELDS, "variant"))
+        self.register_live(*MATERIAL_FIELDS)
         # Accumulators are zero between steps: every apply launch clears what the solves wrote.
         self.delta = wp.zeros(n, dtype=wp.vec3, device=dev)
         self.delta_count = wp.zeros(n, dtype=wp.int32, device=dev)
@@ -83,7 +72,8 @@ class Tet(System):
         xpbd = self.model == "xpbd"  # the multipliers, zeroed every substep (xpbd only)
         self.edge_lambda = wp.zeros((E, S) if xpbd else (1, 1), dtype=wp.float32, device=dev)
         self.tet_lambda = wp.zeros((E, T) if xpbd else (1, 1), dtype=wp.float32, device=dev)
-        self.freeze("model")
+        scene.storage.register_package(identities=((self, "fields", fields),))
+        self.freeze("model", "id")
 
     def substep_start(self, scene, dt, s, substeps):
         if self.model == "xpbd":
@@ -116,6 +106,7 @@ class Tet(System):
 
     def reset(self, scene, mask):
         """Restore the selected envs' active masks from their variant's initial masks."""
+        scene.storage.check()
         for src, dst in ((self.active0, self.active), (self.edge_active0, self.edge_active)):
             if dst.shape[1]:
                 wp.launch(restore_variant_rows, dim=dst.shape, inputs=[mask, self.variant, src], outputs=[dst],

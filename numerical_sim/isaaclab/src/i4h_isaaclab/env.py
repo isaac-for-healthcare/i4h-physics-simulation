@@ -9,12 +9,9 @@ positions within ``workspace`` of their initial pose, quaternion, grip, energy, 
 ``_apply_action`` copies the result into the systems' actions arrays through zero-copy torch views. With
 ``action_mode = "physical"`` (teleop, recorded sessions) the action is those physical rows, written unclamped.
 
-Backends (``I4hEnvCfg.backend``): ``newton`` (default) runs ``I4hSolver`` inside Isaac Lab's own ``NewtonManager``
-(``newton_manager.I4hNewtonManager``): a construction context adds environment-local particles through Lab's
-public replication hook and ``I4hSolverCfg`` carries the case. ``sim.reset()`` finalizes the model and builds the solver, and the env binds its views, bounds and camera in the manager's
-``on_solver`` callback (again after a hard reset); the gym spaces are set in ``_configure_gym_env_spaces``, after
-``sim.reset()``. ``i4h`` is the fallback: ``I4hPhysicsManager`` steps a ``Stepper`` the env builds itself.
-``sim.step()`` replays one graph of ``I4hSolver.step`` either way. Observations
+Isaac Lab's Newton backend owns model/state/control allocation, stepping and capture.
+A component construction context authors particles into every world and publishes a
+PhysicsBinding after solver construction, again after hard rebuilds. Observations
 are ``views.observation``: positions of the integrated bodies (or one part, ``observe = "body.part"``) and
 the per-env state products of the systems, cast to float; with ``camera > 0`` an ``rgb`` and a ``depth``
 image per env are added, rendered by ``i4h_isaaclab.camera.tiled.TiledCamera`` after the step.
@@ -35,7 +32,7 @@ terminates on success or failure and times out on the procedure's deadline or th
 is the ``task`` observation; terminal rows survive the automatic reset in ``extras``.
 
 Gravity: with ``gravity_from_case`` (default) a case's ``sim.gravity`` sets ``sim.gravity``; otherwise
-``sim.gravity`` rules and a different case gravity raises. Both backends build with the resolved value.
+``sim.gravity`` rules and a different case gravity raises. The host builds with the resolved value.
 """
 
 from __future__ import annotations
@@ -44,9 +41,9 @@ import gymnasium as gym
 import numpy as np
 import torch
 import warp as wp
-from i4h_isaaclab.composition import check_dt, load_case, read_case, sim_settings
+from i4h_isaaclab.composition import check_dt, read_case, sim_settings
 from i4h_isaaclab.lab import require
-from i4h_isaaclab.physics import I4hPhysicsCfg, I4hPhysicsManager
+from i4h_isaaclab.newton_manager import I4hSolverCfg, physics_cfg
 from i4h_isaaclab.terminal import ProcedureTorch
 from i4h_isaaclab.views import (
     action_bounds,
@@ -82,9 +79,9 @@ class I4hEnvCfg(DirectRLEnvCfg):
     observation_space: int = 0  # set from the loaded case in _setup_scene
     state_space: int = 0
     scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs=2, env_spacing=1.0)
-    sim: SimulationCfg = SimulationCfg(dt=1.0 / 60.0, render_interval=2, device="cuda:0", physics=I4hPhysicsCfg())
+    sim: SimulationCfg = SimulationCfg(dt=1.0 / 60.0, render_interval=2, device="cuda:0", physics=physics_cfg(I4hSolverCfg()))
     ui_window_class_type = None
-    backend: str = "newton"  # newton: Isaac Lab's NewtonManager runs I4hSolver; i4h: the fallback I4hPhysicsManager
+    backend: str = "newton"  # sole supported host path; legacy recording metadata is translated by the reader
     action_mode: str = "normalized"  # normalized: Box(-1, 1) mapped onto the action bounds; physical: rows as given (teleop, replay)
     rigid_solver_cfg: object = None  # newton backend: MJWarpSolverCfg steps the scene's rigid bodies beside i4h
     coupling_mode: str = "one_way"  # with rigid_solver_cfg: two_way also returns i4h's reactions to the bodies
@@ -106,28 +103,23 @@ def sync_teleop_case(cfg):
 
 
 def apply_backend(cfg: I4hEnvCfg) -> None:
-    """Point ``cfg.sim.physics`` at the chosen backend (``I4hEnv`` does it before Isaac Lab reads the config, so a script
-    may set ``cfg.backend`` after constructing the cfg)."""
-    if cfg.backend == "newton":
-        from i4h_isaaclab.newton_manager import I4hSolverCfg
-        from isaaclab_newton.physics import NewtonCfg
+    """Configure the sole host path, selecting a distinct adapter at cfg construction."""
+    from dataclasses import fields, replace
+    from isaaclab_newton.physics import NewtonCfg
 
-        if not (isinstance(cfg.sim.physics, NewtonCfg) and isinstance(cfg.sim.physics.solver_cfg, I4hSolverCfg)):
-            cfg.sim.physics = NewtonCfg(solver_cfg=I4hSolverCfg(), num_substeps=1)  # the case's substeps run in I4hSolver
-        cfg.sim.physics.solver_cfg.rigid_solver_cfg = cfg.rigid_solver_cfg
-        cfg.sim.physics.solver_cfg.coupling_mode = cfg.coupling_mode
-        cfg.sim.physics.solver_cfg.mounts = cfg.mounts
-        cfg.sim.physics.solver_cfg.rigid_substeps = cfg.rigid_substeps
-    elif cfg.rigid_solver_cfg is not None or cfg.mounts:
-        raise ValueError("I4hEnvCfg.rigid_solver_cfg and mounts need the newton backend: the i4h backend steps i4h physics only")
-    elif cfg.backend == "i4h":
-        cfg.sim.physics = I4hPhysicsCfg()
-    else:
-        raise ValueError(f"I4hEnvCfg.backend must be newton or i4h, got {cfg.backend!r}")
+    if cfg.backend != "newton":
+        raise ValueError("the alternate i4h backend was removed; use the newton host path")
+    previous = cfg.sim.physics
+    solver = previous.solver_cfg if isinstance(previous, NewtonCfg) and isinstance(previous.solver_cfg, I4hSolverCfg) else I4hSolverCfg()
+    solver = replace(solver, rigid_solver_cfg=cfg.rigid_solver_cfg, coupling_mode=cfg.coupling_mode,
+                     mounts=cfg.mounts, rigid_substeps=cfg.rigid_substeps)
+    kwargs = {f.name: getattr(previous, f.name) for f in fields(previous)
+              if f.name not in ("class_type", "solver_cfg", "num_substeps")} if isinstance(previous, NewtonCfg) else {}
+    cfg.sim.physics = physics_cfg(solver, **kwargs)
 
 
 def resolve_gravity(cfg: I4hEnvCfg, case: dict) -> tuple:
-    """The env's gravity, the same for both backends. With ``gravity_from_case`` (default) a case that declares
+    """The env's gravity. With ``gravity_from_case`` (default) a case that declares
     ``sim.gravity`` (chole is Y-up, the aorta cases are weightless) sets ``cfg.sim.gravity``; otherwise
     ``cfg.sim.gravity`` rules and a different declared gravity raises. A case without one uses ``cfg.sim.gravity``."""
     declared = (case.get("sim") or {}).get("gravity")
@@ -156,22 +148,24 @@ class I4hEnv(DirectRLEnv):
         apply_backend(cfg)
         case = read_case(cfg.case)  # once per construction
         self._case = with_gravity(case, resolve_gravity(cfg, case))  # _setup_scene runs inside super().__init__
-        if cfg.backend == "newton":
-            from i4h_isaaclab.newton_manager import construction_context
+        from i4h_isaaclab.newton_manager import construction_context
 
-            cfg.sim.physics.solver_cfg.case = self._case
-            try:
-                with construction_context(cfg.sim.physics.solver_cfg, device=cfg.sim.device,
-                                          envs=cfg.scene.num_envs, on_solver=self._bind_newton):
-                    super().__init__(cfg, render_mode, **kwargs)
-            except BaseException:
-                from isaaclab.sim import SimulationContext
-
-                if SimulationContext.instance() is not None:
-                    SimulationContext.clear_instance()
-                raise
-        else:
-            super().__init__(cfg, render_mode, **kwargs)
+        cfg.sim.physics.solver_cfg.case = self._case
+        self._construction = None
+        try:
+            with construction_context(cfg.sim.physics.solver_cfg, device=cfg.sim.device,
+                                      envs=cfg.scene.num_envs, on_solver=self._bind_newton) as owner:
+                self._construction = owner
+                super().__init__(cfg, render_mode, **kwargs)
+                if cfg.events and "startup" in self.event_manager.available_modes:
+                    self._torch_to_warp()
+                    self.simulator.initialize_particle_history()
+                    self._warp_to_torch()
+        except BaseException:
+            from isaaclab.sim import SimulationContext
+            if SimulationContext.instance() is not None:
+                SimulationContext.clear_instance()
+            raise
 
     def _setup_scene(self):
         case = self._case
@@ -185,16 +179,6 @@ class I4hEnv(DirectRLEnv):
                                       or self.cfg.compute_final_obs or type(self)._reset_idx is not I4hEnv._reset_idx)
         self._staggered = False
         self.camera = None
-        if self.cfg.backend == "i4h":
-            self.simulator = sim = load_case(case, device=self.device, envs=self.scene.num_envs)
-            sim.dt = float(self.physics_dt)  # the value Isaac Lab's clock advances by, as on the newton backend
-            I4hPhysicsManager.sim = sim
-            self._bind(sim)
-            sim.prepare()  # capture the step and reset graphs now: a capture failure surfaces at construction
-            if self.camera is not None:
-                self.camera.prepare()
-            self._set_spaces()  # DirectRLEnv configures the gym spaces after _setup_scene
-            return
         from isaaclab.assets import AssetBaseCfg
         from isaaclab.cloner import ReplicateSession
 
@@ -210,25 +194,19 @@ class I4hEnv(DirectRLEnv):
         """Rebind views after initial construction and each hard rebuild."""
         self.simulator = sim
         self._bind(sim)
+        self._warp_to_torch()  # startup events may read the freshly constructed particle views
         self._camera_prepared = False
 
     def close(self):
-        if self.cfg.backend == "newton":
-            from i4h_isaaclab.newton_manager import I4hNewtonManager
-
-            if self._bind_newton in I4hNewtonManager.on_solver:
-                I4hNewtonManager.on_solver.remove(self._bind_newton)
-        if getattr(self, "simulator", None) is not None:
-            self.simulator.physics.invalidate()
-        if I4hPhysicsManager.after_step == self._warp_to_torch:
-            I4hPhysicsManager.after_step = None
+        if getattr(self, "_construction", None) is not None:
+            self._construction.close()
+            self._construction = None
         super().close()
 
     def _configure_gym_env_spaces(self):
-        if self.cfg.backend == "newton":
-            if self.simulator is None:
-                raise RuntimeError("I4hEnv: the solver was not built by sim.reset()")
-            self._set_spaces()
+        if self.simulator is None:
+            raise RuntimeError("I4hEnv: the solver was not built by sim.reset()")
+        self._set_spaces()
         super()._configure_gym_env_spaces()
         # DirectRLEnv declares only "policy" and batches it alone: declare every returned key and batch the whole Dict
         spaces = self.single_observation_space
@@ -249,17 +227,13 @@ class I4hEnv(DirectRLEnv):
         self.cfg.observation_space = policy_size  # the "policy" group; the other keys are added in _configure_gym_env_spaces
 
     def _bind(self, sim):
-        """Zero-copy views, bounds and the camera over ``sim`` (a ``Stepper`` or a ``NewtonSim``)."""
+        """Zero-copy views, bounds and camera over the current PhysicsBinding."""
         case = self._case
         from i4h_isaaclab.composition import build_procedure
 
         self.procedure = build_procedure(case, sim, horizon_s=self.max_episode_length * self.step_dt)
-        if self.cfg.backend == "i4h":
-            I4hPhysicsManager.procedure = self.procedure
-            I4hPhysicsManager.after_step = self._warp_to_torch
-        else:
-            sim.procedure = self.procedure  # NewtonSim is an Isaac Lab host, not Stepper
-            sim.after_step = self._warp_to_torch
+        sim.procedure = self.procedure
+        sim.after_step = self._warp_to_torch
         self.task = None
         if self.procedure is not None:
             self.task = task = ProcedureTorch(self.procedure, self.cfg.step_weights, self._torch_device)
@@ -312,6 +286,7 @@ class I4hEnv(DirectRLEnv):
             map_actions(actions, self._mid, self._half, self._actions)
 
     def _apply_action(self):
+        self.simulator.check_prepared()
         write_actions(self.action_views, self._actions)
         self._torch_to_warp()
 
@@ -362,6 +337,8 @@ class I4hEnv(DirectRLEnv):
         self._warp_to_torch()  # the events run on torch's stream, after the physical reset
         super()._reset_idx(env_ids)
         self._torch_to_warp()  # Warp (the procedure, the next step, the camera) consumes the events' writes
+        if reset:
+            self.simulator.scene.initialize_particle_history(self.simulator._mask)
         if reset and self.task is not None:
             self.procedure.reset(mask=self.simulator._mask)
             self.task.clear_recorded(env_ids=env_ids)

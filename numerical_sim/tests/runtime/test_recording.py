@@ -157,13 +157,15 @@ def test_every_take_replays_from_its_start(tmp_path):
         assert diffs.shape == (10,) and diffs.max() < 1e-3, (demo, diffs)
 
 
-def test_replay_on_the_other_backend_matches(tmp_path):
-    """A demo recorded on the newton backend replays on the fallback backend: same kernels, same observations."""
+def test_explicit_legacy_backend_metadata_preserves_actions(tmp_path):
+    """Explicit legacy backend metadata maps to Newton without changing action identity."""
     case_path = haptic_case(tmp_path, envs=2)
     inputs = read_case(str(case_path))["inputs"]
     path, _ = record_two_episodes(tmp_path / "demos", case_path, inputs, backend="newton", steps=8)
-    episode, _ = load_demo(path)
-    env = make_env(case_path, backend="i4h")
+    episode, metadata = load_demo(path)
+    metadata["backend"] = "i4h"
+    from i4h_isaaclab.recording import env_cfg_from_recording
+    env = I4hEnv(env_cfg_from_recording(metadata, workdir=tmp_path))
     try:
         diffs = replay_episode(env, episode)
     finally:
@@ -253,8 +255,8 @@ def test_replay_rebuilds_the_recorded_env_after_moving_case_and_data(tmp_path, m
     with pytest.warns(RuntimeWarning, match="decimation=2"):
         env_cfg_from_recording(env_args, {"decimation": 2, "num_envs": 1}, workdir=tmp_path)
     legacy = {k: env_args[k] for k in ("case", "decimation", "backend", "num_envs", "physics_dt", "workspace")}
-    with pytest.warns(DeprecationWarning, match="format_version"):
-        assert env_cfg_from_recording(legacy).decimation == 3
+    with pytest.raises(ValueError, match="insufficient metadata"):
+        env_cfg_from_recording(legacy)
 
     import importlib.util
 

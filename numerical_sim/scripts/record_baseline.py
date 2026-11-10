@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Freeze layout-independent products before migration, using three fresh processes.
+"""Freeze layout-independent products before migration, using six fresh processes.
 
 Dtype, shape and bytes must match by default. Only products demonstrated to vary
 in the frozen repetitions use the original factor (3) and their measured envelope.
@@ -26,7 +26,68 @@ import numpy as np
 import warp as wp
 
 CASES = ("two_worlds", "chole_tet_med", "aorta_static", "aorta_shell", "tissue_contact", "aorta_centreline")
-SYSTEM_ARRAYS = ("frame", "omega", "active", "edge_active")
+# Scope v3 retains the explicit physical/history/measurement contract. Never enumerate
+# arbitrary system buffers: scratch and broadphase candidates are implementation details.
+BASELINE_SCOPE = "physical-history-measurements-v3"
+SYSTEM_FIELDS = {
+    "Particles": "", "Bounds": "", "Attachments": "", "Connectors": "",
+    "Tet": "active edge_active",
+    "Surface": "active edge_active support edge_support deleted cut_count cut_start overflow tris tri_tet dirty",
+    "Shell": "", "RodDirect": "frame omega", "RodPbd": "frame omega",
+    "RodDirectMaterial": "", "RodPbdMaterial": "", "ControlLayout": "",
+    "Fluid": "cursor alive_count overflow",
+    "FluidContact": "", "StaticContact": "",
+    "PartContact": "contact_count overflow_count",
+    "RodContainment": "contact_count contact_depth",
+    "TetContainment": "contact_count contact_depth",
+    "ShellContainment": "contact_count contact_depth",
+    "GraphContainment": "contact_count contact_depth overflow ref_tree ref_samples built",
+    "Drag": "active baseline",
+    "CatheterControl": "actions mount_pose mounted rates root targets impulse moment",
+    "InstrumentControl": "actions mount_pose mounted root shaft_q wrist_q jaw_q jaw_closed jaw_angle sphere_q sphere_q_prev held fire_on fired released grasp_pending energized",
+    "InstrumentContact": "impulse impulse_count jaw_impulse moment record_overflow",
+    "Grasp": "count pending impulse jaw_impulse moment",
+    "VolumetricGrasp": "count pending impulse jaw_impulse moment",
+    "Hook": "active verts tet bary friction_coord radial impulse moment",
+    "Clipping": "count clipped",
+    "Thermal": "heat burn coag",
+    "Cutting": "cut_on cut_tets",
+    "StretchBreaking": "max_stretch",
+    "Centreline": "positions active_count",
+    "Bleeding": "acc serial sealed cut clipped sources",
+    "Emitter": "acc serial spawned",
+    "Suction": "removed",
+    "Smoke": "acc serial cursor pos_age vel_life alive_count",
+    "ContactPaint": "paint painted",
+    "ToolForce": "force jaw_load count",
+}
+SLOT_FIELDS = {
+    "Grasp": "prim tet verts t radial prev_axis bary gap active",
+    "VolumetricGrasp": "particle sphere rest active",
+    "Clipping": "node active",
+}
+
+
+def canonical_slots(fields, *, discard_inactive=True):
+    """Sort complete records within each world/tool, preserving multiplicity and dtypes.
+
+    Inactive grasp payload is never read by a hold; it is overwritten on capture.
+    Keep clip nodes even after a tear: slots are consumed permanently. Hook entry
+    and exit have different roles and are deliberately not interchangeable slots.
+    """
+    shape = fields["active"].shape
+    result = {name: np.zeros_like(value) for name, value in fields.items()}
+    if shape[-1] == 0:
+        return result
+    for group in np.ndindex(shape[:-1]):
+        ids = np.arange(shape[-1])
+        if discard_inactive:
+            ids = ids[fields["active"][group] != 0]
+        keys = np.concatenate([value[group].reshape(shape[-1], -1)[ids] for value in fields.values()], axis=1)
+        order = np.lexsort(tuple(keys[:, column] for column in reversed(range(keys.shape[1]))))
+        for name, value in fields.items():
+            result[name][group][:len(ids)] = value[group][ids[order]]
+    return result
 
 
 def controls_and_bounds(sim):
@@ -54,6 +115,70 @@ def apply_actions(ctrl, mid, half, envs: int, step: int) -> None:
         offset += width
 
 
+def scenario(name: str, steps: int) -> dict:
+    """Fixed phase schedule, shared by recording and replay; no data-dependent checkpoint selection."""
+    if name == "chole_tet_med":
+        return {"kind": "decisive_grasp", "approach_steps": 100, "close_step": 80,
+                "engaged_checkpoint": 120, "retract_steps": 30, "retract_fraction": 0.1,
+                "hold_steps": steps, "reach": 0.85}
+    if name == "aorta_shell":
+        return {"kind": "settled_shell", "drive_steps": steps, "settle_steps": 360, "rates": [0.3, 0.0, 0.0]}
+    if name == "aorta_centreline":
+        return {"kind": "settled_containment", "drive_steps": steps, "settle_steps": 1800,
+                "rates": [0.3, 0.0, 0.0], "rebuild_steps": 1, "post_rebuild_steps": 180}
+    return {"kind": "sinusoidal", "steps": steps}
+
+
+def run_scenario(sim, name, ctrl, mid, half, steps):
+    plan = scenario(name, steps)
+    if plan["kind"] == "decisive_grasp":
+        control = next(s for s in ctrl if type(s).__name__ == "InstrumentControl")
+        grasp = next(s for s in sim.systems if type(s).__name__ == "Grasp")
+        body = sim.scene.body("tissue")
+        part = body.parts["gallbladder"]
+        target = body.rest.q0[:, part.particle_start:part.particle_start + part.particle_count].mean(axis=1)
+        actions = control.actions.numpy()
+        tool = control.names.index("grasper")
+        initial = actions[:, tool, :3].copy()
+        target = initial + plan["reach"] * (target - initial)
+        lifted = target + plan["retract_fraction"] * (initial - target)
+        # Approach, establish the grasp, retract a little, then hold; all other tools retain their defaults.
+        for k in range(plan["engaged_checkpoint"] + plan["retract_steps"] + steps):
+            if k < plan["engaged_checkpoint"]:
+                actions[:, tool, :3] = initial + (target - initial) * min((k + 1) / plan["approach_steps"], 1.0)
+            else:
+                actions[:, tool, :3] = target + (lifted - target) * min(
+                    (k + 1 - plan["engaged_checkpoint"]) / plan["retract_steps"], 1.0)
+            actions[:, tool, 7] = float(k >= plan["close_step"])
+            control.actions.assign(actions)
+            sim.step()
+            if k + 1 >= plan["engaged_checkpoint"] and not (grasp.count.numpy()[:, tool] > 0).all():
+                raise RuntimeError(f"{name}: grasp must be engaged throughout the recorded hold (step {k + 1})")
+    elif plan["kind"] in ("settled_containment", "settled_shell"):
+        control = next(s for s in ctrl if type(s).__name__ == "CatheterControl")
+        kind = "GraphContainment" if plan["kind"] == "settled_containment" else "ShellContainment"
+        containment = next(s for s in sim.systems if type(s).__name__ == kind)
+        control.actions.assign(np.tile(np.asarray(plan["rates"], np.float32), (sim.scene.envs, 1)))
+        for _ in range(steps):
+            sim.step()
+        control.actions.zero_()
+        for _ in range(plan["settle_steps"]):
+            sim.step()
+        if plan["kind"] == "settled_containment":
+            # Invalidate on both sources, rebuild normally, then allow a fixed settling period.
+            containment.rebuild.fill_(1)
+            for _ in range(plan["rebuild_steps"] + plan["post_rebuild_steps"]):
+                sim.step()
+            if containment.rebuild.numpy().any():
+                raise RuntimeError(f"{name}: containment reference was not rebuilt")
+        if not (containment.contact_count.numpy() > 0).all():
+            raise RuntimeError(f"{name}: settled checkpoint must still exercise containment in every world")
+    else:
+        for k in range(steps):
+            apply_actions(ctrl, mid, half, sim.scene.envs, k)
+            sim.step()
+
+
 # Device object handles are process-local addresses, not numerical products.
 HANDLE_ARRAYS = {"bvh_ids", "mesh_ids"}
 
@@ -77,23 +202,24 @@ def snapshot(sim) -> dict[str, np.ndarray]:
     for body in list(scene.bodies) + list(scene.pools):
         for field in scene.main.FIELDS:
             out[f"body/{body.name}/{field}"] = scene.field(field, body).numpy().copy()
-        for name in ("region_properties", "rod_material", "rod_controls", "regions", "tet", "rod", "tree", "shell", "pin", "connectors", "centrelines", "skin"):
-            record = getattr(body, name, None)
-            if record is not None:
-                for key, value in vars(record).items():
-                    out.update(arrays(value, f"body/{body.name}/{name}/{"anatomical_radii" if name == "tree" and key == "material_radius" else key}"))
     out["scene/gravity"] = scene.gravity.numpy().copy()
     for system in sim.systems:
         if not system.id:
             raise ValueError("baseline systems require an explicit stable logical id")
-        for name, value in vars(system).items():
-            if name == "appearance":
-                # Explicit product move: Surface.visual -> domain-owned Appearance.visual.
-                out.update(arrays(value.visual, f"system/{system.id}/visual"))
-            elif name not in HANDLE_ARRAYS:
-                legacy = {"target_response": "vessel_response", "source_max_delta": "catheter_max_delta",
-                          "target_max_delta": "vessel_max_delta"}.get(name, name)
-                out.update(arrays(value, f"system/{system.id}/{legacy}"))
+        kind = type(system).__name__
+        if kind not in SYSTEM_FIELDS:
+            raise ValueError(f"baseline scope needs an explicit review for {kind}")
+        for name in SYSTEM_FIELDS[kind].split():
+            out.update(arrays(getattr(system, name), f"system/{system.id}/{name}"))
+        if kind == "Surface" and hasattr(system, "appearance"):
+            out.update(arrays(system.appearance.visual, f"system/{system.id}/visual"))
+        if kind in SLOT_FIELDS:
+            fields = {name: getattr(system, name).numpy().copy() for name in SLOT_FIELDS[kind].split()}
+            for name, value in canonical_slots(fields, discard_inactive=kind != "Clipping").items():
+                out[f"system/{system.id}/slots/{name}"] = value
+        if kind == "Hook":
+            for name in ("verts", "tet", "bary", "friction_coord", "radial"):
+                out[f"system/{system.id}/{name}"][system.active.numpy() == 0] = 0
     return out
 
 
@@ -112,7 +238,8 @@ def source_identity():
                 files[str(path.relative_to(workspace))] = hashlib.sha256(path.read_bytes()).hexdigest()
     return {"root": str(workspace), "files": files,
             "revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip(),
-            "python": platform.python_version(),
+            "python": platform.python_version(), "baseline_scope": BASELINE_SCOPE,
+            "recorder_sha256": hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),
             "software": {n: importlib.metadata.version(n) for n in ("warp-lang", "newton", "numpy", "pyyaml")},
             "gpu": subprocess.check_output(["nvidia-smi", "--query-gpu=name,uuid,driver_version", "--format=csv,noheader"], text=True).strip()}
 
@@ -133,14 +260,12 @@ def run_case(name: str, envs: int, steps: int, device: str) -> dict[str, np.ndar
     for body in sim.scene.bodies:
         table = body.region_properties
         if table is not None:
-            name = next(k for k in table.tables if not k.startswith('curvature'))
-            table.edit({name: 1.05}, table.membership.names[0], envs=np.array([0], dtype=np.int32))
+            parameter = next(k for k in table.tables if not k.startswith('curvature'))
+            table.edit({parameter: 1.05}, table.membership.names[0], envs=np.array([0], dtype=np.int32))
             edited = True
     if edited:
         data.update({f"regional_edit/{k}": v for k, v in snapshot(sim).items()})
-    for k in range(steps):
-        apply_actions(ctrl, mid, half, envs, k)
-        sim.step()
+    run_scenario(sim, name, ctrl, mid, half, steps)
     wp.synchronize()
     data.update({f"stepped/{k}": v for k, v in snapshot(sim).items()})
     sim.reset([0])
@@ -210,13 +335,42 @@ def compare(ref: dict, cur: dict, atol: float, int_mismatch: float, factor: floa
     return failures
 
 
-def repeat_in_process(name: str, args, k: int) -> dict[str, np.ndarray]:
+def comparison_policy(name, manifest):
+    """Only explicitly accepted chole references use three complete replays."""
+    policy = manifest.get("comparison_policy")
+    if policy is None:
+        return {"kind": "single", "replays": 1, "required_passes": 1,
+                "fresh_processes": True, "retain_all_trials": True}
+    expected = {"kind": "majority-of-three", "replays": 3, "required_passes": 2,
+                "fresh_processes": True, "retain_all_trials": True}
+    disposition = manifest.get("reference_disposition", {})
+    if (name != "chole_tet_med" or policy != expected or disposition.get("status") != "approved"
+            or disposition.get("capacity") != 256):
+        raise ValueError("three-replay policy requires the approved capacity-256 chole reference")
+    return dict(expected)
+
+
+def summarize_replays(policy, trials):
+    """Count whole passing replays, never a majority independently per product."""
+    if len(trials) != policy["replays"]:
+        raise ValueError("all scheduled replays must be retained before deciding")
+    passed = sum(trial["passed"] is True for trial in trials)
+    valid = all(trial.get("valid", True) for trial in trials)
+    return {"policy": policy, "trials": trials, "passed_replays": passed,
+            "valid": valid, "passed": valid and passed >= policy["required_passes"]}
+
+
+def repeat_in_process(name: str, args, k: int, *, retained_path=None):
     """One run in a fresh process: repeats in one process underestimate the spread of the chaotic cases."""
     with tempfile.TemporaryDirectory() as tmp:
-        path = pathlib.Path(tmp) / f"{name}_{k}.npz"
+        path = retained_path or pathlib.Path(tmp) / f"{name}_{k}.npz"
         cmd = [sys.executable, __file__, "--dump", str(path), "--cases", name, "--envs", str(args.envs),
                "--steps", str(args.steps), "--device", args.device]
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+        if retained_path is None:
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+        else:
+            with path.with_suffix(".log").open("x") as log:
+                subprocess.run(cmd, check=True, stdout=log, stderr=subprocess.STDOUT)
         metadata = json.loads(path.with_suffix(".json").read_text())
         return dict(np.load(path)), metadata
 
@@ -231,13 +385,14 @@ def main(argv=None) -> int:
     p.add_argument("--envs", type=int, default=2)
     p.add_argument("--steps", type=int, default=60)
     p.add_argument("--device", default="cuda:0")
-    p.add_argument("--repeat", type=int, default=3, help="runs per case when recording (noise envelope)")
+    p.add_argument("--repeat", type=int, default=6, help="runs per case when recording (noise envelope)")
     p.add_argument("--atol", type=float, default=0.0, help="must remain zero")
     p.add_argument("--int-mismatch", type=float, default=0.0, help="integer mismatch floor (fraction)")
     p.add_argument("--factor", type=float, default=3.0, help="tolerance in multiples of the recorded noise")
+    p.add_argument("--results", type=pathlib.Path, help="fresh comparison evidence directory (leaves reference untouched)")
     args = p.parse_args(argv)
-    if args.repeat != 3 or args.atol != 0 or args.int_mismatch != 0 or args.factor != 3:
-        p.error("requires three repetitions, zero tolerance floors and factor 3")
+    if args.repeat != 6 or args.atol != 0 or args.int_mismatch != 0 or args.factor != 3:
+        p.error("requires six repetitions, zero tolerance floors and factor 3")
     wp.config.quiet = True
     wp.init()
     if args.dump:
@@ -245,6 +400,10 @@ def main(argv=None) -> int:
         np.savez(args.dump, **run_case(args.cases[0], args.envs, args.steps, args.device))
         args.dump.with_suffix(".json").write_text(json.dumps(identity, indent=2) + "\n")
         return 0
+    if args.results:
+        if not args.compare:
+            p.error("--results requires --compare")
+        args.results.mkdir(parents=True, exist_ok=False)
     failed = []
     for name in args.cases:
         print(f"{name}: envs={args.envs} steps={args.steps}", flush=True)
@@ -263,7 +422,7 @@ def main(argv=None) -> int:
                 if structural:
                     raise RuntimeError(structural)
             envelope = noise_envelope(runs)
-            manifest = {"source": identity, "envs": args.envs, "steps": args.steps, "factor": 3,
+            manifest = {"source": identity, "envs": args.envs, "steps": args.steps, "scenario": scenario(name, args.steps), "repeat_count": args.repeat, "factor": 3,
                         "products": {k: {"shape": list(v.shape), "dtype": v.dtype.str,
                                          "sha256": [digest(r[k]) for r in runs],
                                          "noise": float(envelope[f"noise/{k}"])} for k, v in runs[0].items()}}
@@ -275,13 +434,17 @@ def main(argv=None) -> int:
         else:
             manifest = json.loads((args.compare / f"{name}.json").read_text())
             identity = source_identity()
+            if manifest["source"].get("baseline_scope") != BASELINE_SCOPE:
+                raise RuntimeError("baseline scope changed; record a new archive without replacing the original")
             if identity["software"] != manifest["source"]["software"] or identity["gpu"] != manifest["source"]["gpu"]:
                 raise RuntimeError("baseline software/hardware identity changed")
+            if manifest.get("scenario") != scenario(name, args.steps) or manifest.get("repeat_count") != 6:
+                raise RuntimeError("baseline scenario or repetition contract changed")
+            if manifest.get("factor") != 3:
+                raise RuntimeError("baseline factor changed")
             if args.envs != manifest["envs"] or args.steps != manifest["steps"]:
                 raise RuntimeError("baseline workload changed")
-            data, imported = repeat_in_process(name, args, 0)
-            if imported != identity:
-                raise RuntimeError("candidate source identity changed during comparison")
+            policy = comparison_policy(name, manifest)
             ref = dict(np.load(args.compare / f"{name}.npz"))
             products = manifest["products"]
             if set(products) != {k for k in ref if not k.startswith("noise/")}:
@@ -290,17 +453,34 @@ def main(argv=None) -> int:
                 if (digest(ref[key]) != product["sha256"][0] or ref[key].dtype.str != product["dtype"]
                         or list(ref[key].shape) != product["shape"] or float(ref[f"noise/{key}"]) != product["noise"]):
                     raise RuntimeError(f"archive does not match frozen manifest: {key}")
-            report = args.compare / f"{name}.candidate.{hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:12]}.{time.time_ns()}.json"
+            report = (args.results or args.compare) / f"{name}.candidate.{hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:12]}.{time.time_ns()}.json"
             report.write_text(json.dumps({"source": identity, "baseline_source": manifest["source"]}, indent=2) + "\n")
             if non_finite({k: v for k, v in ref.items() if not k.startswith("noise/")}):
                 raise RuntimeError(f"{name}: the baseline holds non-finite values; record it again")
-            failures = compare(ref, data, args.atol, args.int_mismatch, args.factor)
+            trials = []
+            for k in range(policy["replays"]):
+                path = report.with_name(f"{report.stem}.trial{k}.npz")
+                errors = []
+                valid = True
+                try:
+                    data, imported = repeat_in_process(name, args, k, retained_path=path)
+                    if imported != identity:
+                        raise RuntimeError("candidate source identity changed during comparison")
+                    errors = compare(ref, data, args.atol, args.int_mismatch, args.factor)
+                except (subprocess.CalledProcessError, RuntimeError) as error:
+                    errors = [str(error)]
+                    valid = False
+                trial = {"trial": k, "passed": not errors, "valid": valid,
+                         "failures": errors, "products": str(path)}
+                trials.append(trial)
+                path.with_suffix(".comparison.json").write_text(json.dumps(trial, indent=2) + "\n")
+                print(f"  replay {k}: {'FAIL' if errors else 'PASS'}", flush=True)
+                for error in errors:
+                    print(f"  FAIL {error}")
+            summary = summarize_replays(policy, trials)
             report.write_text(json.dumps({"source": identity, "baseline_source": manifest["source"],
-                                          "failures": failures}, indent=2) + "\n")
-            np.savez_compressed(report.with_suffix(".npz"), **data)
-            if failures:
-                for failure in failures:
-                    print(f"  FAIL {failure}")
+                                          **summary}, indent=2) + "\n")
+            if not summary["passed"]:
                 failed.append(name)
     if failed:
         print(f"FAILED: {failed}")

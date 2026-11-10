@@ -98,7 +98,7 @@ class Grasp(System):
         wp.launch(
             hold_grasps,
             dim=(scene.envs, ic.count * self.slots),
-            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.active, ic.prim_a,
+            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.tet_fields.active, ic.prim_a,
                     ic.prim_b, ic.sphere_q_prev, ic.sphere_q, ic.sphere_radius, ic.sphere_jaw_sign, self.stiffness, alpha, iterations,
                     self.slots, b.count, self.tet,
                     self.prim, self.t, self.verts, self.bary, self.gap],
@@ -117,7 +117,7 @@ class Grasp(System):
         wp.launch(
             revalidate_grasps,
             dim=(scene.envs, ic.count * self.slots),
-            inputs=[cc.record_count, cc.rec_verts, cc.rec_normal, cc.rec_pen, self.surface.active, self.prim, self.verts,
+            inputs=[cc.record_count, cc.rec_verts, cc.rec_normal, cc.rec_pen, self.surface.tet_fields.active, self.prim, self.verts,
                     self.tet, self.radial, self.slots],
             outputs=[self.active],
             device=scene.device,
@@ -127,7 +127,7 @@ class Grasp(System):
         wp.launch(
             capture_grasps,
             dim=(scene.envs, ic.count),
-            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.active, self.grasps,
+            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.tet_fields.active, self.grasps,
                     ic.grasp_pending, ic.prim_start,
                     ic.prim_counts, ic.prim_kind, ic.prim_a, ic.prim_b, ic.sphere_q, ic.sphere_radius, ic.sphere_active,
                     cc.margin, cc.record_count, cc.rec_tri, cc.rec_tet, cc.rec_verts, cc.rec_bary, cc.rec_pen, cc.rec_normal,

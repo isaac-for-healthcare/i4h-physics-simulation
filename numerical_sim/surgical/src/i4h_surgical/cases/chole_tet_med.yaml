@@ -147,6 +147,7 @@ systems:
   - type: instrument_contact
     instruments: instrument_control
     surface: surface
+    records: 256
     front_side_only: [liver]
   - type: contact_paint         # debug paint: M/V/B held in the window tint what the tools touch (damage, coagulation, blood)
     contacts: instrument_contact

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""The Isaac Lab revision this package targets (runtime suite passing; physics qualification pending), and a
+"""The Isaac Lab revisions this package targets (see docs/stage-c30.md for candidate status), and a
 check for the Lab APIs it relies on.
 
 Older Isaac Lab 3.0 checkouts lack some of them (``NewtonManager._invalidate_graph``, ``newton_builder_world_hook``,
@@ -10,7 +10,7 @@ until the suites are rerun. No Isaac Lab import here."""
 
 import dataclasses
 
-QUALIFIED = "isaac-sim/IsaacLab v3.0.0 (release/3.0.0) @ e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4"
+QUALIFIED = "Isaac Lab main @ 4cfdfcfa52d7cb64eb83ab293b2fcfc92452aaf1 or patched 3.0 @ e53cd288727a5ca3dae7187d1d415b4d32b67e11 plus docs/newton18-lab30-cloner.patch"
 
 
 def require(owner, name: str) -> None:

@@ -23,6 +23,10 @@ def contact(tmp_path, graph=False, pins=(), **kw):
                         np.full((2, 1), ACTIVE_INT, np.int32))
     rod = scene.add_body("rod", rest, {"rod": Part(0, 0, 1)})
     wall = add_tet_vtu(scene, "wall", write_mesh(tmp_path / "wall.vtu"), pins=pins)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'wall', system_id='tet')
+    from i4h_physics import declare_surface
+    declare_surface(scene)
     scene.allocate()
     tet = Tet(scene, body="wall")
     surf = Surface(scene, tet=tet)

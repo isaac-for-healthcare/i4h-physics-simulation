@@ -36,7 +36,7 @@ import numpy as np
 import warp as wp
 from i4h_physics.systems.base import System
 
-PRIM_KINDS = {"sphere": 0, "jaw_left": 1, "jaw_right": 2, "wrist": 3, "shaft": 4}
+from i4h_surgical.systems.instruments.geometry import InstrumentLayout, PRIM_KINDS as PRIM_KINDS
 EPS = wp.constant(1.0e-6)
 
 
@@ -47,58 +47,43 @@ class InstrumentControl(System):
     fire_threshold: float = 0.5  # live, per env; actions[..., 9] at or above it is "fire" (fired = rising edge)
 
     is_control = True
+    command_view_spec = {"actions": (0, 10), "position": (0, 3), "quaternion": (3, 7),
+                         "grip": (7, 8), "energy": (8, 9), "fire": (9, 10)}
+
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"tool": [(k, name) for k, name in enumerate(getattr(scene, "instruments", {}))]}
+
+    @classmethod
+    def author(cls, scene):
+        scene.instrument_layout = InstrumentLayout(list(getattr(scene, "instruments", {}).values()))
+
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.instrument_storage import publish_instruments, LIVE_FIELDS
+        return publish_instruments(authoring.scene, declarations, spec.get("id", spec["type"]),
+                                   **{key: spec.get(key, getattr(cls, key)) for key in LIVE_FIELDS})
+
+    def prepare(self, scene):
+        scene.storage.check()
+        super().prepare(scene)
 
     def __post_init__(self):
+        from i4h_surgical.instrument_storage import bind_instruments, LIVE_FIELDS
         scene = self.scene
         E, dev = scene.envs, scene.device
-        records = list(scene.instruments.values())
+        records = list(getattr(scene, "instruments", {}).values())
+        self.id = self.id or "instrument_control"
         self.names = [r.name for r in records]
         self.count = n = len(records)
-        self.rest = np.array([r.initial_position for r in records], np.float32).reshape(n, 3)  # for scripts and tests
-        self._live("max_velocity")
-        self._live("energy_threshold")
-        self._live("fire_threshold")
+        self.rest = np.array([r.initial_position for r in records], np.float32).reshape(n, 3)
+        bind_instruments(self)
+        self.register_live(*LIVE_FIELDS)
         self._all = wp.ones(E, dtype=wp.bool, device=dev)
-
-        def floats(values, dtype, tail=()):  # (n, *tail) float constants
-            return wp.array(np.asarray(values, np.float32).reshape((n,) + tail), dtype=dtype, device=dev)
-
-        def ints(values):
-            return wp.array(np.asarray(values, np.int32).reshape(n), dtype=wp.int32, device=dev)
-
-        zero3 = np.zeros(3, np.float32)
-        self.trocar = floats([r.trocar if r.trocar is not None else zero3 for r in records], wp.vec3, (3,))
-        self.has_trocar = ints([r.trocar is not None for r in records])
-        self.initial_position = floats(self.rest, wp.vec3, (3,))
-        self.initial_rotation = floats([r.initial_rotation for r in records], wp.quat, (4,))
-        self.jaw_open = floats([r.jaw_open for r in records], wp.float32)
-        self.jaw_closed = floats([r.jaw_closed for r in records], wp.float32)
-        self.jaw_response = floats([r.jaw_response for r in records], wp.float32)
-        self.grasp_threshold = floats([r.grasp_threshold for r in records], wp.float32)
-        self.wrist_pivot = floats([r.wrist_pivot for r in records], wp.vec3, (3,))
-        self.jaw_anchor = floats([r.jaw_anchor for r in records], wp.vec3, (3,))
-        self.wrist_end = floats([r.wrist_end if r.wrist_end is not None else zero3 for r in records], wp.vec3, (3,))
-        self.has_wrist_end = ints([r.wrist_end is not None for r in records])
-        self.wrist_end_bind = floats([r.wrist_end_bind for r in records], wp.mat44, (4, 4))
-        self.shaft_spacing = floats([r.shaft_spacing for r in records], wp.float32)
-
-        # Flat sphere layout: instrument by instrument, each [fixed chains][wrist][shaft].
-        specs, owner, starts = [], [], []
-        prim_a, prim_b, prim_owner, prim_kind, prim_starts = [], [], [], [], []
-        jaw_root_a, jaw_root_b = [], []
-        for k, r in enumerate(records):
-            starts.append(len(specs))
-            prim_starts.append(len(prim_a))
-            specs += r.spheres
-            owner += [k] * len(r.spheres)
-            for a, b, name in r.prims:
-                prim_a.append(starts[k] + a)
-                prim_b.append(starts[k] + b)
-                prim_owner.append(k)
-                prim_kind.append(PRIM_KINDS[name])
-            roots = [starts[k] + a for a, b, name in r.prims if name in ("jaw_left", "jaw_right")]
-            jaw_root_a.append(roots[0] if len(roots) >= 2 else -1)
-            jaw_root_b.append(roots[1] if len(roots) >= 2 else -1)
+        layout = InstrumentLayout(records)
+        specs, starts = layout.specs, layout.starts
+        prim_a = layout.prim_a
+        prim_owner, prim_kind, prim_starts = layout.prim_owner, layout.prim_kind, layout.prim_starts
         S, P = len(specs), len(prim_a)
         self.sphere_count = S
         self.prim_count = P
@@ -110,52 +95,12 @@ class InstrumentControl(System):
         self.host_sphere_start = np.asarray(starts, np.int32)  # sphere layout for systems that select spheres at construction
         self.host_sphere_counts = np.asarray([len(r.spheres) for r in records], np.int32)
         self.host_sphere_chain = np.asarray([s.chain for s in specs], np.int32)
-        self.prim_start = ints(prim_starts)
-        self.prim_counts = ints([len(r.prims) for r in records])
-        self.jaw_root_a = ints(jaw_root_a)
-        self.jaw_root_b = ints(jaw_root_b)
+        self.freeze("id", "count", "sphere_count", "prim_count")
+        scene.storage.register_package(checks=(self._check_layout,))
 
-        def sfloats(values, dtype, tail=()):  # (S, *tail) float constants
-            return wp.array(np.asarray(values, np.float32).reshape((S,) + tail), dtype=dtype, device=dev)
-
-        def sints(values, count=S):
-            return wp.array(np.asarray(values, np.int32).reshape(count), dtype=wp.int32, device=dev)
-
-        self.sphere_instrument = sints(owner)
-        self.sphere_role = sints([s.role for s in specs])
-        self.sphere_jaw_sign = sfloats([s.jaw_sign for s in specs], wp.float32)
-        self.sphere_local = sfloats([s.local for s in specs], wp.vec3, (3,))
-        self.sphere_bind = sfloats([s.bind for s in specs], wp.mat44, (4, 4))
-        self.sphere_radius = sfloats([s.radius for s in specs], wp.float32)
-        self.sphere_chain = sints([s.chain for s in specs])
-        self.sphere_chain_index = sints([s.chain_index for s in specs])
-        self.sphere_chain_count = sints([s.chain_count for s in specs])
-        self.prim_a = sints(prim_a, P)
-        self.prim_b = sints(prim_b, P)
-        self.prim_instrument = sints(prim_owner, P)
-        self.prim_kind = sints(prim_kind, P)
-
-        # Per-env state. actions is written by the app or Isaac Lab between steps.
-        self.actions = wp.zeros((E, n, 10), dtype=wp.float32, device=dev)
-        self.root = wp.zeros((E, n), dtype=wp.vec3, device=dev)
-        self.shaft_q = wp.zeros((E, n), dtype=wp.quat, device=dev)
-        self.wrist_q = wp.zeros((E, n), dtype=wp.quat, device=dev)
-        self.jaw_q = wp.zeros((E, n), dtype=wp.quat, device=dev)
-        self.jaw_angle = wp.zeros((E, n), dtype=wp.float32, device=dev)
-        self.jaw_delta = wp.zeros((E, n), dtype=wp.float32, device=dev)  # angle decrease this step (> 0 while closing)
-        self.held = wp.zeros((E, n), dtype=wp.int32, device=dev)
-        self.grasp_pending = wp.zeros((E, n), dtype=wp.int32, device=dev)
-        self.released = wp.zeros((E, n), dtype=wp.int32, device=dev)
-        self.energized = wp.zeros((E, n), dtype=wp.int32, device=dev)
-        self.fire_on = wp.zeros((E, n), dtype=wp.int32, device=dev)
-        self.fired = wp.zeros((E, n), dtype=wp.int32, device=dev)
-        self.sphere_q = wp.zeros((E, S), dtype=wp.vec3, device=dev)
-        self.sphere_q_prev = wp.zeros((E, S), dtype=wp.vec3, device=dev)
-        self.sphere_active = wp.zeros((E, S), dtype=wp.int32, device=dev)
-        self.mounted = wp.zeros(max(n, 1), dtype=wp.int32, device=dev)  # 1: a host body drives the pose (mount_pose)
-        self.mount_pose = wp.array(np.tile(np.concatenate([self.rest, np.asarray([r.initial_rotation for r in records],
-                                   np.float32).reshape(n, 4)], axis=1), (E, 1)).reshape(E, n, 7), dtype=wp.transform, device=dev)
-        self.reset(scene, self._all)
+    def _check_layout(self):
+        if tuple(getattr(self, key) for key in self._frozen) != self._built:
+            raise RuntimeError("instrument layout changed; reconstruct the model")
 
     def action_bounds(self, workspace: float) -> tuple[list, list]:
         """Per instrument: position within ``workspace`` of its initial position, quaternion within ±1 of its initial
@@ -205,32 +150,38 @@ class InstrumentControl(System):
         self._place(scene, self._all, 0)
 
     def reset(self, scene, mask):
-        if self.count == 0:
-            return
-        wp.launch(
-            reset_pose,
-            dim=(scene.envs, self.count),
-            inputs=[mask, self.initial_position, self.initial_rotation, self.trocar, self.has_trocar, self.jaw_open,
-                    self.mounted, self.mount_pose],
-            outputs=[self.actions, self.root, self.shaft_q, self.wrist_q, self.jaw_q, self.jaw_angle, self.jaw_delta,
-                     self.held, self.grasp_pending, self.released, self.energized, self.fire_on, self.fired],
-            device=scene.device,
-        )
-        self._place(scene, mask, 1)
+        reset_instruments(self, scene, mask)
 
     def _place(self, scene, mask, copy_prev: int):
-        wp.launch(
-            place_spheres,
-            dim=(scene.envs, self.sphere_count),
-            inputs=[mask, copy_prev, self.sphere_instrument, self.sphere_role, self.sphere_jaw_sign, self.sphere_local,
-                    self.sphere_bind, self.sphere_chain, self.sphere_chain_index, self.sphere_chain_count,
-                    self.jaw_root_a, self.jaw_root_b, self.wrist_end, self.has_wrist_end, self.wrist_end_bind,
-                    self.trocar, self.mounted, self.shaft_spacing, self.wrist_pivot, self.jaw_anchor,
-                    self.root, self.shaft_q, self.wrist_q, self.jaw_q, self.jaw_angle],
-            outputs=[self.sphere_q, self.sphere_q_prev, self.sphere_active],
-            device=scene.device,
-        )
+        place_instruments(self, scene, mask, copy_prev)
 
+
+def reset_instruments(self, scene, mask):
+    if self.count == 0:
+        return
+    wp.launch(
+        reset_pose,
+        dim=(scene.envs, self.count),
+        inputs=[mask, self.initial_position, self.initial_rotation, self.trocar, self.has_trocar, self.jaw_open,
+                self.mounted, self.mount_pose],
+        outputs=[self.actions, self.root, self.shaft_q, self.wrist_q, self.jaw_q, self.jaw_angle, self.jaw_delta,
+                 self.held, self.grasp_pending, self.released, self.energized, self.fire_on, self.fired],
+        device=scene.device,
+    )
+    place_instruments(self, scene, mask, 1)
+
+def place_instruments(self, scene, mask, copy_prev: int):
+    wp.launch(
+        place_spheres,
+        dim=(scene.envs, self.sphere_count),
+        inputs=[mask, copy_prev, self.sphere_instrument, self.sphere_role, self.sphere_jaw_sign, self.sphere_local,
+                self.sphere_bind, self.sphere_chain, self.sphere_chain_index, self.sphere_chain_count,
+                self.jaw_root_a, self.jaw_root_b, self.wrist_end, self.has_wrist_end, self.wrist_end_bind,
+                self.trocar, self.mounted, self.shaft_spacing, self.wrist_pivot, self.jaw_anchor,
+                self.root, self.shaft_q, self.wrist_q, self.jaw_q, self.jaw_angle],
+        outputs=[self.sphere_q, self.sphere_q_prev, self.sphere_active],
+        device=scene.device,
+    )
 
 # --- pose math (runtime_state.py:29-95, grasper.py:900-910), as device functions ---------------------------
 

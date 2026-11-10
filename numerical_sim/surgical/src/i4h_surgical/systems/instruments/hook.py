@@ -102,7 +102,7 @@ class Hook(System):
         wp.launch(
             retain_hook,
             dim=scene.envs,
-            inputs=[scene.field("q_prev", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.active, ic.prim_a,
+            inputs=[scene.field("q_prev", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.tet_fields.active, ic.prim_a,
                     ic.prim_b, ic.sphere_q_prev, ic.sphere_q, ic.sphere_radius, ic.sphere_active, self.prim, self.retention_slack,
                     self.axial_friction, self.engage_inward_speed, dt * float(self._substeps), dt, self.tool, self.tet,
                     self.verts, self.bary, ic.root],
@@ -115,7 +115,7 @@ class Hook(System):
         wp.launch(
             acquire_hook,
             dim=scene.envs,
-            inputs=[scene.field("q", b), scene.field("q_prev", b), scene.field("flags", b), sf.active, sf.variant, sf.tets, sf.tet_part, sf.face_neighbor, sf.tri_part,
+            inputs=[scene.field("q", b), scene.field("q_prev", b), scene.field("flags", b), sf.tet_fields.active, sf.tet_fields.variant, sf.tet_fields.tets, sf.tet_fields.tet_part, sf.face_neighbor, sf.tri_part,
                     ic.prim_a, ic.prim_b, ic.sphere_q_prev, ic.sphere_q, ic.sphere_active, cc.record_count, cc.rec_tri, cc.rec_tet,
                     cc.rec_verts, cc.rec_bary, cc.rec_pen, cc.rec_t, cc.rec_normal, self.prim, self.part_index,
                     self.engage_overlap, self.engage_inward_speed, self.puncture_distance, dt * float(self._substeps), dt],

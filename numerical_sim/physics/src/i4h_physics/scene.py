@@ -17,15 +17,16 @@ Loaders attach host records to a ``Body``. Immutable mesh data (topology, rest g
 initial active masks, connectors, pins) is stored once per mesh variant, ``(V, ...)``,
 and every env points at a variant through ``Body.variant_of_env``; independent per-env
 geometry is simply ``V == E``. Mutable state (positions, active masks) and the particle
-rest rows (``ParticleRest``) are per env, ``(E, ...)``. ``Scene.allocate()`` uploads the
-particle rest state; the system that reads any other record uploads it and owns the
-device arrays.
+rest rows (``ParticleRest``) are per env, ``(E, ...)``. ``Scene.allocate()`` binds authored particle storage; the system that reads any
+other record uses it according to its declared ownership contract.
 
 ``Scene.allocate()`` builds the Newton model behind the main block (one world per env,
-``newton_model.build_model``) and its state: the main block's ``q0``, ``inv_mass``,
-``radius`` and ``flags`` are the model's particle arrays, ``q`` and ``qd`` the state's,
-``gravity`` an ``(E,)`` view of the model's per-world gravity; ``q_prev`` and ``flags0``
-stay scene-owned. Nothing is copied between the two.
+``newton_model.build_model``) and its state. Native State q/qd and Model radius remain
+aliases. q0 aliases native Model particle_q; exact inv_mass/flags0 are Model
+custom particle attributes; q_prev and
+mutable flags are State custom particle attributes. All are authored before
+finalization, including history defaults. Binding never initializes history or
+mutates native Model flags.
 
 Particles live in two blocks with the same fields (``Block.FIELDS``): the main block
 (``scene.main``; ``scene.q`` and friends are its arrays) holds tissue, shell, rod and
@@ -357,13 +358,14 @@ class Scene:
         return self.env_xforms is not None and any(
             not np.allclose(np.asarray(q, np.float64), (0.0, 0.0, 0.0, 1.0), atol=1.0e-7) for _, q in self.env_xforms)
 
-    def refresh_gravity(self) -> None:
-        """After the model's gravity changed: a rotated component's own ``R_e^T g`` copy is rewritten in place (the
+    def refresh_gravity(self, model=None) -> None:
+        """After the model's gravity changed (pass model for an explicit pre-bind refresh): a rotated component's own ``R_e^T g`` copy is rewritten in place (the
         captured graphs keep its buffer); otherwise ``gravity`` views the model's array and is already current."""
-        if self.env_rotated and self.gravity is not None and self.model is not None:
+        model = model if model is not None else self.model
+        if self.env_rotated and model is not None:
             from i4h_physics.newton_model import component_gravity
 
-            self.gravity.assign(component_gravity(self.model, self))
+            model.i4h.scene_gravity.assign(component_gravity(model, self))
 
     @property
     def gravity_vector(self) -> tuple:
@@ -407,8 +409,8 @@ class Scene:
         raise ValueError(f"no body {name!r}; bodies: {[b.name for b in self.bodies + self.pools]}")
 
     def estimate_bytes(self, construction: bool = False) -> dict[str, int]:
-        """Device bytes ``allocate`` needs: the Newton model and state behind the main block (its q, qd, q0, inv_mass,
-        radius and flags are Newton's arrays), the scene-owned q_prev and flags0, and the private pool block. The
+        """Device bytes ``allocate`` needs: the Newton model and state behind the main block, the declared particle
+        defaults, history, flags and initialization templates, and the private pool block. The
         steady figure by default; ``construction`` adds the transient peak of building the Newton model, which is
         what ``allocate`` checks against free memory."""
         from i4h_physics.newton_model import estimate_bytes as newton_bytes
@@ -416,9 +418,17 @@ class Scene:
         sizes = {"q": _VEC3, "qd": _VEC3, "q_prev": _VEC3, "q0": _VEC3, "inv_mass": _F32, "radius": _F32, "flags": _I32,
                  "flags0": _I32}
         n, m = self.particle_count, self.pool_count
-        out = {"q_prev": n * _VEC3, "flags0": n * _I32}
-        out.update(newton_bytes(n, construction))
-        out.update({f"pool_{field}": m * size for field, size in sizes.items()})
+        out = newton_bytes(n, construction)
+        out.update({f"pool_{field}": max(1, m) * size for field, size in sizes.items()})
+        out["pool_initialization_templates"] = max(1, m) * 40
+        out["pool_identity"] = max(1, m) * 8
+        out["body_variants"] = len(self.bodies + self.pools) * self.envs * 4
+        out["component_gravity"] = self.envs * 12 if self.env_rotated else 0
+        out["static_geometry"] = sum(max(1, len(m.points)) * 20 + max(1, m.indices.size) * 12 for m in self.static_meshes)
+        from i4h_physics.tet_storage import estimate_tet_bytes
+        out["tet_storage"] = estimate_tet_bytes(self)
+        from i4h_physics.surface_storage import estimate_surface_bytes
+        out["surface_storage"] = estimate_surface_bytes(self)
         return out
 
     def check_memory(self, estimate: dict[str, int]) -> None:
@@ -434,15 +444,16 @@ class Scene:
                 f"need {total / 1e9:.3f} GB but device {self.device} has {free / 1e9:.3f} GB free; largest: {detail}"
             )
 
-    def allocate(self, model=None, state=None) -> None:
-        """Build the Newton model and state behind the main block and alias them (standalone), or take an owner's
-        finalized ``model`` and ``state`` (Isaac Lab's NewtonManager finalizes from ``newton_model.build_builder`` and
-        owns ``state_0``): the per-env rows are written into them here, then aliased the same way."""
+    def allocate(self, model=None, state=None, *, control=None) -> None:
+        """Alias declared Scene storage in the selected Newton Model and State.
+
+        Without a host model, author exact worlds and finalize a standalone model.
+        With a model and state, validate layout and leave their arrays untouched.
+        """
         if self.q is not None:
             raise RuntimeError("allocate() called twice; systems and captured graphs hold the existing arrays")
         from i4h_physics.newton_model import (
             build_model,
-            component_gravity,
             finish_model,
             place_main,
             rebuild_particle_bvh,
@@ -458,61 +469,53 @@ class Scene:
         else:
             if state is None:
                 raise ValueError("an owner's model comes with its state")
+            if model.device != dev or model.world_count != self.envs:
+                raise ValueError("host model device/world count does not match the authored scene")
+            for name in ("particle_q", "particle_qd", "particle_f"):
+                array = getattr(state, name)
+                if model.particle_count and (array is None or array.device != dev or array.shape != (model.particle_count,) or array.dtype is not wp.vec3):
+                    raise ValueError(f"host state {name} has incompatible device or capacity")
             place_main(model, self)
             finish_model(model, self, state, host=True)
             self.model, self.state = model, state
-        rebuild_particle_bvh(self.model, self.state)
+        if model is None:
+            rebuild_particle_bvh(self.model, self.state)
+        if not hasattr(self, "declarations"):
+            raise RuntimeError("native particles require authored storage declarations")
+        from i4h_physics.scene_storage import validate_scene
+        validate_scene(self)
+        self.control = control if control is not None else self.model.control()
+        base, stride, col = self.main.place(self.envs)
+        self.storage = self.declarations.bind(self.model, self.state, self.control,
+            placements={self.particle_domain: (base + col, stride)} if self.main.width else {})
         self._alias_main()
-        self._allocate_block(self.pool)
+        for name in Block.FIELDS:
+            setattr(self.pool, name, self.attr(self.pool_domain, name))
+        self.pool.size = self.pool_count
         for field in Block.FIELDS:  # scene.q and friends are the main block's arrays
             setattr(self, field, getattr(self.main, field))
-        if self.env_rotated:  # the component frame differs per env: our own (E,) gravity, R_e^T g (refresh_gravity)
-            self.gravity = wp.array(component_gravity(self.model, self), dtype=wp.vec3, device=dev)
-        else:
-            self.gravity = self.model.gravity[: self.envs]  # (E,) view of Newton's per-world gravity (the last slot is world -1)
+        self.gravity = self.attr(self.gravity_domain, "gravity")
+        self.storage.register_package(identities=((self.model, "gravity", self.model.gravity),))
         for b in self.bodies + self.pools:
-            b.variant = wp.array(b.variant_of_env, dtype=wp.int32, device=dev)
+            b.variant = self.attr(self.body_domains[b.name], "variant")
 
     def _alias_main(self) -> None:
-        """The main block's arrays are the Newton model's and state's: q0, inv_mass, radius and flags on the model
-        (flags are mutated in place: cuts and burns are model edits, so Newton sees them), q and qd on the state; q_prev
-        and flags0 stay scene-owned. An empty main block (a fluid-only scene) gets zero-length arrays: Newton allocates
-        no particle arrays then."""
+        """Attach full native backing aliases without writing defaults or history."""
         m, s, main = self.model, self.state, self.main
-        if m.particle_count == 0:
-            self._allocate_block(main)
-            return
-        base, stride, col = main.place(self.envs)
-        if base + (self.envs - 1) * stride + col + main.width > m.particle_count:
-            raise RuntimeError(f"newton model has {m.particle_count} particles; the main block's placement {main.place(self.envs)} "
-                               f"needs {base + (self.envs - 1) * stride + col + main.width}")
-        main.size = m.particle_count  # host particles share the arrays; every main-block array has this length
-        main.q0, main.inv_mass, main.radius, main.flags = m.particle_q, m.particle_inv_mass, m.particle_radius, m.particle_flags
-        main.q, main.qd = s.particle_q, s.particle_qd
-        main.q_prev = wp.clone(m.particle_q)
-        main.flags0 = wp.clone(m.particle_flags)
-
-    def _allocate_block(self, block: Block) -> None:
-        dev, n = self.device, block.count(self.envs)
-
-        # Only for the body-major pool block and an empty main block: a populated main block is the Newton model's
-        # arrays (newton_model.main_rows lays out its world-major rows).
-        assert not (block.world_major and block.bodies), "a populated main block is allocated by build_model"
-
-        def flat(field, dtype):  # (E, n, *tail) rows of every body -> (N, *tail), each body's envs one after another
-            rows = [getattr(b.rest, field) for b in block.bodies]
-            if not rows:
-                return np.zeros((0, 3) if field == "q0" else (0,), dtype)
-            return np.concatenate([r.reshape((-1,) + r.shape[2:]) for r in rows])
-
-        block.q0 = wp.array(flat("q0", np.float32), dtype=wp.vec3, device=dev)
-        block.q = wp.clone(block.q0)
-        block.q_prev = wp.clone(block.q0)
-        block.qd = wp.zeros(n, dtype=wp.vec3, device=dev)
-        block.inv_mass = wp.array(flat("inv_mass", np.float32), dtype=wp.float32, device=dev)
-        block.radius = wp.array(flat("radius", np.float32), dtype=wp.float32, device=dev)
-        block.flags0 = wp.array(flat("flags", np.int32), dtype=wp.int32, device=dev)
-        block.flags = wp.clone(block.flags0)
+        main.size = m.particle_count
+        main.q0 = m.particle_q if m.particle_count else self.storage.attr(self.particle_domain, "q0").flatten()
+        for name in ("inv_mass", "flags0", "q_prev", "flags"):
+            setattr(main, name, getattr(m.i4h if name in ("inv_mass", "flags0") else s.i4h, f"particle_{name}"))
+        # Empty native backing has one inaccessible element; expose empty aliases.
+        if not m.particle_count:
+            for name in ("inv_mass", "flags0", "q_prev", "flags"):
+                setattr(main, name, getattr(main, name)[:0])
+            main.q = main.q0
+            main.qd = main.q0
+            main.radius = main.inv_mass
+        else:
+            main.radius = m.particle_radius
+            main.q, main.qd = s.particle_q, s.particle_qd
 
     # device-side helpers ----------------------------------------------------
 
@@ -548,12 +551,14 @@ class Scene:
         meshes = {m.name: m for m in self.static_meshes}
         if name not in meshes:
             raise ValueError(f"{name!r}: unknown static mesh; known: {sorted(meshes)}")
+        if getattr(self, "storage", None) is None:
+            raise RuntimeError("scene has no completed storage declarations")
+        self.storage.check()
         cached = self._fields.get(("static_mesh", name, None))
         if cached is None:
-            m = meshes[name]
-            self.check_memory({"mesh": m.points.nbytes + m.indices.nbytes})
-            points = wp.array(m.points, dtype=wp.vec3, device=self.device)
-            indices = wp.array(np.ascontiguousarray(m.indices.reshape(-1), dtype=np.int32), dtype=wp.int32, device=self.device)
+            points_domain, indices_domain = self.static_domains[name]
+            points = self.attr(points_domain, "points")
+            indices = self.attr(indices_domain, "indices")
             cached = self._fields[("static_mesh", name, None)] = wp.Mesh(points, indices)  # static: never refit
         return cached
 
@@ -571,6 +576,13 @@ class Scene:
         p = body.parts[part]
         return self.view(arr, body)[:, p.particle_start : p.particle_start + p.particle_count]
 
+    def attr(self, domain, key):
+        """Return the cached zero-copy view of an explicitly declared field."""
+        storage = getattr(self, "storage", None)
+        if storage is None:
+            raise RuntimeError("scene has no completed storage declarations")
+        return storage.attr(domain, key)
+
     def field(self, name: str, body: Body, part: str | None = None) -> wp.array:
         """``(E, count)`` view of the live per-particle array ``name`` (``"q"``, ``"flags"``, ...) of the block the
         body lives in; one part's ``(E, capacity)`` view when ``part`` is given."""
@@ -587,10 +599,24 @@ class Scene:
         self._fields[key] = view
         return view
 
+    def initialize_particle_history(self, mask: wp.array) -> None:
+        """After an explicit teleport, copy selected owned positions into history only.
+
+        Binding and cache refresh never call this: restored history is independent
+        of live positions. The caller orders its writes before this device operation.
+        """
+        self.storage.check()
+        views = [(self.block_field, self.main.width)] if self.main.width else []
+        views += [((lambda name, b=b: self.field(name, b)), b.count) for b in self.pools if b.count]
+        for f, n in views:
+            wp.launch(initialize_particle_history, dim=(self.envs, n), inputs=[mask, f("q")],
+                      outputs=[f("q_prev")], device=self.device)
+
     def reset(self, mask: wp.array, positions: bool = True, velocities: bool = True) -> None:
         """Restore the envs where ``mask[env]`` is true. Always: the particle flags from ``flags0`` (topology and flags
         go back together) and ``q_prev = q``. ``positions`` restores the main block's ``q`` from ``q0`` first,
         ``velocities`` zeroes its ``qd``; the private pool block is always restored in full."""
+        self.storage.check()
         views = [(self.block_field, self.main.width, positions, velocities)] if self.main.width else []
         views += [((lambda name, b=b: self.field(name, b)), b.count, True, True) for b in self.pools]  # pools: in full
         for f, n, pos, vel in views:  # one launch for the whole main block, one per pool
@@ -601,6 +627,14 @@ class Scene:
                 outputs=[f("q"), f("qd"), f("q_prev"), f("flags")],
                 device=self.device,
             )
+
+
+@wp.kernel
+def initialize_particle_history(mask: wp.array(dtype=wp.bool), q: wp.array2d(dtype=wp.vec3),
+                                previous: wp.array2d(dtype=wp.vec3)):
+    env, i = wp.tid()
+    if mask[env]:
+        previous[env, i] = q[env, i]
 
 
 @wp.kernel

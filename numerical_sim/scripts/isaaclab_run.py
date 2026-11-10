@@ -45,8 +45,6 @@ def parse(argv):
     parser.add_argument("--task", default="I4h-TwoWorlds-Direct", help="a registered task id (i4h_isaaclab.tasks)")
     parser.add_argument("--data", help="production asset directory (overrides I4H_DATA)")
     parser.add_argument("--case", default=None, help="a case name or path instead of --task (default env cfg)")
-    parser.add_argument("--backend", choices=("newton", "i4h"), default=None,
-                        help="newton (default): Isaac Lab's NewtonManager runs I4hSolver; i4h: the fallback I4hPhysicsManager")
     parser.add_argument("--num_envs", type=int, default=None, help="default 2 (replay: the recorded count)")
     parser.add_argument("--steps", type=int, default=200, help="timed policy steps")
     parser.add_argument("--warmup", type=int, default=20, help="untimed policy steps before the timed loop")
@@ -122,7 +120,7 @@ def make_cfg(args):
 
         path, demo = replay_path(args.policy[len("replay_hdf5:"):])
         episode, env_args = load_demo(path, demo, device="cpu")
-        overrides = {"case": args.case, "backend": args.backend, "num_envs": args.num_envs, "camera": args.camera,
+        overrides = {"case": args.case, "num_envs": args.num_envs, "camera": args.camera,
                      "workspace": args.workspace, "observe": args.observe, "stagger_episodes": False if args.no_stagger else None}
         cfg = env_cfg_from_recording(env_args, overrides, data=args.data,
                                      seed=args.seed if args.seed is not None else getattr(episode, "seed", None))
@@ -137,7 +135,7 @@ def make_cfg(args):
         cfg = load_cfg_from_registry(args.task, "env_cfg_entry_point")
     cfg.scene.num_envs = int(args.num_envs if args.num_envs is not None else 2)
     if args.task in tasks.MANAGER_TASKS and not args.case:  # Isaac Lab's NewtonManager, no camera or staggering
-        if args.backend not in (None, "newton") or args.camera:
+        if args.camera:
             raise SystemExit("-Manager tasks run on the newton backend without the tiled camera")
         if args.policy.startswith("replay:"):
             raise SystemExit("replay: runs the -Direct tasks")
@@ -148,7 +146,6 @@ def make_cfg(args):
         if args.observe is not None:
             cfg.observe = args.observe
         return cfg
-    cfg.backend = args.backend or "newton"
     cfg.sim.device = args.device or "cuda:0"
     cfg.seed = int(args.seed or 0)
     cfg.camera = int(args.camera or 0)
@@ -178,8 +175,7 @@ def clear_context():
 
 
 def simulator_pins() -> dict[str, str]:
-    """The exact versions the installed i4h-physics pins (``name==version`` requirements), so the check follows the
-    package instead of repeating its numbers."""
+    """Exact versions or git URLs declared by the installed physics package."""
     from importlib.metadata import requires
 
     pins = {}
@@ -188,7 +184,25 @@ def simulator_pins() -> dict[str, str]:
         if "==" in spec and "extra" not in requirement:
             name, version = spec.split("==", 1)
             pins[name.split("[")[0].strip().lower()] = version.strip()
+        elif " @ git+" in spec and "extra" not in requirement:
+            name, url = spec.split(" @ ", 1)
+            pins[name.split("[")[0].strip().lower()] = url.strip()
     return pins
+
+
+def check_simulator_pins():
+    from importlib.metadata import distribution
+    import json
+
+    for name, expected in simulator_pins().items():
+        installed = distribution(name)
+        if expected.startswith("git+"):
+            url, revision = expected.removeprefix("git+").rsplit("@", 1)
+            origin = json.loads(installed.read_text("direct_url.json") or "{}")
+            assert (origin.get("url") == url and origin.get("vcs_info", {}).get("commit_id") == revision), (
+                f"{name} origin {origin} != {expected} (i4h-physics' pin)")
+        else:
+            assert installed.version == expected, f"{name} {installed.version} != {expected} (i4h-physics' pin)"
 
 
 def check(args):
@@ -200,9 +214,7 @@ def check(args):
         module = __import__(name)
         versions[name] = getattr(module, "__version__", "ok")
     versions["torch"], versions["warp"], versions["newton"] = torch.__version__, wp.__version__, newton.__version__
-    pins = simulator_pins()
-    assert wp.__version__ == pins["warp-lang"], f"warp {wp.__version__} != {pins['warp-lang']} (i4h-physics' pin)"
-    assert newton.__version__ == pins["newton"], f"newton {newton.__version__} != {pins['newton']} (i4h-physics' pin)"
+    check_simulator_pins()
     assert torch.cuda.is_available(), "torch has no CUDA device"
     args.task, args.case, args.num_envs = "I4h-TwoWorlds-Direct", None, 2
     from isaaclab.app.sim_launcher import launch_simulation

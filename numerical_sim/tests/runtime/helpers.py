@@ -90,6 +90,13 @@ def run_rates(sim, steps, rates):
 def free_rod(envs=2, backend=RodDirect, tip_edges=8, **control):
     scene = Scene("cuda:0", envs, (0.0, 0.0, 0.0))
     add_rod(scene, "rod", [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], 33, 0.05, 0.02, mass=1.0)
+    from i4h_physics.rod_storage import declare_rod_direct, declare_rod_pbd
+    from i4h_endoluminal.rod_storage import declare_catheter_control
+    if backend is RodPbd:
+        declare_rod_pbd(scene, 'rod')
+    else:
+        declare_rod_direct(scene, 'rod', torsion=1.0e9, bend=0.1)
+    declare_catheter_control(scene, 'rod_pbd' if backend is RodPbd else 'rod_direct', track_length=1.0, tip_edges=tip_edges)
     scene.allocate()
     rod = backend(scene, body="rod") if backend is RodPbd else backend(scene, body="rod", torsion=1.0e9, bend=0.1)
     ctl = CatheterControl(scene, rod=rod, track_length=1.0, tip_edges=tip_edges, **control)
@@ -256,3 +263,20 @@ def live_surface_is_consistent(sim, env):
     assert (tris[~live][:, 0] == tris[~live][:, 1]).all()
     support = surface.support.numpy().reshape(scene.envs, -1)[env]
     assert support.sum() == 4 * active.sum() and np.array_equal(support > 0, (flags & ACTIVE_INT) != 0)
+
+
+def lab_runtime():
+    """Native host allocation on either qualified Lab release (test introspection only)."""
+    from types import SimpleNamespace
+    from isaaclab.sim import SimulationContext
+
+    sim = SimulationContext.instance()
+    manager = sim.backend_manager if hasattr(sim, "backend_manager") else sim.physics_manager
+    backend = manager.backend
+    main = hasattr(backend, "solver")
+    return SimpleNamespace(model=backend.model, state_0=backend.state_0, control=backend.control,
+                           solver=backend.solver if main else manager._solver,
+                           contacts=backend.contacts if main else manager._contacts,
+                           graph=next(iter(backend.graphs.values()), None) if main else manager._graph,
+                           capture_pending=(not backend.graphs and backend.capture is not None) if main
+                           else manager._graph_capture_pending)

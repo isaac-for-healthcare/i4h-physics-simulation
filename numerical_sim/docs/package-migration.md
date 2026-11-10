@@ -10,8 +10,8 @@ device, whose case then follows the environment case.
 `PhysicsBinding` owns physical lifetime and masked reset. Host teardown and replacement
 invalidate bindings. Assessment evaluates every completed physics sample, before rewards
 and termination checks. Empty reset selections leave assessment and host pacing alone.
-`Stepper.step()` advances one physics sample; `NewtonSim.step()` invokes the manager,
-including its configured decimation. Per-sample reward pulses and action totals retain
+`Stepper.step()` advances one standalone physics sample. In Lab, the native
+manager advances physics and owns decimation; the hosted binding has no `step()`. Per-sample reward pulses and action totals retain
 their existing meanings.
 
 Loader and constructor maps are explicit. Ordinary owning sidecars carry presentation;

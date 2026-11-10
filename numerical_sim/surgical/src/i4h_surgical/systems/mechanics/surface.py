@@ -22,8 +22,8 @@ class Surface(PhysicalSurface):
         from i4h_physics.systems.mechanics.tet import Tet
         if not isinstance(self.tet, Tet):
             raise TypeError("surface.tet must name a tet system")
-        self.appearance = Appearance(self.scene, self.tet.body.count)
         super().__post_init__()
+        self.appearance = Appearance(self.scene, self.body.count)
 
     def reset(self, scene, mask):
         super().reset(scene, mask)

@@ -128,6 +128,21 @@ class ShiftEvents:
     shift = EventTermCfg(func=shift_positions, mode="reset", params={"offset": 0.01})
 
 
+@configclass
+class StartupShiftEvents:
+    shift = EventTermCfg(func=shift_positions, mode="startup", params={"offset": 0.01})
+
+
+def test_startup_event_initializes_history_before_first_reset(make_env):
+    env = make_env(events=StartupShiftEvents())
+    scene = env.unwrapped.i4h.scene
+    q, q0 = positions(env)
+    body = next(b for b in scene.bodies if b.integrate)
+    history = wp.to_torch(scene.field("q_prev", body)).view(2, -1)
+    assert torch.equal(q, q0 + 0.01), "manager startup position edits survive construction"
+    assert torch.equal(history, q), "manager startup history is live before any reset or step"
+
+
 @needs_vessels
 def test_reset_event_reaches_the_procedure(make_env):
     """Physical reset, then the event (on a side stream), then the procedure, which samples the shifted tip."""
@@ -135,6 +150,9 @@ def test_reset_event_reaches_the_procedure(make_env):
     u = env.unwrapped
     dev = torch.device(u.device)
     env.reset()
+    history = wp.to_torch(u.i4h.scene.field("q_prev", u.i4h.scene.body("catheter"))).view(2, -1)
+    q, q0 = positions(env)
+    assert torch.equal(history, q), "manager reset events initialize history before the first step"
     for _ in range(5):
         env.step(torch.zeros((2, 3), device=dev))
     with torch.cuda.stream(torch.cuda.Stream(device=dev)):
@@ -146,6 +164,14 @@ def test_reset_event_reaches_the_procedure(make_env):
     rest = q0.view(2, -1, 3)[:, -1]
     assert torch.allclose(tips, rest + 0.01, atol=1e-5), "the event moved the catheter"
     assert torch.allclose(wp.to_torch(procedure.previous_tip), tips, atol=1e-6), "the procedure sampled the moved tip"
+    assert torch.equal(history, q), "side-stream manager reset events initialize particle history"
+    env.step(torch.zeros((2, 3), device=dev))
+    previous = history[0].clone()
+    with torch.cuda.stream(torch.cuda.Stream(device=dev)):
+        u._reset_idx(torch.tensor([1], device=dev))
+    torch.cuda.synchronize()
+    assert torch.equal(history[1], q[1])
+    assert torch.equal(history[0], previous), "manager reset preserves unselected history"
 
 
 @pytest.mark.parametrize("outcome", ["success", "timeout"])
@@ -190,7 +216,6 @@ def test_hard_reset_rebinds(make_env):
 
 
 def test_close_and_reopen(make_env):
-    from i4h_isaaclab.newton_manager import I4hNewtonManager
 
     first = make_env()
     first.reset()
@@ -199,7 +224,7 @@ def test_close_and_reopen(make_env):
     env = make_env(num_envs=3)
     assert not previous.valid
     u = env.unwrapped
-    assert u.i4h.scene.envs == 3 and len(I4hNewtonManager.on_solver) == 1
+    assert u.i4h.scene.envs == 3 and u.i4h._construction.binding is u.i4h.sim
     env.reset()
     for _ in range(5):
         obs, *_ = env.step(torch.rand((3, 10), device=u.device) * 2 - 1)

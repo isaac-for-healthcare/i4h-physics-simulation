@@ -51,6 +51,13 @@ class Thermal(System):
     refs = ("surface", "contacts", "instruments", "hook")
     structural = System.structural + ("diffusion_substeps", "instrument")  # the instrument index is baked into the launches
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.tet_storage import declare_thermal_tet_fields
+        body = records[spec["surface"]]["body"]
+        domain = declare_thermal_tet_fields(declarations, body, spec.get("id", spec["type"]), lambda: authoring.particle_starts(body))
+        return {"body": body, "state": domain}
+
     def __post_init__(self):
         scene = self.scene
         sf, cc, ic = self.surface, self.contacts, self.instruments
@@ -72,7 +79,7 @@ class Thermal(System):
         self.freeze("instrument")
         self.body = b = sf.body
         E, dev = scene.envs, scene.device
-        T, n = sf.tets.shape[1], E * b.count
+        T, n = sf.tet_fields.tets.shape[1], E * b.count
         scene.check_memory({"heat": 3 * E * T * 4, "coag": n * 4})
         self._live("power", "diffusion", "cooling", "burn_rate", "coag_heat", "delete_heat", "delete_burn")
         self.heat = wp.zeros((E, T), dtype=wp.float32, device=dev)
@@ -85,35 +92,35 @@ class Thermal(System):
     def substep_end(self, scene, dt):
         sf, cc, ic, b = self.surface, self.contacts, self.instruments, self.body
         E, dev = scene.envs, scene.device
-        T = sf.tets.shape[1]
+        T = sf.tet_fields.tets.shape[1]
         if T == 0:
             return
         hook_active = self.hook.entry_active if self.hook is not None else self._no_hook
         P, R = cc.rec_tet.shape[1], cc.rec_tet.shape[2]
         if P:
             wp.launch(deposit_heat, dim=(E, P, R),
-                      inputs=[ic.energized, self.k, self.source_prim, hook_active, cc.record_count, cc.rec_tet, sf.active,
-                              sf.tet_part, sf.heat_enabled, self.power, dt],
+                      inputs=[ic.energized, self.k, self.source_prim, hook_active, cc.record_count, cc.rec_tet, sf.tet_fields.active,
+                              sf.tet_fields.tet_part, sf.heat_enabled, self.power, dt],
                       outputs=[self.heat], device=dev)
         if self.hook is not None:
             wp.launch(deposit_hook_heat, dim=E,
-                      inputs=[ic.energized, self.k, self.hook.entry_active, self.hook.entry_tet, sf.active, sf.tet_part,
+                      inputs=[ic.energized, self.k, self.hook.entry_active, self.hook.entry_tet, sf.tet_fields.active, sf.tet_fields.tet_part,
                               sf.heat_enabled, self.power, dt],
                       outputs=[self.heat], device=dev)
         src, dst = self.heat, self.heat_next
         sweeps = int(self.diffusion_substeps)
         for _ in range(sweeps):
             wp.launch(diffuse_heat, dim=(E, T),
-                      inputs=[src, sf.variant, sf.active, sf.tet_part, sf.heat_enabled, sf.face_neighbor, self.diffusion,
+                      inputs=[src, sf.tet_fields.variant, sf.tet_fields.active, sf.tet_fields.tet_part, sf.heat_enabled, sf.face_neighbor, self.diffusion,
                               self.cooling, dt / sweeps],
                       outputs=[dst], device=dev)
             src, dst = dst, src
         if src is self.heat:  # an even sweep count ended in ``heat``; the burn reads ``heat_next`` and writes ``heat``
             wp.copy(self.heat_next, self.heat)
         wp.launch(burn_and_delete, dim=(E, T),
-                  inputs=[self.heat_next, sf.variant, sf.tets, sf.tet_part, sf.heat_enabled, sf.deletable, sf.tet_edges, self.coag_heat,
+                  inputs=[self.heat_next, sf.tet_fields.variant, sf.tet_fields.tets, sf.tet_fields.tet_part, sf.heat_enabled, sf.deletable, sf.tet_edges, self.coag_heat,
                           self.delete_heat, self.delete_burn, self.burn_rate, dt, b.count],
-                  outputs=[self.heat, self.burn, self.coag, sf.active, sf.edge_active, sf.support, sf.edge_support, scene.field("flags", b),
+                  outputs=[self.heat, self.burn, self.coag, sf.tet_fields.active, sf.tet_fields.edge_active, sf.support, sf.edge_support, scene.field("flags", b),
                            sf.deleted, sf.dirty],
                   device=dev)
 

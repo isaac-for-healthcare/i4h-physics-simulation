@@ -74,6 +74,16 @@ class Drag(System):
     body: str  # the centreline-tree body
     max_delta: float = 0.01  # live, per env: motion clamp per substep (omniendo vessel_max_delta)
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_endoluminal.rod_storage import publish_drag
+        return publish_drag(authoring.scene, declarations, spec.get('id', spec['type']),
+                            body=spec['body'], max_delta=spec.get('max_delta', cls.max_delta))
+
+    def prepare(self, scene):
+        scene.storage.check()
+        super().prepare(scene)
+
     def __post_init__(self):
         scene = self.scene
         E, dev = scene.envs, scene.device
@@ -81,14 +91,12 @@ class Drag(System):
         if b.tree is None:
             raise ValueError(f"drag: body {b.name!r} is not a centreline tree")
         self.P = P = b.count
-        self.active = wp.zeros(E, dtype=wp.int32, device=dev)
-        self.node = wp.zeros(E, dtype=wp.int32, device=dev)
-        self.target = wp.zeros(E, dtype=wp.vec3, device=dev)
-        self.weights = wp.zeros(E * P, dtype=wp.float32, device=dev)
-        self.baseline = wp.zeros(E * P, dtype=wp.vec3, device=dev)
+        from i4h_endoluminal.rod_storage import bind_endoluminal
+        bind_endoluminal(self, 'drag')
         self.ref = wp.zeros(E * P, dtype=wp.vec3, device=dev)  # the body's substep-start positions, frozen before the drag writes
-        self._live("max_delta")
+        self.register_live("max_delta")
         self._rest_inv_mass = b.rest.inv_mass[0]
+        self.freeze("id", "P")
 
     # host API: run between steps on the physics thread (the app's worker.edit) ------------------------------------
 

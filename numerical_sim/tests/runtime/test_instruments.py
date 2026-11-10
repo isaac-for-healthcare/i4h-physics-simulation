@@ -13,6 +13,7 @@ from i4h_isaaclab.composition import data_dir
 from i4h_physics import Scene, Stepper
 from i4h_physics.quat import quat_to_matrix
 from i4h_surgical.loaders.instrument_usd import add_instrument
+from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 
 ASSETS = data_dir() / "instruments"
@@ -43,6 +44,7 @@ def make(envs=1):
     scene = Scene("cuda:0", envs, (0.0, -9.81, 0.0))
     grasper = add_instrument(scene, "grasper", **GRASPER)
     hook = add_instrument(scene, "hook", **HOOK)
+    declare_instruments(scene)
     scene.allocate()
     control = InstrumentControl(scene)
     sim = Stepper.create(scene, [control], dt=1.0 / 60.0, substeps=1, iterations=1)
@@ -701,6 +703,7 @@ def _pickup_driver(envs=1, renderer=None):
     scene = Scene("cuda:0", envs, (0.0, -9.81, 0.0))
     add_instrument(scene, "grasper", **GRASPER)
     add_instrument(scene, "hook", input="secondary", **HOOK)
+    declare_instruments(scene)
     scene.allocate()
     control = InstrumentControl(scene)
     sim = Stepper.create(scene, [control], dt=1.0 / 60.0, substeps=1, iterations=1)
@@ -885,9 +888,11 @@ def test_pickup_proxies_and_recording(tmp_path):
     assert (tmp_path / "s_grasper.npy").is_file() and (tmp_path / "s_secondary.npy").is_file()
 
 
-def test_gl_key_presses_reach_the_pickup_keys():
+def test_gl_key_presses_reach_the_pickup_keys(monkeypatch):
     """The GL view's pyglet key symbols arrive in the Slang event shape Pickup.handle_key reads (the teleop loop's keys)."""
-    pytest.importorskip("pyglet")
+    pyglet = pytest.importorskip("pyglet")
+    # Key symbols need no GL context or working desktop display.
+    monkeypatch.setattr(pyglet.options, "shadow_window", False)
     from i4h_isaaclab.camera.camera import key_event
     from i4h_standalone.render.gl import _KeyPress
     from pyglet.window import key

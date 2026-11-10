@@ -23,6 +23,8 @@ from i4h_endoluminal.loaders.centreline import (
 from i4h_physics import Scene, Stepper
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.rod_pbd import RodPbd
+from i4h_physics.rod_storage import declare_rod_pbd
+from i4h_endoluminal.rod_storage import declare_drag, declare_control_layout
 
 
 def branch(points, rmin, rmax):
@@ -83,6 +85,7 @@ def y_sim(envs=1, gravity=(0.0, 0.0, 0.0), damping=1.0, sweeps=20, **rod):
     pos, edges, dirs = build_y()
     scene = Scene("cuda:0", envs, gravity=gravity)
     body = add_centreline_tree(scene, "y", pos, edges, 0.05, root=0, pinned_nodes=[0], pinned_segments=[0, 12, 24], mass=1.0, inertia=1.0)
+    declare_rod_pbd(scene, "y", bend=0.6, twist=0.6, **rod)
     scene.allocate()
     tree = RodPbd(scene, body="y", bend=0.6, twist=0.6, sweeps=sweeps, **rod)
     sim = Stepper.create(scene, [Particles(scene, damping=damping), tree], dt=1.0 / 60.0, substeps=1, iterations=1)
@@ -414,6 +417,19 @@ def test_tree_case_masked_reset():
     keep = {name: env_slice(scene, scene.q, scene.body(name), 0) for name in ("catheter", "aorta")}
     frames0 = {r: r.frame.numpy().reshape(2, -1, 4)[0].copy() for r in (tree_rod, cath_rod)}
     targets0 = ctl.targets.numpy()[0].copy()
+    # A host cache refresh must invalidate selected candidates without resetting catheter commands or measurements.
+    current = scene.q.numpy().copy()
+    measurements = [lc.contact_count, lc.contact_depth, lc.overflow, ctl.targets, tree_rod.frame, cath_rod.frame]
+    saved = [a.numpy().copy() for a in measurements]
+    rebuild = lc.rebuild.numpy().copy()
+    sim.solver.reset(sim.state, wp.zeros(3, dtype=wp.bool, device=scene.device), flags=0)
+    np.testing.assert_array_equal(lc.rebuild.numpy(), rebuild)
+    for _ in range(2):
+        sim.solver.reset(sim.state, wp.array([False, True, False], dtype=wp.bool, device=scene.device), flags=0)
+        np.testing.assert_array_equal(lc.rebuild.numpy(), [rebuild[0], 1])
+        np.testing.assert_array_equal(scene.q.numpy(), current)
+        for a, expected in zip(measurements, saved):
+            np.testing.assert_array_equal(a.numpy(), expected)
     sim.reset([1])
     for name, before in keep.items():
         body = scene.body(name)
@@ -521,6 +537,7 @@ def test_skin_rigid_motion():
     pos = np.asarray([[0.0, 0.0, 0.0], [0.5, 0.0, 0.0], [1.0, 0.0, 0.0]], np.float32)
     scene = Scene("cuda:0", 2, gravity=(0.0, 0.0, 0.0))
     body = add_centreline_tree(scene, "v", pos, np.asarray([[0, 1], [1, 2]], np.int32), 0.1, root=0, pinned_nodes=[0], mass=1.0)
+    declare_rod_pbd(scene, "v")
     scene.allocate()
     body.skin = skin = bind_skin("v", pts, tris, body.tree, "cuda:0", {"color": [0.5, 0.5, 0.5]})
     assert skin.adj_offsets[-1] == len(skin.adj_vertices) and (np.diff(skin.adj_offsets) >= 4).all()
@@ -576,6 +593,8 @@ def test_drag_weights_and_reach_target():
     pos, edges, dirs = build_y()
     scene = Scene("cuda:0", 2, gravity=(0.0, 0.0, 0.0))
     body = add_centreline_tree(scene, "y", pos, edges, 0.05, root=0, pinned_nodes=[0], pinned_segments=[0, 12, 24], mass=1.0, inertia=1.0)
+    declare_rod_pbd(scene, "y", bend=0.6, twist=0.6, sweeps=8)
+    declare_drag(scene, "y")
     scene.allocate()
     rod = RodPbd(scene, body="y", bend=0.6, twist=0.6, sweeps=8)
     drag = Drag(scene, body="y")
@@ -612,6 +631,8 @@ def test_drag_motion_limit_and_zero_velocity(substeps):
     pos, edges, dirs = build_y()
     scene = Scene("cuda:0", 1, gravity=(0.0, 0.0, 0.0))
     body = add_centreline_tree(scene, "y", pos, edges, 0.05, root=0, pinned_nodes=[0], pinned_segments=[0, 12, 24], mass=1.0, inertia=1.0)
+    declare_rod_pbd(scene, "y", sweeps=4)
+    declare_drag(scene, "y")
     scene.allocate()
     rod = RodPbd(scene, body="y", sweeps=4)
     drag = Drag(scene, body="y", max_delta=0.01)
@@ -678,6 +699,8 @@ def test_drag_driver_picks_and_edits():
     pos, edges, dirs = build_y()
     scene = Scene("cuda:0", 1, gravity=(0.0, 0.0, 0.0))
     body = add_centreline_tree(scene, "y", pos, edges, 0.05, root=0, pinned_nodes=[0], pinned_segments=[0, 12, 24], mass=1.0)
+    declare_rod_pbd(scene, "y")
+    declare_drag(scene, "y")
     scene.allocate()
     rod = RodPbd(scene, body="y")
     drag = Drag(scene, body="y")
@@ -722,8 +745,10 @@ def layout_sim(layouts, envs=1, sweeps=1):
     pos, edges, dirs = build_y()
     scene = Scene("cuda:0", envs, gravity=(0.0, 0.0, 0.0))
     body = add_centreline_tree(scene, "y", pos, edges, 0.05, root=0, pinned_nodes=[0], pinned_segments=[0, 12, 24], mass=1.0, inertia=1.0)
-    scene.allocate()
     body.anatomy.layouts = layouts
+    declare_rod_pbd(scene, "y", sweeps=sweeps)
+    declare_control_layout(scene, "y", rod="rod_pbd")
+    scene.allocate()
     rod = RodPbd(scene, body="y", sweeps=sweeps)
     ctl = ControlLayout(scene, centreline="y", rod=rod)
     sim = Stepper.create(scene, [Particles(scene), rod, ctl], dt=1.0 / 60.0, substeps=1, iterations=1)

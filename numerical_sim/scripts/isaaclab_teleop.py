@@ -37,7 +37,6 @@ def parse(argv):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data", help="production asset directory (overrides I4H_DATA)")
     parser.add_argument("--case", default="chole_tet_med", help="a case name or path")
-    parser.add_argument("--backend", choices=("newton", "i4h"), default="newton")
     parser.add_argument("--num_envs", type=int, default=1)
     parser.add_argument("--others", choices=("hold", "mirror"), default="hold", help="what the envs other than 0 do")
     source = parser.add_mutually_exclusive_group()
@@ -150,7 +149,7 @@ def main(argv=None) -> int:
     from isaaclab.app.sim_launcher import launch_simulation
 
     case = read_case(args.case)
-    cfg = I4hEnvCfg(case=args.case, backend=args.backend, action_mode="physical", stagger_episodes=False,
+    cfg = I4hEnvCfg(case=args.case, action_mode="physical", stagger_episodes=False,
                     episode_length_s=float(args.episode_s), seed=int(args.seed), camera=int(args.camera))
     cfg.scene.num_envs = int(args.num_envs)
     cfg.sim.device = args.device
@@ -272,7 +271,7 @@ def main(argv=None) -> int:
 
             torch.cuda.synchronize()
             finite = bool(torch.isfinite(obs["policy"]).all())
-            print(f"{args.case}: {teleop.steps} teleop steps, {u.num_envs} envs, backend {args.backend}, env 0 resets {resets}, "
+            print(f"{args.case}: {teleop.steps} teleop steps, {u.num_envs} envs, backend newton, env 0 resets {resets}, "
                   f"finite={finite}")
         finally:
             if recorder is not None:

@@ -74,7 +74,6 @@ def test_nonfinite_timesteps_rejected(dt):
 def test_pbd_binding_and_appearance_free_surface():
     from i4h_endoluminal.bindings import CatheterBinding
     from i4h_isaaclab.composition import load_case
-    from i4h_physics.systems.mechanics.surface import Surface
     from i4h_standalone.render.snapshots import Snapshot
 
     cfg = {"sim": {"device": "cpu", "envs": 2, "cuda_graph": False},
@@ -82,10 +81,13 @@ def test_pbd_binding_and_appearance_free_surface():
                       "solid": {"type": "tet_grid", "dim": [2, 2, 2], "cell": .02}},
            "systems": [{"type": "particles"}, {"type": "rod_pbd", "body": "wire", "id": "rod"},
                        {"type": "catheter_control", "rod": "rod", "track_length": 0},
-                       {"type": "tet", "body": "solid", "id": "tet"}]}
-    sim = load_case(cfg)
-    surface = Surface(sim.scene, tet=sim.systems[-1])
-    sim.systems.append(surface)
+                       {"type": "tet", "body": "solid", "id": "tet"},
+                       {"type": "surface", "tet": "tet"}]}
+    from i4h_physics.systems.mechanics.surface import Surface
+    from i4h_endoluminal.systems import SYSTEMS
+    from i4h_endoluminal.loaders import LOADERS
+    sim = load_case(cfg, systems={**SYSTEMS, "surface": Surface}, loaders=LOADERS)
+    surface = sim.systems[-1]
     sim.prepare()
     binding = CatheterBinding(sim, "wire")
     assert binding.material_backend == "pbd" and set(binding.materials) == {"stretch", "bend", "twist"}

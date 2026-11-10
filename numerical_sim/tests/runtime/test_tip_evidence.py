@@ -18,6 +18,10 @@ from i4h_physics.systems.rods.rod_direct import RodDirect
 def small_rod(device="cuda:0", envs=2, young=1e3):
     scene = Scene(device, envs, (0.0, 0.0, -9.81))
     add_rod(scene, "rod", [0, 0, 0.2], [1, 0, 0], 9, 0.02, 0.004, mass=0.01)
+    from i4h_physics.rod_storage import declare_rod_direct
+    from i4h_endoluminal.rod_storage import declare_catheter_control
+    declare_rod_direct(scene, 'rod', young=young)
+    declare_catheter_control(scene, 'rod_direct', track_length=0.0)
     scene.allocate()
     rod = RodDirect(scene, body="rod", young=young)
     control = CatheterControl(scene, rod=rod, track_length=0.0)

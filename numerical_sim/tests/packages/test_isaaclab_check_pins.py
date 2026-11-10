@@ -18,7 +18,9 @@ def test_check_pins_are_the_physics_package_pins():
     spec.loader.exec_module(run)
     declared = tomllib.loads((ROOT / "physics" / "pyproject.toml").read_text())["project"]["dependencies"]
     expected = dict(d.split("==") for d in declared if "==" in d)
+    expected.update(d.split(" @ ", 1) for d in declared if " @ git+" in d)
     pins = run.simulator_pins()
     assert pins["warp-lang"] == expected["warp-lang"] and pins["newton"] == expected["newton"], (pins, expected)
     source = (ROOT / "scripts" / "isaaclab_run.py").read_text()
     assert not re.search(r'__version__ == "\d', source), "no hard-coded version in the check"
+    run.check_simulator_pins()

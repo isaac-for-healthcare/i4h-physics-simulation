@@ -1,34 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""I4hSolver: the i4h systems behind Newton's ``SolverBase`` interface.
+"""In-place Newton solver over the ordered i4h five-hook loop.
 
-The scene's main particle block *is* the Newton model's and state's particle arrays (``Scene.allocate``), so
-``step`` runs the ordered system loop directly on the bound state: no copies in or out. The solver is restricted to
-that one bound ``State``: ``step(state, state, control, None, dt)`` and ``reset(state, ...)`` with any other state raise.
-Mutable model flags and the solver-owned histories (tet topology and active masks, heat, grasp, clip and hook records,
-rod frames, the private fluid pools) make this a single simulation timeline: copying a Newton ``State`` does not
-clone the simulation. ``control`` and ``contacts`` are accepted and not read (actions live in the control systems;
-contacts are the contact systems' own). ``Stepper`` owns ``dt``, ``substeps``, ``iterations`` and the CUDA graphs and
-pushes the prepared values in through ``configure``; ``step`` refuses any other ``dt``.
-
-``reset(state, world_mask=None, flags=None)``, ``world_mask`` of shape ``(world_count + 1,)`` (``None``: every env;
-the last entry is world -1, which holds no i4h entity). Every mode restores all solver-owned history of the selected
-worlds: tet topology and active masks from the variant together with the particle flags from their rest values (so
-restored topology never references a particle still marked inactive), heat, grasp, clip, hook and contact records,
-rod frames and angular velocities, the fluid pools and their counters. The standard state fields follow ``flags``:
-
-=====================  =====================  ==============  ==============  =================
-``flags``              ``particle_q``         ``particle_qd`` ``particle_f``  ``q_prev``
-=====================  =====================  ==============  ==============  =================
-``None`` / ``ALL``     restored from ``q0``   zeroed          zeroed          ``= q``
-``0``                  preserved              preserved       preserved       ``= current q``
-``PARTICLE_Q``         restored from ``q0``   --              --              ``= q``
-``PARTICLE_QD``        --                     zeroed          --              ``= current q``
-``PARTICLE_F``         --                     --              zeroed          ``= current q``
-=====================  =====================  ==============  ==============  =================
-
-The bits combine; joint and body bits have no i4h fields. External particle forces are not consumed by the systems.
+Construction may precede runtime binding. ``reset(flags=0)`` refreshes caches;
+``restore_episode`` restores the selected worlds' physical history and commands.
+Particle reset flags never imply restoration of surgical topology or history.
 """
 
 from __future__ import annotations
@@ -40,28 +17,94 @@ import warp as wp
 from i4h_physics.checks import check_bool, check_float, check_int
 from i4h_physics.debug import alias_checks
 from i4h_physics.scene import Scene, fill_rows
-from i4h_physics.systems.base import System
 from newton import ModelFlags, StateFlags
 from newton.solvers import SolverBase
+from i4h_physics.observables import KINDS, ObservableKind, Observables, OutputPublisher, identities, check_identities
 
 
 class I4hSolver(SolverBase):
-    def __init__(self, model, scene: Scene, systems, state):
+    ObservableKind = ObservableKind
+    Observables = Observables
+    SUPPORTED_OBSERVABLES = KINDS
+
+    def __init__(self, model, scene: Scene = None, systems=None, state=None, control=None):
         super().__init__(model)
-        if scene.model is not model or scene.state is not state:
-            raise ValueError("I4hSolver: the model and state must be the ones the scene was allocated on")
-        if model.world_count != scene.envs:
-            raise ValueError(f"I4hSolver: the model has {model.world_count} worlds, the scene {scene.envs} envs")
-        self.scene = scene
-        self.systems: list[System] = list(systems)
-        self.state = state
-        self.dt, self.substeps, self.iterations = None, 1, 1  # set by configure() (Stepper.prepare)
+        self.scene = self.state = self.control = None
+        self.systems = []
+        self.dt, self.substeps, self.iterations = None, 1, 1
         self.debug = False
-        E, dev = scene.envs, scene.device
-        self._all = wp.ones(E + 1, dtype=wp.bool, device=dev)  # world_mask=None: every env (preallocated, capture-safe)
+        self._outputs = []
+        self._output_identities = []
+        self.publisher = None
+        if scene is not None:
+            self.bind(scene, systems, state, control)
+
+    def bind(self, scene, systems, state, control):
+        if self.scene is not None:
+            raise RuntimeError("I4hSolver is already bound; construct a fresh solver for replacement buffers")
+        if scene.model is not self.model or scene.state is not state:
+            raise ValueError("I4hSolver: model and bound state must belong to the scene")
+        if self.model.world_count != scene.envs or self.model.device != scene.device:
+            raise ValueError("I4hSolver: scene world count/device differs from model")
+        if hasattr(scene, "control") and control is not None and control is not scene.control:
+            raise ValueError("I4hSolver: foreign control")
+        self.scene, self.systems, self.state = scene, list(systems), state
+        self.control = control if control is not None else getattr(scene, "control", None)
+        self._all = wp.ones(scene.envs + 1, dtype=wp.bool, device=scene.device)
+        self._bound_arrays = [(state, name, getattr(state, name)) for name in ("particle_q", "particle_qd", "particle_f")]
+        self._bound_arrays += [(self.model, name, getattr(self.model, name))
+                               for name in ("particle_q", "particle_mass", "particle_inv_mass", "particle_radius", "particle_flags")]
+
+        if self.control is not None:
+            self._bound_arrays += [(self.control, name, array) for name, array in vars(self.control).items()
+                                   if isinstance(array, wp.array)]
+        self._bound_arrays += [(scene, name, getattr(scene, name))
+                               for name in ("q", "qd", "q_prev", "q0", "inv_mass", "radius", "flags", "flags0")]
+
+        from i4h_physics.commands import CommandViews
+        self._command_views = {}
+        for system in self.systems:
+            if system.command_view_spec is not None:
+                if system.id in self._command_views:
+                    raise ValueError(f"duplicate command system id {system.id!r}")
+                self._command_views[system.id] = CommandViews(scene, system)
+
+    def observables(self, kinds, *, contacts=None, requires_grad=None):
+        if self.scene is None:
+            raise RuntimeError("bind i4h before allocating outputs")
+        if self.scene.device.is_capturing:
+            raise RuntimeError("allocate observables before graph capture")
+        if self.publisher is None:
+            self.publisher = OutputPublisher(self)
+        result = super().observables(kinds, contacts=contacts, requires_grad=requires_grad)
+        self.publisher.initialize(result)
+        result._identities = identities(result)
+        self._outputs.append(result)
+        self._output_identities.extend(identities(result))
+        return result
+
+    def validate_observables(self, observables, contacts=None):
+        super().validate_observables(observables, contacts)
+        if observables is not None:
+            check_identities(observables._identities)
+
+    def check_binding(self):
+        """Host boundary check; capture never performs structural or buffer validation."""
+        self._check_state(self.state, "check_binding")
+        self.scene.storage.check()
+        for commands in self._command_views.values():
+            commands.check()
+        check_identities(self._output_identities)
+        if self.publisher is not None:
+            check_identities(self.publisher._identities)
+        for owner, name, array in self._bound_arrays:
+            if getattr(owner, name) is not array:
+                raise RuntimeError(f"bound {name} buffer was replaced; construct and bind a fresh runtime")
 
     def configure(self, dt: float, substeps: int, iterations: int, debug: bool = False) -> None:
         """The prepared timestep and loop counts (Stepper.prepare); a graph captured afterwards bakes them."""
+        if self.scene is None:
+            raise RuntimeError("I4hSolver is unbound")
         if check_float("dt", dt) <= 0.0:
             raise ValueError("dt must be positive")
         self.dt, self.debug = float(dt), check_bool("debug", debug)
@@ -69,13 +112,20 @@ class I4hSolver(SolverBase):
         self.active = [s for s in self.systems if check_bool(f"{s.id or type(s).__name__}.enabled", s.enabled)]  # structural
 
     def _check_state(self, state, what: str) -> None:
+        if self.scene is None:
+            raise RuntimeError("I4hSolver is unbound")
         if state is not self.state:
             raise ValueError(f"I4hSolver.{what}: only the bound state is supported (the scene's arrays are its arrays)")
 
     # SolverBase -------------------------------------------------------------------------------------------------
 
-    def step(self, state_in, state_out, control, contacts, dt: float) -> None:
+    def step(self, state_in, state_out, control, contacts, dt: float, observables=None) -> None:
         self._check_state(state_in, "step")
+        if self.control is not None and control is not self.control:
+            raise ValueError("I4hSolver.step: only the bound control is supported")
+        if contacts is not None:
+            raise ValueError("pure i4h does not accept external collision inputs")
+        self.validate_observables(observables, contacts)
         if state_out is not state_in:
             raise ValueError("I4hSolver.step: state_out must be state_in (single-state stepping)")
         if self.dt is None:
@@ -86,33 +136,64 @@ class I4hSolver(SolverBase):
         systems = self.active
         sdt = dt / self.substeps
         with alias_checks() if self.debug else contextlib.nullcontext():
+            # Frame commands and reaction accumulators.
             for s in systems:
                 s.step_start(scene, dt)
             for sub in range(self.substeps):
+                # Predict particle positions and rod frames.
                 for s in systems:
                     s.substep_start(scene, sdt, sub, self.substeps)
+                # Elasticity, contact and surgical constraints in authored order.
                 for k in range(self.iterations):
                     for s in systems:
                         s.iteration(scene, sdt, k, self.iterations)
+                # Finalize velocities, then surgical deletion in case order.
                 for s in systems:
                     s.substep_end(scene, sdt)
+            # Rebuild surfaces and publish frame measurements in case order.
             for s in systems:
                 s.step_end(scene, dt)
+            if observables is not None:
+                self.publisher.publish(observables, dt, self.substeps)
 
-    def reset(self, state, world_mask=None, flags=None) -> None:
+    def reset(self, state, world_mask=None, flags=0) -> None:
+        """Refresh caches against current state, optionally restoring supported particle fields."""
         self._check_state(state, "reset")
-        scene, E = self.scene, self.scene.envs
+        supported = int(StateFlags.PARTICLE_Q | StateFlags.PARTICLE_QD | StateFlags.PARTICLE_F)
+        flags = supported if flags is None else int(flags)
+        if flags & ~supported:
+            raise ValueError("pure i4h reset supports particle flags only; rigid body/joint flags are unsupported")
         mask = self._all if world_mask is None else self._normalize_reset_world_mask(world_mask)
+        scene, E = self.scene, self.scene.envs
         envs = mask[:E]
-        f = int(StateFlags.ALL) if flags is None else int(flags)
-        with alias_checks() if self.debug else contextlib.nullcontext():
-            scene.reset(envs, positions=bool(f & StateFlags.PARTICLE_Q), velocities=bool(f & StateFlags.PARTICLE_QD))
-            if f & StateFlags.PARTICLE_F and state.particle_f is not None and state.particle_f.size:
-                W = scene.main.width
-                wp.launch(fill_rows, dim=(E, W), inputs=[envs, wp.vec3(0.0, 0.0, 0.0)],
+        if scene.main.width and flags:
+            wp.launch(reset_particle_fields, dim=(E, scene.main.width),
+                      inputs=[envs, scene.block_field("q0"), flags],
+                      outputs=[scene.block_field("q"), scene.block_field("qd"), scene.block_field("q_prev")],
+                      device=scene.device)
+            if flags & StateFlags.PARTICLE_F and state.particle_f is not None:
+                wp.launch(fill_rows, dim=(E, scene.main.width), inputs=[envs, wp.vec3(0.0)],
                           outputs=[scene.main.rows(state.particle_f, E)], device=scene.device)
-            for s in self.systems:
-                s.reset(scene, envs)
+        for system in self.systems:
+            system.refresh(self.scene, envs)
+
+    def restore_episode(self, state, control, world_mask=None) -> None:
+        """Restore authored physical state, history and command defaults for selected worlds."""
+        self._check_state(state, "restore_episode")
+        if self.control is not None and control is not self.control:
+            raise ValueError("I4hSolver.restore_episode: only the bound control is supported")
+        mask = self._all if world_mask is None else self._normalize_reset_world_mask(world_mask)
+        envs = mask[:self.scene.envs]
+        with alias_checks() if self.debug else contextlib.nullcontext():
+            self.scene.reset(envs)
+            if self.scene.main.width and state.particle_f is not None:
+                wp.launch(fill_rows, dim=(self.scene.envs, self.scene.main.width), inputs=[envs, wp.vec3(0.0)],
+                          outputs=[self.scene.main.rows(state.particle_f, self.scene.envs)], device=self.scene.device)
+            for system in self.systems:
+                system.restore_episode(self.scene, envs)
+            self.reset(state, mask, flags=0)
+            for output in self._outputs:
+                self.publisher.clear(output, mask)
 
     def notify_model_changed(self, flags) -> None:
         """Gravity (``MODEL_PROPERTIES``) is read live from ``model.gravity``, except by a rotated component, whose
@@ -120,3 +201,16 @@ class I4hSolver(SolverBase):
         rigid solver (``i4h_isaaclab.coupling``) and do not concern i4h."""
         if int(flags) & int(ModelFlags.MODEL_PROPERTIES):
             self.scene.refresh_gravity()
+
+
+@wp.kernel
+def reset_particle_fields(mask: wp.array(dtype=wp.bool), rest: wp.array2d(dtype=wp.vec3), flags: int,
+                          q: wp.array2d(dtype=wp.vec3), qd: wp.array2d(dtype=wp.vec3),
+                          previous: wp.array2d(dtype=wp.vec3)):
+    e, i = wp.tid()
+    if mask[e]:
+        if flags & int(StateFlags.PARTICLE_Q):
+            q[e, i] = rest[e, i]
+            previous[e, i] = rest[e, i]
+        if flags & int(StateFlags.PARTICLE_QD):
+            qd[e, i] = wp.vec3(0.0)
