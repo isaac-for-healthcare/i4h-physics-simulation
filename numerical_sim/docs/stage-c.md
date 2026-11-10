@@ -1,3 +1,18 @@
+**C4.0 status — 2026-11-10: campaign clean, timing gate failed, stopped for decision.**
+Three hook-passing commits (`c9339e9`, `7a5291b`, `02ea7f0`): hook exclusions for the
+evidence files, import ordering only in 67 files, timing harness options. The single
+frozen campaign on `02ea7f0` passed **36/36 groups, 46/48 replays, 16/18 chole trials**
+and core **1,096**, Lab main **121**, Lab 3.0 **118** with zero failures; it is the full
+qualification of the C3.3 follow-up source. Construction storage equals the C3.3
+follow-up byte for byte. The one valid exclusive timing campaign **failed the +5% gate**:
+`tissue_contact` at 64 worlds is +7.54% (Lab 3.0) and +7.74% (Lab main) against the
+Stage B references; `aorta_static` is 4% to 7% faster. Nothing was tuned or rerun.
+The remaining-State inventory confirms 65 sites and records five findings that change
+C4.1 and C4.2. See [stage-c40.md](stage-c40.md) and
+[stage-c4-inventory.md](stage-c4-inventory.md). **Stop before C4.1.** No push.
+
+---
+
 **C3.3 disposition and C4 entry — 2026-11-10.** The user accepted C3.3 for
 progression with retained gaps: its follow-up source (public storage registration,
 `Control.clear` rejection) has focused verification only, and HDF5 recording/replay
