@@ -138,6 +138,9 @@ def held_probe(mode):
     declare_surface(scene)
     from i4h_surgical.instrument_storage import declare_instruments
     declare_instruments(scene)
+    from i4h_surgical.interaction_storage import declare_instrument_contact
+    contact = next(s for s in cfg["systems"] if s["type"] == "instrument_contact")
+    declare_instrument_contact(scene, surface=contact["surface"], records=contact.get("records", 8))
     declare_mounts(scene, {"probe": {"body": "holder", "offset": OFFSET}}, two_way=mode == "two_way")
     b = newton.ModelBuilder()
     for e, (pos, quat) in enumerate(ENV_XFORMS):

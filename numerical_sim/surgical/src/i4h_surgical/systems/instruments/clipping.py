@@ -42,6 +42,13 @@ class Clipping(System):
     refs = ("centreline", "instruments")
     structural = System.structural + ("slots", "instrument", "line")  # the applier and line indices are baked into the launches
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_clipping
+        return publish_clipping(authoring.scene, declarations, spec.get("id", spec["type"]), centreline=spec["centreline"],
+                                instruments=spec["instruments"], instrument=spec["instrument"],
+                                slots=check_int("clipping.slots", spec.get("slots", cls.slots), 1))
+
     def __post_init__(self):
         scene = self.scene
         cl, ic = self.centreline, self.instruments
@@ -59,15 +66,16 @@ class Clipping(System):
         self.k = ic.names.index(self.instrument)
         self.line = lines  # always a tuple (structural)
         self.body = cl.body
-        E, dev = scene.envs, scene.device
+        dev = scene.device
         K, G = cl.positions.shape[1], int(self.slots)
         indices = [cl.names.index(name) for name in lines]
         self.eligible = wp.array(np.isin(cl.line, indices).astype(np.int32), dtype=wp.int32, device=dev)  # (K,)
         self._live("reach", "lumen", "stiffness")
-        self.node = wp.full((E, G), -1, dtype=wp.int32, device=dev)  # clipped node per slot
-        self.active = wp.zeros((E, G), dtype=wp.int32, device=dev)
-        self.count = wp.zeros(E, dtype=wp.int32, device=dev)  # clips placed; a clip torn off (its ring cut away) keeps its slot
-        self.clipped = wp.zeros((E, K), dtype=wp.int32, device=dev)  # per node; stays latched after a tear (bleeding sees the node as cut)
+        # Newton State: node (E, G), the clipped node per slot (-1 when free); active (E, G); count (E,), clips
+        # placed (a clip torn off, its ring cut away, keeps its slot); clipped (E, K), per centreline node, which
+        # stays latched after a tear (bleeding sees the node as cut).
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "clipping", slots=G, nodes=K, instrument=self.instrument)
         self.freeze("slots", "instrument", "line")
 
 

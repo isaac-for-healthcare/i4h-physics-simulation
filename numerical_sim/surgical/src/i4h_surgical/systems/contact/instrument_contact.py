@@ -71,6 +71,12 @@ class InstrumentContact(System):
         return {"capsule": [(*row, capacity) for row in capsules],
                 "record": [(*row, r) for row in capsules for r in range(capacity)]}
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_contact
+        return publish_contact(authoring.scene, declarations, spec.get("id", spec["type"]), surface=spec["surface"],
+                               records=check_int("instrument_contact.records", spec.get("records", cls.records)))
+
     def __post_init__(self):
         scene = self.scene
         if not isinstance(self.instruments, InstrumentControl) or not isinstance(self.surface, Surface):
@@ -102,8 +108,10 @@ class InstrumentContact(System):
         self.delta = wp.zeros(n, dtype=wp.vec3, device=dev)  # body-local, zero between launches
         self.delta_count = wp.zeros(n, dtype=wp.int32, device=dev)
         # Tool force channel: each instrument's share of ``delta``, reduced into ``impulse`` before the apply.
-        self.delta_k = wp.zeros((n, n_tools), dtype=wp.vec3, device=dev)
-        self.delta_jaw = wp.zeros((n, n_tools), dtype=wp.vec3, device=dev)  # the same share signed by the jaw side (+1 left, -1 right)
+        # delta_k (n, n_tools) and delta_jaw, the same share signed by the jaw side (+1 left, -1 right), are Newton
+        # State: the apply kernel leaves shares it did not reduce, so they persist across steps.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "instrument_contact", body=b, records=self.records, tools=n_tools)
         self.impulse = wp.zeros((E, n_tools), dtype=wp.vec3, device=dev)  # product: sum of m * dx the tool imposed this step
         self.jaw_impulse = wp.zeros((E, n_tools), dtype=wp.vec3, device=dev)  # product: left minus right jaw share (the squeeze)
         self.moment = wp.zeros((E, n_tools), dtype=wp.vec3, device=dev)  # product: the impulse's moment about the tool root (coupling)

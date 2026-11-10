@@ -20,6 +20,7 @@ from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.mechanics.tet import Tet
 from i4h_standalone.app.instruments import scripted_actions
 from i4h_surgical.instrument_storage import declare_instruments
+from i4h_surgical.interaction_storage import declare_instrument_contact
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
@@ -158,6 +159,7 @@ def test_velocity_clip_before_contact():
     from i4h_physics import declare_surface
     declare_surface(scene)
     declare_instruments(scene)
+    declare_instrument_contact(scene)
     scene.allocate()
     scene.qd.assign(np.tile(np.float32([0.0, 0.0, -20.0]), (scene.particle_count, 1)))  # 0.33 per step, past the centre
     particles = Particles(scene, damping=1.0, max_velocity=6.0)  # allows 0.1 per step

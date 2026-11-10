@@ -187,6 +187,8 @@ def test_real_grasp_and_mixed_sequence(mixed):
     from i4h_physics import declare_tet
     declare_tet(scene, 'block', system_id='tet')
     declare_instruments(scene)
+    from i4h_surgical.interaction_storage import declare_volumetric_grasp
+    declare_volumetric_grasp(scene, body="block", capacity=64)
     scene.allocate()
     control = InstrumentControl(scene)
     grasp = VolumetricGrasp(scene, instruments=control, body="block", capacity=64)

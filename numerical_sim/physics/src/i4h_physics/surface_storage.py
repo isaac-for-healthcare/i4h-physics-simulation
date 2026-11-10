@@ -106,6 +106,17 @@ def publish_surface(scene, declarations, system_id, tet_id, particle_starts):
     return record
 
 
+def support_domain(scene, body):
+    """The ``(E, count)`` per-particle row domain of the Surface declared on ``body``, or None.
+
+    Packages add particle-indexed history of that body to these existing rows.
+    """
+    for record in getattr(scene, "surface_domains", {}).values():
+        if record["body"] is body:
+            return record["domains"][4]
+    return None
+
+
 def declare_surface(scene, *, tet_id="tet", system_id="surface"):
     """Predeclare after the matching Tet and before allocation/schema registration."""
     if hasattr(scene, "declarations") or scene.q is not None:

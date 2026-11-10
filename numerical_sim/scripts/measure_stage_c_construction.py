@@ -114,6 +114,21 @@ def instrument_accounting(scene):
     return result
 
 
+def interaction_accounting(scene):
+    """Interaction history (C4.1): State bytes per system, its own rows and identities; shared rows add none."""
+    result = {}
+    for sid, record in getattr(scene, "interaction_domains", {}).items():
+        state = {key: f.domain.count * wp.types.type_size_in_bytes(f.backing_dtype) for key, (f, _, _) in record["fields"].items()}
+        own = {label: d for label, d in record["domains"].items() if d.custom}
+        result[sid] = dict(kind=record["kind"], state_field_bytes=state, each_state_bytes=sum(state.values()),
+                           initialization_template_bytes=sum(state.values()),
+                           own_rows={label: d.count for label, d in own.items()},
+                           identity_column_bytes=sum(max(1, d.count) * 8 for d in own.values()),
+                           fields_on_shared_rows=sorted(key for key, (f, _, _) in record["fields"].items()
+                                                        if f.domain not in record["domains"].values()))
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--declarations", action="store_true", help="retained compatibility flag; declarations are required")
@@ -191,12 +206,13 @@ def main():
         for key in ("delta_k", "delta_jaw"):
             entries = {system.id or str(index): getattr(system, key) for index, system in enumerate(systems)
                        if type(system).__name__ == cls}
-            residue[f"{cls}.{key}"] = {"bytes": byte_count(entries.values()), "owner": "legacy system State",
-                                        "instances": {sid: a.size * wp.types.type_size_in_bytes(a.dtype) for sid, a in entries.items()},
-                                        "newton_template_bytes": 0, "checkpoint_bytes": 0}
+            sizes = {sid: a.size * wp.types.type_size_in_bytes(a.dtype) for sid, a in entries.items()}
+            # Newton State since C4.1: each container holds a copy and the Model holds the zero template.
+            residue[f"{cls}.{key}"] = {"bytes": byte_count(entries.values()), "owner": "Newton State", "instances": sizes,
+                                        "newton_template_bytes": sum(sizes.values()), "checkpoint_bytes": sum(sizes.values())}
     report = dict(
         workload="chole_tet_med", worlds=args.worlds, instrument_contact_records=next(s["records"] for s in cfg["systems"] if s["type"] == "instrument_contact"),
-        variant="C3.3 Newton-owned mounted flags, mount poses and pending reactions",
+        variant="C4.1 Newton-owned interaction history and tool-share residue",
         scope="construction only; no steady-state performance claim",
         timings=timings, custom_domain_rows=rows, declared_fields=len(declarations.fields) if declarations else 0,
         completion_microseconds_per_row=(1e6 * timings["row_authoring_seconds"] / rows) if rows else None,
@@ -217,6 +233,7 @@ def main():
         tet_storage=tet_accounting(scene),
         surface_storage=surface_accounting(scene),
         instrument_storage=instrument_accounting(scene),
+        interaction_storage=interaction_accounting(scene),
         ordinary_shared_live_control=dict(same_container=True, additional_bytes=0,
                                          aliases_template=control is shared,
                                          buffer_bytes=byte_count(buffers(control).values())),
@@ -237,7 +254,9 @@ def main():
                              "Surface eight State allocations and constructor reset mask",
                              "Instrument geometry and live Model parameters", "Instrument State and packed Control runtime allocations",
                              "Instrument constructor reset", "Instrument mounted flags and mount-pose runtime allocations",
-                             "Instrument finalization temporary mount flags and poses"],
+                             "Instrument finalization temporary mount flags and poses",
+                             "Centreline, hook, grasp, volumetric grasp and clipping history and the six tool-share arrays",
+                             "Centreline constructor reset mask"],
         remaining_duplicates=["native inverse mass versus exact i4h inverse mass", "native flags versus i4h-semantic default flags",
                               "State history/flags initialization templates", "pool State initialization templates (40 bytes/row)", "Tet mask initialization templates", "Surface State initialization templates", "Thermal heat/burn", "Appearance legacy", "Instrument State/Control initialization templates"],
         native_counts=dict(particles=model.particle_count, tets=model.tet_count, triangles=model.tri_count),

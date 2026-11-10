@@ -31,8 +31,8 @@
     "physics/src/i4h_physics/scene_storage.py": "c421861cbfd799b1a1ca18d8eeac8169df36bc369b8e5d1936d02c88840deddb",
     "physics/src/i4h_physics/sim.py": "09ef208b3c9479688ea3e689615b2974d6532860ac84eecac94588b73be02f53",
     "physics/src/i4h_physics/stepper.py": "b0c4c267357bd7e190ee2943ba3ab49cd2af598e8983345fd1d69153ddf76a83",
-    "physics/src/i4h_physics/storage.py": "73f4fffde402b034a4f7cc2177b5a4e2ed56b82a8ab8dd1e4454b5e657507336",
-    "physics/src/i4h_physics/surface_storage.py": "9525629653201e0bd4ebfc84a488fde63f92410263a725dd0393ef904d9468a9",
+    "physics/src/i4h_physics/storage.py": "b2499c574fa51384df79d2764887babba5d37df7b55c7058965fc2dcfd5dfe0c",
+    "physics/src/i4h_physics/surface_storage.py": "a3d4e1b37c6257e2034e896ef02107f942b58ef86f6a7c882b7c30d750f05107",
     "physics/src/i4h_physics/systems/__init__.py": "6c210e1d46456b19dc950af65e0643828acf5f348fd1d85bb8dd29ddf3d771f4",
     "physics/src/i4h_physics/systems/base.py": "50166a73a25414af7b8b57fd816bd18502d75722d352f8b63f9f2134927eed44",
     "physics/src/i4h_physics/systems/contact/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
@@ -68,6 +68,7 @@
     "surgical/src/i4h_surgical/assessment.py": "c7f4816197a52e2de4b7b269ad219902291615c5ed4f35f4d4c08ce6e445fb66",
     "surgical/src/i4h_surgical/config.py": "b08f2deccc3e87e25b1dc2c2dd80550cb8b9252b858d68ce6cea79857d726dcf",
     "surgical/src/i4h_surgical/instrument_storage.py": "a904e649930ce4b4b4af39ab3283cbc38d582636fe9cf72a21dd33522b39aaa6",
+    "surgical/src/i4h_surgical/interaction_storage.py": "0ccbd170a2712fab3854e1baf6c50cc334152a1da49e580bf7d06909bc988351",
     "surgical/src/i4h_surgical/loaders/__init__.py": "47731272d51a9473be64c10effaa4fad4e97a4c4c7fa7119e06cda50ba98435a",
     "surgical/src/i4h_surgical/loaders/instrument_usd.py": "48e3e387504ef304f65bc53726aedd6428e78aa9ce5781af1f2913fbe06c53ae",
     "surgical/src/i4h_surgical/loaders/presentation.py": "53342411e56b9073c4e60ed41f90c2052ec55beb41bee70c9116566ceb194c5a",
@@ -75,25 +76,25 @@
     "surgical/src/i4h_surgical/scene.py": "7183ce577a4ba44d0550b32af204f20789c668afa3b7464427daff55b17ca1a3",
     "surgical/src/i4h_surgical/systems/__init__.py": "7e76355121ef94e84bd1489d3a357d81f436516feb9cc5ca0f752fc7b609f298",
     "surgical/src/i4h_surgical/systems/contact/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
-    "surgical/src/i4h_surgical/systems/contact/instrument_contact.py": "1c6e2fe12232b07040d78f3439fe468caa6d4b989e518ce4dd60b918fbddc612",
+    "surgical/src/i4h_surgical/systems/contact/instrument_contact.py": "fe2a8a4377ff012bd30c066a8edd6082405213a9057fef03b79968e9e8000c36",
     "surgical/src/i4h_surgical/systems/fluids/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "surgical/src/i4h_surgical/systems/fluids/bleeding.py": "9511d740dfe164ec4732b7bfcde78bc6014505828f0f1d360e6579ad27170db5",
     "surgical/src/i4h_surgical/systems/fluids/emitter.py": "789475882ab55b542c3a6f1887dda410ddaa7a17107e00f232790dfb48e85161",
     "surgical/src/i4h_surgical/systems/fluids/smoke.py": "112d45fd49b5bd919caeded5783b532446d0b60c9f10b7402d83e916f6007796",
     "surgical/src/i4h_surgical/systems/fluids/suction.py": "0127fa6fb13bdd6844fc8857ad006febf59a1d89418d6f5ef73a921d2bc9c4c9",
     "surgical/src/i4h_surgical/systems/instruments/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
-    "surgical/src/i4h_surgical/systems/instruments/clipping.py": "b8e0264d8f80022f786b9463f8caa1bf950f3b7cceb1e633b5ed1f0564f43955",
+    "surgical/src/i4h_surgical/systems/instruments/clipping.py": "4a002cd27732e63c3bd8307c9dfceb9bddfe63d128ffd49996b0fad0f79fcd84",
     "surgical/src/i4h_surgical/systems/instruments/contact_paint.py": "9c7aa0b3b7e653ca1656731b078a709d4203b041133888907cd171b384532011",
     "surgical/src/i4h_surgical/systems/instruments/cutting.py": "fd97427c7177b02b4dbd09ccad452a0a6a0c283b12e3a391c01915a6ef5fe967",
     "surgical/src/i4h_surgical/systems/instruments/geometry.py": "ccfd4028df13ee4ed2785dc220856fa20a1eb39a6bc2c0a65fbd180faa8e55ee",
-    "surgical/src/i4h_surgical/systems/instruments/grasp.py": "38404d228f2b5b9613395720815640fa4d9e3795b4ec04189e70282e9f026110",
-    "surgical/src/i4h_surgical/systems/instruments/hook.py": "0e304b7834d111ca9ffd33d552a234060248cf7c54a06e7bf06b1788f479abbd",
+    "surgical/src/i4h_surgical/systems/instruments/grasp.py": "85e29f5496149274f778ead27f09367e2a5444d40fec9cf3cd23c2a65c4e7fd3",
+    "surgical/src/i4h_surgical/systems/instruments/hook.py": "099fc3071a5305332f1c3ea58433b1336083c01e8a3f2150ccca44feae2fe0c8",
     "surgical/src/i4h_surgical/systems/instruments/instrument_control.py": "ae228cb19ca1b1f4b9085c4d15045629cc3afecf9d637d1e267179e41a2dbe02",
     "surgical/src/i4h_surgical/systems/instruments/thermal.py": "0150152b129f5c505848219da1d287993f1c0f5c97337cad34424d75040a5ed0",
     "surgical/src/i4h_surgical/systems/instruments/tool_force.py": "c5b51edf6513c8ac73dabc8a16abd5162b98ab6ea5df339b7ca28dc89df50675",
-    "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py": "8e0a7fcc166a734ea3ef0258093744e49568ea69000a610115593336d64dcee7",
+    "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py": "de711de2c14ec46aae7d4255e2b8f952dce51fc57219e1fda12196303d29fff1",
     "surgical/src/i4h_surgical/systems/mechanics/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
-    "surgical/src/i4h_surgical/systems/mechanics/centreline.py": "0193f93eb597d045659308dd44cf478d76bfff43adda84eb8a0e96b039705fe3",
+    "surgical/src/i4h_surgical/systems/mechanics/centreline.py": "d16af349cfe8ec2c7d3677a7bd4608c3f72b85984d6263bfda70e71d0334a31f",
     "surgical/src/i4h_surgical/systems/mechanics/stretch_breaking.py": "eb8efa811838becbf8557bd6285117de15e6a773c12e7a81b3332c1c4b018c0a",
     "surgical/src/i4h_surgical/systems/mechanics/surface.py": "9e2602967ae0057dc5004a4a010013ab8980d4cf983584d5be8a6edf7e452449",
     "surgical/src/i4h_surgical/systems/mechanics/tool_delta.py": "4e92802198d84a6d94a8a51c72d2e67a55d7b703e2711ddbebcfe0ff2aaab428",
@@ -128,7 +129,7 @@
     "isaaclab/src/i4h_isaaclab/coupling.py": "d488e14bd0b17c127d6a5779268ac0b1b3ae755f7ea60ccb341cbf035ff8241b",
     "isaaclab/src/i4h_isaaclab/env.py": "e08fe26915252e05150803f673093bc1a1599420978138a8092fd1f536bfdc5e",
     "isaaclab/src/i4h_isaaclab/lab.py": "35da49a1faad65b417ee9bda37a21c53ff34cb2fcf5472f92d6e9f755bc33ebf",
-    "isaaclab/src/i4h_isaaclab/lab30.py": "56e7556d87070feba44bd61d98348c5000fcc6129496bcb990af6c4f6f367479",
+    "isaaclab/src/i4h_isaaclab/lab30.py": "79407d0534fe40dad4cb714709dc8ddc6ac3d2d15651b4865fefa7fc154253f4",
     "isaaclab/src/i4h_isaaclab/manager.py": "60302897161a4fa75bd7145fd4a6d280e2b8dee219a5803f8faf46e36f33e444",
     "isaaclab/src/i4h_isaaclab/newton_manager.py": "0c579cbff9ce6adfc269cb73e64a656a26c43ed614a131433fb445f475493ae4",
     "isaaclab/src/i4h_isaaclab/newton_solver.py": "14e23cf2e33bbee20d6968daef711c966ae0549da03d052e0c49e067d608af17",
@@ -2347,6 +2348,11 @@
       "section": "C3.3 Mount ownership",
       "label": "Mounted flags / pose commands / pending reactions",
       "text": "Newton Model flags and mappings; Control mount poses; State pending reactions; descriptors and deferred host values; no coupling runtime allocation"
+    },
+    "c41-interaction-owned": {
+      "section": "C4.1 Interaction history",
+      "label": "Typed view of Newton-owned history",
+      "text": "X, zero-copy view over a declared Newton State field (vector_view); allocates no storage"
     }
   },
   "sites": [
@@ -2609,7 +2615,7 @@
     {
       "path": "physics/src/i4h_physics/storage.py",
       "scope": "_finalize_empty_native",
-      "line": 391,
+      "line": 415,
       "expression": "attribute.build_array(max(1, count), device=model.device, requires_grad=model.requires_grad)",
       "target": "data",
       "kind": "newton_backing_allocation",
@@ -2623,7 +2629,7 @@
     },
     {
       "path": "physics/src/i4h_physics/storage.py",
-      "line": 424,
+      "line": 448,
       "scope": "Views.__init__",
       "kind": "allocation",
       "target": "array",
@@ -2639,7 +2645,7 @@
     {
       "path": "physics/src/i4h_physics/storage.py",
       "scope": "Views.__init__",
-      "line": 454,
+      "line": 478,
       "expression": "wp.array(ptr=rows.ptr, dtype=field.dtype, shape=field.shape,\n                                           strides=(stride * item_bytes, *strides[1:]), device=array.device,\n                                           capacity=array.capacity - start * item_bytes, copy=False)",
       "target": "self._views[key]",
       "kind": "view",
@@ -2650,6 +2656,23 @@
       ],
       "expanded_fields": [],
       "basis": "scoped named field"
+    },
+    {
+      "path": "physics/src/i4h_physics/storage.py",
+      "line": 587,
+      "scope": "vector_view",
+      "kind": "view",
+      "target": "view",
+      "expression": "wp.array(ptr=array.ptr, dtype=dtype, shape=shape, device=array.device,\n                    capacity=array.size * wp.types.type_size_in_bytes(scalar), copy=False)",
+      "dtype_expression": "dtype",
+      "shape_or_source_expression": "shape",
+      "contracts": [
+        "c41-interaction-owned"
+      ],
+      "expanded_fields": [
+        "C4.1 typed zero-copy view of declared State"
+      ],
+      "basis": "C4.1 explicit source review; a view constructor, no allocation"
     },
     {
       "path": "physics/src/i4h_physics/systems/base.py",
@@ -4845,7 +4868,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 93,
+      "line": 99,
       "expression": "wp.array(front[b.tet.tri_part], dtype=wp.int32, device=dev)",
       "target": "self.tri_front_only",
       "kind": "allocation",
@@ -4862,7 +4885,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 96,
+      "line": 102,
       "expression": "wp.array(np.int32(tips), dtype=wp.int32, device=dev)",
       "target": "self.prim_records",
       "kind": "allocation",
@@ -4879,7 +4902,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 97,
+      "line": 103,
       "expression": "self._live(\"margin\")",
       "target": null,
       "kind": "live_helper",
@@ -4896,7 +4919,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 98,
+      "line": 104,
       "expression": "self._live(\"stiffness\")",
       "target": null,
       "kind": "live_helper",
@@ -4913,7 +4936,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 99,
+      "line": 105,
       "expression": "self._live(\"static_friction\")",
       "target": null,
       "kind": "live_helper",
@@ -4930,7 +4953,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 100,
+      "line": 106,
       "expression": "self._live(\"kinetic_friction\")",
       "target": null,
       "kind": "live_helper",
@@ -4947,7 +4970,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 101,
+      "line": 107,
       "expression": "self._live(\"max_correction\")",
       "target": null,
       "kind": "live_helper",
@@ -4964,7 +4987,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 102,
+      "line": 108,
       "expression": "wp.zeros(n, dtype=wp.vec3, device=dev)",
       "target": "self.delta",
       "kind": "allocation",
@@ -4981,7 +5004,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 103,
+      "line": 109,
       "expression": "wp.zeros(n, dtype=wp.int32, device=dev)",
       "target": "self.delta_count",
       "kind": "allocation",
@@ -4998,41 +5021,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 105,
-      "expression": "wp.zeros((n, n_tools), dtype=wp.vec3, device=dev)",
-      "target": "self.delta_k",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(n, n_tools)",
-      "contracts": [
-        "73bfd0c845d2"
-      ],
-      "expanded_fields": [
-        "InstrumentContact.delta_k"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
-      "scope": "InstrumentContact.__post_init__",
-      "line": 106,
-      "expression": "wp.zeros((n, n_tools), dtype=wp.vec3, device=dev)",
-      "target": "self.delta_jaw",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(n, n_tools)",
-      "contracts": [
-        "73bfd0c845d2"
-      ],
-      "expanded_fields": [
-        "InstrumentContact.delta_jaw"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
-      "scope": "InstrumentContact.__post_init__",
-      "line": 107,
+      "line": 115,
       "expression": "wp.zeros((E, n_tools), dtype=wp.vec3, device=dev)",
       "target": "self.impulse",
       "kind": "allocation",
@@ -5049,7 +5038,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 108,
+      "line": 116,
       "expression": "wp.zeros((E, n_tools), dtype=wp.vec3, device=dev)",
       "target": "self.jaw_impulse",
       "kind": "allocation",
@@ -5066,7 +5055,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 109,
+      "line": 117,
       "expression": "wp.zeros((E, n_tools), dtype=wp.vec3, device=dev)",
       "target": "self.moment",
       "kind": "allocation",
@@ -5083,7 +5072,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 110,
+      "line": 118,
       "expression": "wp.zeros((E, n_tools), dtype=wp.int32, device=dev)",
       "target": "self.impulse_count",
       "kind": "allocation",
@@ -5100,7 +5089,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 114,
+      "line": 122,
       "expression": "wp.zeros((E, P), dtype=wp.int32, device=dev)",
       "target": "self.record_count",
       "kind": "allocation",
@@ -5117,7 +5106,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 115,
+      "line": 123,
       "expression": "wp.zeros((E, P, R), dtype=wp.int32, device=dev)",
       "target": "self.rec_tri",
       "kind": "allocation",
@@ -5134,7 +5123,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 116,
+      "line": 124,
       "expression": "wp.zeros((E, P, R), dtype=wp.int32, device=dev)",
       "target": "self.rec_tet",
       "kind": "allocation",
@@ -5151,7 +5140,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 117,
+      "line": 125,
       "expression": "wp.zeros((E, P, R), dtype=wp.vec3i, device=dev)",
       "target": "self.rec_verts",
       "kind": "allocation",
@@ -5168,7 +5157,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 118,
+      "line": 126,
       "expression": "wp.zeros((E, P, R), dtype=wp.vec3, device=dev)",
       "target": "self.rec_bary",
       "kind": "allocation",
@@ -5185,7 +5174,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 119,
+      "line": 127,
       "expression": "wp.zeros((E, P, R), dtype=wp.float32, device=dev)",
       "target": "self.rec_pen",
       "kind": "allocation",
@@ -5202,7 +5191,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 120,
+      "line": 128,
       "expression": "wp.zeros((E, P, R), dtype=wp.float32, device=dev)",
       "target": "self.rec_t",
       "kind": "allocation",
@@ -5219,7 +5208,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 121,
+      "line": 129,
       "expression": "wp.zeros((E, P, R), dtype=wp.vec3, device=dev)",
       "target": "self.rec_normal",
       "kind": "allocation",
@@ -5236,7 +5225,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 124,
+      "line": 132,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.record_overflow",
       "kind": "allocation",
@@ -5253,7 +5242,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 128,
+      "line": 136,
       "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
       "target": "self.suppress_active",
       "kind": "allocation",
@@ -5270,7 +5259,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
       "scope": "InstrumentContact.__post_init__",
-      "line": 129,
+      "line": 137,
       "expression": "wp.zeros(E, dtype=wp.vec3i, device=dev)",
       "target": "self.suppress_verts",
       "kind": "allocation",
@@ -5763,7 +5752,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
       "scope": "Clipping.__post_init__",
-      "line": 65,
+      "line": 72,
       "expression": "wp.array(np.isin(cl.line, indices).astype(np.int32), dtype=wp.int32, device=dev)",
       "target": "self.eligible",
       "kind": "allocation",
@@ -5780,7 +5769,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
       "scope": "Clipping.__post_init__",
-      "line": 66,
+      "line": 73,
       "expression": "self._live(\"reach\", \"lumen\", \"stiffness\")",
       "target": null,
       "kind": "live_helper",
@@ -5795,74 +5784,6 @@
         "Clipping.stiffness"
       ],
       "basis": "expanded live helper"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
-      "scope": "Clipping.__post_init__",
-      "line": 67,
-      "expression": "wp.full((E, G), -1, dtype=wp.int32, device=dev)",
-      "target": "self.node",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, G)",
-      "contracts": [
-        "e7463271b613"
-      ],
-      "expanded_fields": [
-        "Clipping.node"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
-      "scope": "Clipping.__post_init__",
-      "line": 68,
-      "expression": "wp.zeros((E, G), dtype=wp.int32, device=dev)",
-      "target": "self.active",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, G)",
-      "contracts": [
-        "e7463271b613"
-      ],
-      "expanded_fields": [
-        "Clipping.active"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
-      "scope": "Clipping.__post_init__",
-      "line": 69,
-      "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
-      "target": "self.count",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "1485f1bbbc5b"
-      ],
-      "expanded_fields": [
-        "Clipping.count"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
-      "scope": "Clipping.__post_init__",
-      "line": 70,
-      "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
-      "target": "self.clipped",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, K)",
-      "contracts": [
-        "041606d081bf"
-      ],
-      "expanded_fields": [
-        "Clipping.clipped"
-      ],
-      "basis": "scoped named field"
     },
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/contact_paint.py",
@@ -5989,7 +5910,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
       "scope": "Grasp.__post_init__",
-      "line": 54,
+      "line": 60,
       "expression": "live(scene, [r.grasp_stiffness for r in scene.instruments.values()])",
       "target": "self.stiffness",
       "kind": "live_helper",
@@ -6006,7 +5927,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
       "scope": "Grasp.__post_init__",
-      "line": 56,
+      "line": 62,
       "expression": "wp.array(np.int32([r.kind == \"grasper\" for r in scene.instruments.values()]).reshape(n), dtype=wp.int32, device=dev)",
       "target": "self.grasps",
       "kind": "allocation",
@@ -6023,7 +5944,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
       "scope": "Grasp.__post_init__",
-      "line": 57,
+      "line": 63,
       "expression": "wp.zeros(E * self.body.count, dtype=wp.vec3, device=dev)",
       "target": "self.delta",
       "kind": "allocation",
@@ -6040,7 +5961,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
       "scope": "Grasp.__post_init__",
-      "line": 58,
+      "line": 64,
       "expression": "wp.zeros(E * self.body.count, dtype=wp.int32, device=dev)",
       "target": "self.delta_count",
       "kind": "allocation",
@@ -6057,41 +5978,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
       "scope": "Grasp.__post_init__",
-      "line": 59,
-      "expression": "wp.zeros((E * self.body.count, max(n, 1)), dtype=wp.vec3, device=dev)",
-      "target": "self.delta_k",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E * self.body.count, max(n, 1))",
-      "contracts": [
-        "23a1819d2040"
-      ],
-      "expanded_fields": [
-        "Grasp.delta_k"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 60,
-      "expression": "wp.zeros((E * self.body.count, max(n, 1)), dtype=wp.vec3, device=dev)",
-      "target": "self.delta_jaw",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E * self.body.count, max(n, 1))",
-      "contracts": [
-        "23a1819d2040"
-      ],
-      "expanded_fields": [
-        "Grasp.delta_jaw"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 61,
+      "line": 65,
       "expression": "wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)",
       "target": "self.impulse",
       "kind": "allocation",
@@ -6108,7 +5995,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
       "scope": "Grasp.__post_init__",
-      "line": 62,
+      "line": 66,
       "expression": "wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)",
       "target": "self.jaw_impulse",
       "kind": "allocation",
@@ -6125,7 +6012,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
       "scope": "Grasp.__post_init__",
-      "line": 63,
+      "line": 67,
       "expression": "wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)",
       "target": "self.moment",
       "kind": "allocation",
@@ -6140,196 +6027,9 @@
       "basis": "scoped named field"
     },
     {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 66,
-      "expression": "wp.full((E, n, G), -1, dtype=wp.int32, device=dev)",
-      "target": "self.prim",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "60144894db5c"
-      ],
-      "expanded_fields": [
-        "Grasp.prim"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 67,
-      "expression": "wp.full((E, n, G), -1, dtype=wp.int32, device=dev)",
-      "target": "self.tet",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "60144894db5c"
-      ],
-      "expanded_fields": [
-        "Grasp.tet"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 68,
-      "expression": "wp.zeros((E, n, G), dtype=wp.float32, device=dev)",
-      "target": "self.t",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "861656a1f6b6"
-      ],
-      "expanded_fields": [
-        "Grasp.t"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 69,
-      "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
-      "target": "self.radial",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "94c300607122"
-      ],
-      "expanded_fields": [
-        "Grasp.radial"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 70,
-      "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
-      "target": "self.prev_axis",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "94c300607122"
-      ],
-      "expanded_fields": [
-        "Grasp.prev_axis"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 71,
-      "expression": "wp.zeros((E, n, G), dtype=wp.vec3i, device=dev)",
-      "target": "self.verts",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3i",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "ac5ee8004d9b"
-      ],
-      "expanded_fields": [
-        "Grasp.verts"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 72,
-      "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
-      "target": "self.bary",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "94c300607122"
-      ],
-      "expanded_fields": [
-        "Grasp.bary"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 73,
-      "expression": "wp.zeros((E, n, G), dtype=wp.float32, device=dev)",
-      "target": "self.gap",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "861656a1f6b6"
-      ],
-      "expanded_fields": [
-        "Grasp.gap"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 74,
-      "expression": "wp.zeros((E, n, G), dtype=wp.int32, device=dev)",
-      "target": "self.active",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "7beccdab427c"
-      ],
-      "expanded_fields": [
-        "Grasp.active"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 75,
-      "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
-      "target": "self.count",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n)",
-      "contracts": [
-        "e359bf1bcd38"
-      ],
-      "expanded_fields": [
-        "Grasp.count"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
-      "scope": "Grasp.__post_init__",
-      "line": 76,
-      "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
-      "target": "self.pending",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n)",
-      "contracts": [
-        "e359bf1bcd38"
-      ],
-      "expanded_fields": [
-        "Grasp.pending"
-      ],
-      "basis": "scoped named field"
-    },
-    {
       "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
       "scope": "Hook.__post_init__",
-      "line": 72,
+      "line": 78,
       "expression": "self._live(\"engage_overlap\", \"engage_inward_speed\", \"retention_slack\", \"axial_friction\", \"puncture_distance\")",
       "target": null,
       "kind": "live_helper",
@@ -6350,109 +6050,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
       "scope": "Hook.__post_init__",
-      "line": 75,
-      "expression": "wp.full((E, 2), wp.vec3i(-1, -1, -1), dtype=wp.vec3i, device=dev)",
-      "target": "self.verts",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3i",
-      "shape_or_source_expression": "(E, 2)",
-      "contracts": [
-        "34f7475b2b9c"
-      ],
-      "expanded_fields": [
-        "Hook.verts"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
-      "scope": "Hook.__post_init__",
-      "line": 76,
-      "expression": "wp.full((E, 2), -1, dtype=wp.int32, device=dev)",
-      "target": "self.tet",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, 2)",
-      "contracts": [
-        "34f7475b2b9c"
-      ],
-      "expanded_fields": [
-        "Hook.tet"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
-      "scope": "Hook.__post_init__",
-      "line": 77,
-      "expression": "wp.zeros((E, 2), dtype=wp.vec3, device=dev)",
-      "target": "self.bary",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E, 2)",
-      "contracts": [
-        "2b69388c8aea"
-      ],
-      "expanded_fields": [
-        "Hook.bary"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
-      "scope": "Hook.__post_init__",
-      "line": 78,
-      "expression": "wp.zeros((E, 2), dtype=wp.float32, device=dev)",
-      "target": "self.friction_coord",
-      "kind": "allocation",
-      "dtype_expression": "wp.float32",
-      "shape_or_source_expression": "(E, 2)",
-      "contracts": [
-        "e8504589ed87"
-      ],
-      "expanded_fields": [
-        "Hook.friction_coord"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
-      "scope": "Hook.__post_init__",
-      "line": 79,
-      "expression": "wp.zeros((E, 2), dtype=wp.vec3, device=dev)",
-      "target": "self.radial",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E, 2)",
-      "contracts": [
-        "2b69388c8aea"
-      ],
-      "expanded_fields": [
-        "Hook.radial"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
-      "scope": "Hook.__post_init__",
-      "line": 80,
-      "expression": "wp.zeros((E, 2), dtype=wp.int32, device=dev)",
-      "target": "self.active",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, 2)",
-      "contracts": [
-        "2e65f35fadfb"
-      ],
-      "expanded_fields": [
-        "Hook.active"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
-      "scope": "Hook.__post_init__",
-      "line": 83,
+      "line": 86,
       "expression": "wp.zeros((E, ic.count), dtype=wp.vec3, device=dev)",
       "target": "self.impulse",
       "kind": "allocation",
@@ -6469,7 +6067,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
       "scope": "Hook.__post_init__",
-      "line": 84,
+      "line": 87,
       "expression": "wp.zeros((E, ic.count), dtype=wp.vec3, device=dev)",
       "target": "self.moment",
       "kind": "allocation",
@@ -6716,7 +6314,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 67,
+      "line": 76,
       "expression": "wp.array(np.int32([r.kind == \"grasper\" for r in records]).reshape(n), dtype=wp.int32, device=dev)",
       "target": "self.grasps",
       "kind": "allocation",
@@ -6733,7 +6331,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 68,
+      "line": 77,
       "expression": "wp.array(np.int32(starts).reshape(n), dtype=wp.int32, device=dev)",
       "target": "self.jaw_start",
       "kind": "allocation",
@@ -6750,7 +6348,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 69,
+      "line": 78,
       "expression": "wp.array(np.int32(counts).reshape(n), dtype=wp.int32, device=dev)",
       "target": "self.jaw_count",
       "kind": "allocation",
@@ -6767,7 +6365,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 70,
+      "line": 79,
       "expression": "live(scene, [r.grasp_stiffness for r in records])",
       "target": "self.stiffness",
       "kind": "live_helper",
@@ -6784,126 +6382,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 74,
-      "expression": "wp.full((E, n, G), -1, dtype=wp.int32, device=dev)",
-      "target": "self.particle",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "35edb307f27b"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.particle"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 75,
-      "expression": "wp.zeros((E, n, G), dtype=wp.int32, device=dev)",
-      "target": "self.sphere",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "37a19d2ed3cf"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.sphere"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 76,
-      "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
-      "target": "self.rest",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "0ccd575e95db"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.rest"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 77,
-      "expression": "wp.zeros((E, n, G), dtype=wp.int32, device=dev)",
-      "target": "self.active",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n, G)",
-      "contracts": [
-        "2d9fcafd73ca"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.active"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 78,
-      "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
-      "target": "self.count",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n)",
-      "contracts": [
-        "049193a08d52"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.count"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 79,
-      "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
-      "target": "self.pending",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n)",
-      "contracts": [
-        "049193a08d52"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.pending"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 80,
-      "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
-      "target": "self.claim",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, n)",
-      "contracts": [
-        "049193a08d52"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.claim"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 81,
+      "line": 89,
       "expression": "wp.zeros(E * b.count, dtype=wp.vec3, device=dev)",
       "target": "self.delta",
       "kind": "allocation",
@@ -6920,7 +6399,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 82,
+      "line": 90,
       "expression": "wp.zeros(E * b.count, dtype=wp.int32, device=dev)",
       "target": "self.delta_count",
       "kind": "allocation",
@@ -6937,41 +6416,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 83,
-      "expression": "wp.zeros((E * b.count, max(n, 1)), dtype=wp.vec3, device=dev)",
-      "target": "self.delta_k",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E * b.count, max(n, 1))",
-      "contracts": [
-        "1579b0ffa691"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.delta_k"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 84,
-      "expression": "wp.zeros((E * b.count, max(n, 1)), dtype=wp.vec3, device=dev)",
-      "target": "self.delta_jaw",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E * b.count, max(n, 1))",
-      "contracts": [
-        "1579b0ffa691"
-      ],
-      "expanded_fields": [
-        "VolumetricGrasp.delta_jaw"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
-      "scope": "VolumetricGrasp.__post_init__",
-      "line": 85,
+      "line": 91,
       "expression": "wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)",
       "target": "self.impulse",
       "kind": "allocation",
@@ -6988,7 +6433,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 86,
+      "line": 92,
       "expression": "wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)",
       "target": "self.jaw_impulse",
       "kind": "allocation",
@@ -7005,7 +6450,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
       "scope": "VolumetricGrasp.__post_init__",
-      "line": 87,
+      "line": 93,
       "expression": "wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)",
       "target": "self.moment",
       "kind": "allocation",
@@ -7022,7 +6467,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
       "scope": "Centreline.__post_init__",
-      "line": 41,
+      "line": 46,
       "expression": "wp.array(c.clamp_start, dtype=wp.int32, device=dev)",
       "target": "self.clamp_start",
       "kind": "allocation",
@@ -7039,7 +6484,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
       "scope": "Centreline.__post_init__",
-      "line": 42,
+      "line": 47,
       "expression": "wp.array(c.clamp_count, dtype=wp.int32, device=dev)",
       "target": "self.clamp_count",
       "kind": "allocation",
@@ -7056,7 +6501,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
       "scope": "Centreline.__post_init__",
-      "line": 43,
+      "line": 48,
       "expression": "wp.array(c.clamp, dtype=wp.int32, device=dev)",
       "target": "self.clamp",
       "kind": "allocation",
@@ -7073,7 +6518,7 @@
     {
       "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
       "scope": "Centreline.__post_init__",
-      "line": 44,
+      "line": 49,
       "expression": "wp.array(c.rest, dtype=wp.vec3, device=dev)",
       "target": "self.rest",
       "kind": "allocation",
@@ -7085,55 +6530,6 @@
       "expanded_fields": [
         "Centreline.rest"
       ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
-      "scope": "Centreline.__post_init__",
-      "line": 45,
-      "expression": "wp.empty((E, K), dtype=wp.vec3, device=dev)",
-      "target": "self.positions",
-      "kind": "allocation",
-      "dtype_expression": "wp.vec3",
-      "shape_or_source_expression": "(E, K)",
-      "contracts": [
-        "c98b85165dc0"
-      ],
-      "expanded_fields": [
-        "Centreline.positions"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
-      "scope": "Centreline.__post_init__",
-      "line": 46,
-      "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
-      "target": "self.active_count",
-      "kind": "allocation",
-      "dtype_expression": "wp.int32",
-      "shape_or_source_expression": "(E, K)",
-      "contracts": [
-        "c98b85165dc0"
-      ],
-      "expanded_fields": [
-        "Centreline.active_count"
-      ],
-      "basis": "scoped named field"
-    },
-    {
-      "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
-      "scope": "Centreline.__post_init__",
-      "line": 47,
-      "expression": "wp.ones(E, dtype=wp.bool, device=dev)",
-      "target": null,
-      "kind": "allocation",
-      "dtype_expression": "wp.bool",
-      "shape_or_source_expression": "E",
-      "contracts": [
-        "8f0caabe1189"
-      ],
-      "expanded_fields": [],
       "basis": "scoped named field"
     },
     {
@@ -11115,7 +10511,7 @@
   },
   "certificate": {
     "scope": "Static source inventory for the recorded source hashes; no migration or dynamic continuation certification",
-    "site_count": 511,
+    "site_count": 475,
     "runtime_gates": "Scratch poisoning, reset/restore byte checks and fresh-runtime replay remain mandatory in C2-C4.",
     "boundary": "External native Newton allocations are accounted by container/template byte reports; external renderer factories are source-linked but excluded from physics continuation.",
     "residue_evidence": ".tmp_tests/stage-c-inventory-20261105/tool-residue.json",
@@ -11126,7 +10522,8 @@
     "c31_scope": "Ownership and named command views; frozen gates determine disposition independently of C3.0 acceptance.",
     "c32_scope": "Rod ownership and catheter command views; frozen gates determine disposition independently of C3.1 acceptance.",
     "c33_scope": "Mount ownership only; frozen gates determine disposition independently of C3.2 progression acceptance.",
-    "c40_scope": "Import-order-only formatting; sites re-anchored by line, no classification change. Baseline for C4."
+    "c40_scope": "Import-order-only formatting; sites re-anchored by line, no classification change. Baseline for C4.",
+    "c41_scope": "Interaction history (centreline, tool-share residue, hook, grasp, volumetric grasp, clipping) as Newton State; frozen gates determine disposition."
   },
   "c2_migration": {
     "slice": "C2.4",
@@ -13245,5 +12642,659 @@
     "added_sites": [],
     "removed_sites": [],
     "previous_certificate_site_count": 587
+  },
+  "c41_migration": {
+    "slice": "C4.1",
+    "removed_sites": [
+      {
+        "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
+        "scope": "InstrumentContact.__post_init__",
+        "line": 105,
+        "expression": "wp.zeros((n, n_tools), dtype=wp.vec3, device=dev)",
+        "target": "self.delta_k",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(n, n_tools)",
+        "contracts": [
+          "73bfd0c845d2"
+        ],
+        "expanded_fields": [
+          "InstrumentContact.delta_k"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/contact/instrument_contact.py",
+        "scope": "InstrumentContact.__post_init__",
+        "line": 106,
+        "expression": "wp.zeros((n, n_tools), dtype=wp.vec3, device=dev)",
+        "target": "self.delta_jaw",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(n, n_tools)",
+        "contracts": [
+          "73bfd0c845d2"
+        ],
+        "expanded_fields": [
+          "InstrumentContact.delta_jaw"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
+        "scope": "Clipping.__post_init__",
+        "line": 67,
+        "expression": "wp.full((E, G), -1, dtype=wp.int32, device=dev)",
+        "target": "self.node",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, G)",
+        "contracts": [
+          "e7463271b613"
+        ],
+        "expanded_fields": [
+          "Clipping.node"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
+        "scope": "Clipping.__post_init__",
+        "line": 68,
+        "expression": "wp.zeros((E, G), dtype=wp.int32, device=dev)",
+        "target": "self.active",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, G)",
+        "contracts": [
+          "e7463271b613"
+        ],
+        "expanded_fields": [
+          "Clipping.active"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
+        "scope": "Clipping.__post_init__",
+        "line": 69,
+        "expression": "wp.zeros(E, dtype=wp.int32, device=dev)",
+        "target": "self.count",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "1485f1bbbc5b"
+        ],
+        "expanded_fields": [
+          "Clipping.count"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/clipping.py",
+        "scope": "Clipping.__post_init__",
+        "line": 70,
+        "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
+        "target": "self.clipped",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, K)",
+        "contracts": [
+          "041606d081bf"
+        ],
+        "expanded_fields": [
+          "Clipping.clipped"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 59,
+        "expression": "wp.zeros((E * self.body.count, max(n, 1)), dtype=wp.vec3, device=dev)",
+        "target": "self.delta_k",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E * self.body.count, max(n, 1))",
+        "contracts": [
+          "23a1819d2040"
+        ],
+        "expanded_fields": [
+          "Grasp.delta_k"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 60,
+        "expression": "wp.zeros((E * self.body.count, max(n, 1)), dtype=wp.vec3, device=dev)",
+        "target": "self.delta_jaw",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E * self.body.count, max(n, 1))",
+        "contracts": [
+          "23a1819d2040"
+        ],
+        "expanded_fields": [
+          "Grasp.delta_jaw"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 66,
+        "expression": "wp.full((E, n, G), -1, dtype=wp.int32, device=dev)",
+        "target": "self.prim",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "60144894db5c"
+        ],
+        "expanded_fields": [
+          "Grasp.prim"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 67,
+        "expression": "wp.full((E, n, G), -1, dtype=wp.int32, device=dev)",
+        "target": "self.tet",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "60144894db5c"
+        ],
+        "expanded_fields": [
+          "Grasp.tet"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 68,
+        "expression": "wp.zeros((E, n, G), dtype=wp.float32, device=dev)",
+        "target": "self.t",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "861656a1f6b6"
+        ],
+        "expanded_fields": [
+          "Grasp.t"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 69,
+        "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
+        "target": "self.radial",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "94c300607122"
+        ],
+        "expanded_fields": [
+          "Grasp.radial"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 70,
+        "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
+        "target": "self.prev_axis",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "94c300607122"
+        ],
+        "expanded_fields": [
+          "Grasp.prev_axis"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 71,
+        "expression": "wp.zeros((E, n, G), dtype=wp.vec3i, device=dev)",
+        "target": "self.verts",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3i",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "ac5ee8004d9b"
+        ],
+        "expanded_fields": [
+          "Grasp.verts"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 72,
+        "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
+        "target": "self.bary",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "94c300607122"
+        ],
+        "expanded_fields": [
+          "Grasp.bary"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 73,
+        "expression": "wp.zeros((E, n, G), dtype=wp.float32, device=dev)",
+        "target": "self.gap",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "861656a1f6b6"
+        ],
+        "expanded_fields": [
+          "Grasp.gap"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 74,
+        "expression": "wp.zeros((E, n, G), dtype=wp.int32, device=dev)",
+        "target": "self.active",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "7beccdab427c"
+        ],
+        "expanded_fields": [
+          "Grasp.active"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 75,
+        "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
+        "target": "self.count",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n)",
+        "contracts": [
+          "e359bf1bcd38"
+        ],
+        "expanded_fields": [
+          "Grasp.count"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/grasp.py",
+        "scope": "Grasp.__post_init__",
+        "line": 76,
+        "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
+        "target": "self.pending",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n)",
+        "contracts": [
+          "e359bf1bcd38"
+        ],
+        "expanded_fields": [
+          "Grasp.pending"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
+        "scope": "Hook.__post_init__",
+        "line": 75,
+        "expression": "wp.full((E, 2), wp.vec3i(-1, -1, -1), dtype=wp.vec3i, device=dev)",
+        "target": "self.verts",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3i",
+        "shape_or_source_expression": "(E, 2)",
+        "contracts": [
+          "34f7475b2b9c"
+        ],
+        "expanded_fields": [
+          "Hook.verts"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
+        "scope": "Hook.__post_init__",
+        "line": 76,
+        "expression": "wp.full((E, 2), -1, dtype=wp.int32, device=dev)",
+        "target": "self.tet",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, 2)",
+        "contracts": [
+          "34f7475b2b9c"
+        ],
+        "expanded_fields": [
+          "Hook.tet"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
+        "scope": "Hook.__post_init__",
+        "line": 77,
+        "expression": "wp.zeros((E, 2), dtype=wp.vec3, device=dev)",
+        "target": "self.bary",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E, 2)",
+        "contracts": [
+          "2b69388c8aea"
+        ],
+        "expanded_fields": [
+          "Hook.bary"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
+        "scope": "Hook.__post_init__",
+        "line": 78,
+        "expression": "wp.zeros((E, 2), dtype=wp.float32, device=dev)",
+        "target": "self.friction_coord",
+        "kind": "allocation",
+        "dtype_expression": "wp.float32",
+        "shape_or_source_expression": "(E, 2)",
+        "contracts": [
+          "e8504589ed87"
+        ],
+        "expanded_fields": [
+          "Hook.friction_coord"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
+        "scope": "Hook.__post_init__",
+        "line": 79,
+        "expression": "wp.zeros((E, 2), dtype=wp.vec3, device=dev)",
+        "target": "self.radial",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E, 2)",
+        "contracts": [
+          "2b69388c8aea"
+        ],
+        "expanded_fields": [
+          "Hook.radial"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/hook.py",
+        "scope": "Hook.__post_init__",
+        "line": 80,
+        "expression": "wp.zeros((E, 2), dtype=wp.int32, device=dev)",
+        "target": "self.active",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, 2)",
+        "contracts": [
+          "2e65f35fadfb"
+        ],
+        "expanded_fields": [
+          "Hook.active"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 74,
+        "expression": "wp.full((E, n, G), -1, dtype=wp.int32, device=dev)",
+        "target": "self.particle",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "35edb307f27b"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.particle"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 75,
+        "expression": "wp.zeros((E, n, G), dtype=wp.int32, device=dev)",
+        "target": "self.sphere",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "37a19d2ed3cf"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.sphere"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 76,
+        "expression": "wp.zeros((E, n, G), dtype=wp.vec3, device=dev)",
+        "target": "self.rest",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "0ccd575e95db"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.rest"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 77,
+        "expression": "wp.zeros((E, n, G), dtype=wp.int32, device=dev)",
+        "target": "self.active",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n, G)",
+        "contracts": [
+          "2d9fcafd73ca"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.active"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 78,
+        "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
+        "target": "self.count",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n)",
+        "contracts": [
+          "049193a08d52"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.count"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 79,
+        "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
+        "target": "self.pending",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n)",
+        "contracts": [
+          "049193a08d52"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.pending"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 80,
+        "expression": "wp.zeros((E, n), dtype=wp.int32, device=dev)",
+        "target": "self.claim",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, n)",
+        "contracts": [
+          "049193a08d52"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.claim"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 83,
+        "expression": "wp.zeros((E * b.count, max(n, 1)), dtype=wp.vec3, device=dev)",
+        "target": "self.delta_k",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E * b.count, max(n, 1))",
+        "contracts": [
+          "1579b0ffa691"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.delta_k"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/instruments/volumetric_grasp.py",
+        "scope": "VolumetricGrasp.__post_init__",
+        "line": 84,
+        "expression": "wp.zeros((E * b.count, max(n, 1)), dtype=wp.vec3, device=dev)",
+        "target": "self.delta_jaw",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E * b.count, max(n, 1))",
+        "contracts": [
+          "1579b0ffa691"
+        ],
+        "expanded_fields": [
+          "VolumetricGrasp.delta_jaw"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
+        "scope": "Centreline.__post_init__",
+        "line": 45,
+        "expression": "wp.empty((E, K), dtype=wp.vec3, device=dev)",
+        "target": "self.positions",
+        "kind": "allocation",
+        "dtype_expression": "wp.vec3",
+        "shape_or_source_expression": "(E, K)",
+        "contracts": [
+          "c98b85165dc0"
+        ],
+        "expanded_fields": [
+          "Centreline.positions"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
+        "scope": "Centreline.__post_init__",
+        "line": 46,
+        "expression": "wp.zeros((E, K), dtype=wp.int32, device=dev)",
+        "target": "self.active_count",
+        "kind": "allocation",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "(E, K)",
+        "contracts": [
+          "c98b85165dc0"
+        ],
+        "expanded_fields": [
+          "Centreline.active_count"
+        ],
+        "basis": "scoped named field"
+      },
+      {
+        "path": "surgical/src/i4h_surgical/systems/mechanics/centreline.py",
+        "scope": "Centreline.__post_init__",
+        "line": 47,
+        "expression": "wp.ones(E, dtype=wp.bool, device=dev)",
+        "target": null,
+        "kind": "allocation",
+        "dtype_expression": "wp.bool",
+        "shape_or_source_expression": "E",
+        "contracts": [
+          "8f0caabe1189"
+        ],
+        "expanded_fields": [],
+        "basis": "scoped named field"
+      }
+    ],
+    "added_sites": [
+      {
+        "path": "physics/src/i4h_physics/storage.py",
+        "line": 587,
+        "scope": "vector_view",
+        "kind": "view",
+        "target": "view",
+        "expression": "wp.array(ptr=array.ptr, dtype=dtype, shape=shape, device=array.device,\n                    capacity=array.size * wp.types.type_size_in_bytes(scalar), copy=False)",
+        "dtype_expression": "dtype",
+        "shape_or_source_expression": "shape",
+        "contracts": [
+          "c41-interaction-owned"
+        ],
+        "expanded_fields": [
+          "C4.1 typed zero-copy view of declared State"
+        ],
+        "basis": "C4.1 explicit source review; a view constructor, no allocation"
+      }
+    ],
+    "line_moves": 52,
+    "ownership": "36 system-owned State arrays become declared Newton State; resets unchanged; one constructor reset mask removed with the Centreline constructor reset",
+    "residue": "the six residue arrays are Newton State columns of existing particle rows"
   }
 }

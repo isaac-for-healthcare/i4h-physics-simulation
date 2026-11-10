@@ -132,6 +132,7 @@ class Declarations:
     def __init__(self):
         self._fields = {}
         self._values = {}
+        self._defaults = {}
         self._names = {}
         self._domains = {}
         self._builder = None
@@ -208,7 +209,12 @@ class Declarations:
                 raise ValueError("native domain values are authored through native entity hooks")
             self._domains[domain] = None
 
-    def add(self, field, values=None):
+    def add(self, field, values=None, *, default=None):
+        """Declare a field with authored rows, or with one ``default`` for every row.
+
+        A uniform default authors no per-row values: Newton fills the array at
+        finalization, so large initially-uniform history costs no row authoring.
+        """
         if self._builder is not None:
             raise RuntimeError("persistent declarations are frozen; reconstruct the model for additions")
         if not isinstance(field, Field):
@@ -223,6 +229,21 @@ class Declarations:
         if field.native_attribute is not None:
             if values is not None:
                 raise ValueError("native aliases do not author duplicate values")
+            self._fields[key], self._names[key] = field, field.name
+            return
+        if default is not None:
+            if values is not None or field.references is not None:
+                raise ValueError("a uniform default excludes authored values and entity references")
+            scalar = getattr(field.dtype, "_wp_scalar_type_", field.dtype)
+            data = np.asarray(default, dtype=wp.dtype_to_numpy(scalar))
+            components = tuple(getattr(field.dtype, "_shape_", ()))
+            if data.shape not in ((), components):
+                raise ValueError(f"{key}: default has shape {data.shape}, expected a scalar or {components}")
+            backing = field.backing_dtype
+            width = int(np.prod(getattr(backing, "_shape_", ()) or (1,)))
+            flat = np.broadcast_to(data, components).reshape(-1) if components else np.broadcast_to(data, (width,))
+            # A Warp value (never a list) keeps Newton on its direct-fill path.
+            self._defaults[key] = backing(*flat.tolist()) if width > 1 else backing(flat[0].item())
             self._fields[key], self._names[key] = field, field.name
             return
         if callable(values):
@@ -267,7 +288,7 @@ class Declarations:
         if start < 0 or count < 0 or start + count > domain.count:
             raise ValueError("native row selection outside the authored domain")
         return {f"i4h:{f.name}": self._rows(key, start, count) for key, f in self._fields.items()
-                if f.domain == domain and f.native_attribute is None}
+                if f.domain == domain and f.native_attribute is None and key not in self._defaults}
 
     def _rows(self, key, start=0, count=None):
         field = self._fields[key]
@@ -319,9 +340,11 @@ class Declarations:
             builder.add_custom_attribute(newton.ModelBuilder.CustomAttribute(
                 name=name, namespace="i4h", dtype=field.backing_dtype, frequency=field.domain.frequency,
                 assignment=getattr(newton.Model.AttributeAssignment, field.owner.name), references=field.references,
+                default=self._defaults.get(key),
                 # begin_world(attributes=...) is metadata-only in pinned Newton.
                 # WORLD values use its documented enum-indexed value dictionary.
-                values=dict(enumerate(self._rows(key))) if field.domain.frequency == newton.Model.AttributeFrequency.WORLD else None))
+                values=dict(enumerate(self._rows(key))) if field.domain.frequency == newton.Model.AttributeFrequency.WORLD
+                and key not in self._defaults else None))
             if not field.domain.custom and field.domain.count == 0:
                 # The normal finalizer skips empty native frequencies. Preserve
                 # the genuine frequency and reserve one backing element without
@@ -366,7 +389,8 @@ class Declarations:
         for domain, identities in self._domains.items():
             if not domain.custom:
                 continue
-            columns = {f"i4h:{f.name}": self._rows(key) for key, f in self._fields.items() if f.domain == domain}
+            columns = {f"i4h:{f.name}": self._rows(key) for key, f in self._fields.items()
+                       if f.domain == domain and key not in self._defaults}
             worlds, owners = identities
             for row in range(max(1, domain.count)):
                 values = {key: values[row] if domain.count else None for key, values in columns.items()}
@@ -546,6 +570,24 @@ class Views:
                 if field.owner is Owner.CONTROL and backing.ptr == getattr(model.i4h, name).ptr:
                     totals["control_shared_with_template"] += nbytes
         return totals
+
+
+def vector_view(array, dtype, shape):
+    """Expose a contiguous scalar field as ``shape`` rows of vector ``dtype`` without copying.
+
+    The layout is exactly an array allocated with that dtype and shape, so kernels
+    keep their signatures. The result keeps the backing array alive.
+    """
+    scalar = getattr(dtype, "_wp_scalar_type_", None)
+    if scalar is None or not isinstance(array, wp.array) or array.dtype != scalar or not array.is_contiguous:
+        raise ValueError("vector_view needs a contiguous scalar array of the vector's component type")
+    shape = tuple(int(n) for n in shape)
+    if prod(shape) * wp.types.type_size_in_bytes(dtype) != array.size * wp.types.type_size_in_bytes(scalar):
+        raise ValueError("vector_view shape does not cover the scalar field exactly")
+    view = wp.array(ptr=array.ptr, dtype=dtype, shape=shape, device=array.device,
+                    capacity=array.size * wp.types.type_size_in_bytes(scalar), copy=False)
+    view._ref = array
+    return view
 
 
 def defer_declaration(scene, key, callback, settings):

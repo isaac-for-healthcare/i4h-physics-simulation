@@ -26,6 +26,11 @@ from i4h_physics.systems.base import System
 class Centreline(System):
     body: str  # asset id with ``centrelines:``; the Body after construction
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_centreline
+        return publish_centreline(authoring.scene, declarations, spec.get("id", spec["type"]), body=spec["body"])
+
     def __post_init__(self):
         scene = self.scene
         self.body = b = scene.body(self.body)
@@ -42,10 +47,14 @@ class Centreline(System):
         self.clamp_count = wp.array(c.clamp_count, dtype=wp.int32, device=dev)  # (V, K)
         self.clamp = wp.array(c.clamp, dtype=wp.int32, device=dev)  # (V, C) body-local
         self.rest = wp.array(c.rest, dtype=wp.vec3, device=dev)  # (V, K)
-        self.positions = wp.empty((E, K), dtype=wp.vec3, device=dev)
-        self.active_count = wp.zeros((E, K), dtype=wp.int32, device=dev)  # live clamp particles per node
-        self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
-        self.refresh(scene, None)  # a host may bind an already moved state
+        # positions (E, K) and active_count (E, K), the live clamp particles per node, are Newton State; their
+        # templates are the rest rows.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "centreline", body=b, nodes=K)
+        # The one write at binding: a host may bind an already moved State. Every value written is derived from
+        # that State's particles (a ring with no live particle keeps its position), so on a State saved after a
+        # completed step this rewrites the same bytes.
+        self.refresh(scene, None)
 
     def step_end(self, scene, dt):
         self.refresh(scene, None)

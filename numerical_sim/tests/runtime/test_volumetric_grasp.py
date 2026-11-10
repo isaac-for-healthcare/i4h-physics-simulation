@@ -14,6 +14,7 @@ from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_tet_grid
 from i4h_physics.systems.mechanics.tet import Tet
 from i4h_surgical.instrument_storage import declare_instruments
+from i4h_surgical.interaction_storage import declare_volumetric_grasp
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.systems.instruments.grasp import Grasp
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
@@ -40,6 +41,7 @@ def block_and_grasper(envs=2, capacity=64):
     from i4h_physics import declare_tet
     declare_tet(scene, 'block', system_id='tet')
     declare_instruments(scene)
+    declare_volumetric_grasp(scene, body="block", capacity=capacity)
     scene.allocate()
     ic = InstrumentControl(scene)
     tet = Tet(scene, body="block")

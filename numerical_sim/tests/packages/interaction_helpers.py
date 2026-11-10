@@ -31,14 +31,18 @@ def chole_cfg(disable=()):
     return cfg
 
 
-def authored(device, envs=2, disable=()):
+def authored(device, envs=2, disable=(), mount=None):
+    """``mount``: an instrument name to mount two-way on a free rigid body ``holder`` added to every world."""
     cfg = chole_cfg(disable)
-    a = author_case(cfg, loaders={**physical.LOADERS, **LOADERS}, systems={**physical.SYSTEMS, **SYSTEMS}, device=device, envs=envs)
+    a = author_case(cfg, loaders={**physical.LOADERS, **LOADERS}, systems={**physical.SYSTEMS, **SYSTEMS}, device=device, envs=envs,
+                    mounts={mount: {"body": "holder"}} if mount else None, coupling_mode="two_way" if mount else "one_way")
     b = newton.ModelBuilder()
     a.declare(b)
     for world in range(envs):
         b.begin_world(gravity=a.scene.gravity_vector)
         a.add_world(b, world)
+        if mount:
+            b.add_body(label="holder", mass=1.0)
         b.end_world()
     a.complete(b)
     m = b.finalize(device=device)
@@ -77,3 +81,126 @@ def poison(sim, seed=7):
             values = rng.integers(1, 5, host.shape).astype(host.dtype) if host.dtype.kind in "iu" else rng.uniform(0.5, 1.5, host.shape).astype(host.dtype)
             wp.copy(a, wp.array(values, dtype=a.dtype, device=a.device))
     wp.synchronize()
+
+
+# Systems with history that C4.2 migrates; resume fixtures keep them out of the step.
+LATER = ("thermal", "bleeding", "emitter", "suction", "smoke", "fluid", "fluid_contact")
+
+
+def arrays(container):
+    """Every Warp array of a Newton Model, State or Control, including the i4h namespace."""
+    found = {}
+    for key, value in vars(container).items():
+        if isinstance(value, wp.array):
+            found[key] = value
+        elif isinstance(value, newton.Model.AttributeNamespace):
+            found.update({f"{key}:{k}": v for k, v in vars(value).items() if isinstance(v, wp.array)})
+    return found
+
+
+def snapshot(*containers):
+    wp.synchronize()
+    return [{key: a.numpy().tobytes() for key, a in arrays(c).items()} for c in containers]
+
+
+def copy_container(source, destination):
+    """Checkpoint copy between containers of one Model: every array, nothing else."""
+    src, dst = arrays(source), arrays(destination)
+    assert src.keys() == dst.keys()
+    for key, a in src.items():
+        if a.size:
+            wp.copy(dst[key], a)
+    wp.synchronize()
+
+
+def first_difference(a, b):
+    """Name the first array (in container order) whose bytes differ, for a readable resume failure."""
+    for index, (x, y) in enumerate(zip(a, b)):
+        for key in x:
+            if x[key] != y[key]:
+                return f"container {index}: {key}"
+    return None
+
+
+class Episode:
+    """A scripted chole episode: tools travel to the tissue, jaws close, the applier fires a clip."""
+
+    def __init__(self, sim):
+        self.sim = sim
+        scene, self.control, self.clip = sim.scene, system(sim, "InstrumentControl"), system(sim, "Clipping")
+        body = scene.body("tissue")
+        c = body.centrelines
+        q = scene.field("q", body).numpy()[0]
+        live = np.flatnonzero(scene.field("flags", body).numpy()[0] & 1)
+        self.targets = self.control.actions.numpy().copy()  # on the CPU numpy() aliases the Control
+        for k in range(len(self.control.names)):
+            self.targets[:, k, :3] = c.rest[0, int(np.flatnonzero(c.line == 1)[0])] if k == self.clip.k else q[live[(k * 997) % len(live)]]
+        self.clip.reach.fill_(10.0)  # live parameter: every runtime of the comparison sets it
+
+    def actions(self, closed):
+        act = self.targets.copy()
+        act[:, :, 7] = float(closed)
+        act[:, self.clip.k, 9] = float(closed)
+        return act
+
+    def run(self, steps, closed, *others):
+        for _ in range(steps):
+            for sim in (self.sim, *others):
+                system(sim, "InstrumentControl").actions.assign(self.actions(closed))
+                sim.step()
+
+
+def set_hook(sim):
+    """Engage the hook on the fat triangle nearest its limb in every world (a valid anchor; the test_instruments
+    hook test reaches the same state through an injected contact record)."""
+    scene, hook, control = sim.scene, system(sim, "Hook"), system(sim, "InstrumentControl")
+    body = hook.body
+    tris, tri_part, tri_tet = body.tet.tris[0], body.tet.tri_part, body.tet.tri_tet[0]
+    q, spheres = scene.field("q", body).numpy(), control.sphere_q.numpy()
+    a, b = int(control.prim_a.numpy()[hook.prim]), int(control.prim_b.numpy()[hook.prim])
+    candidates = np.flatnonzero((tri_part == body.parts["fat"].index) & (tri_tet >= 0))
+    verts, tet, bary, active = (x.numpy() for x in (hook.verts, hook.tet, hook.bary, hook.active))
+    for env in range(scene.envs):
+        limb = spheres[env, a] + 0.8 * (spheres[env, b] - spheres[env, a])
+        f = int(candidates[np.argmin(np.linalg.norm(q[env][tris[candidates]].mean(axis=1) - limb, axis=1))])
+        verts[env, 0], tet[env, 0], bary[env, 0], active[env, 0] = tris[f], tri_tet[f], 1.0 / 3.0, 1
+    for dst, host in ((hook.verts, verts), (hook.tet, tet), (hook.bary, bary), (hook.active, active)):
+        wp.copy(dst, wp.array(host, dtype=dst.dtype, device=dst.device))
+    wp.synchronize()
+
+
+@wp.kernel
+def heavy_advance(q: wp.array(dtype=wp.transform), qd: wp.array(dtype=wp.spatial_vector),
+                  force: wp.array(dtype=wp.spatial_vector), inverse_mass: float, dt: float):
+    i = wp.tid()
+    v = wp.spatial_top(qd[i]) + wp.spatial_top(force[i]) * inverse_mass * dt
+    qd[i] = wp.spatial_vector(v, wp.spatial_bottom(qd[i]))
+    q[i] = wp.transform(wp.transform_get_translation(q[i]) + v * dt, wp.transform_get_rotation(q[i]))
+
+
+class HeavyRigid(newton.solvers.SolverBase):
+    """Test rigid solver: a heavy free body per world; ALL of its history is native State.body_q and body_qd."""
+
+    def step(self, state_in, state_out, control, contacts, dt, observables=None):
+        wp.launch(heavy_advance, self.model.body_count, [state_in.body_q, state_in.body_qd, state_in.body_f, 1.0e-6, dt],
+                  device=self.model.device)
+
+    def reset(self, state, world_mask=None, flags=0):
+        pass
+
+
+class Coupled:
+    """A chole runtime whose mounted tool is carried by a rigid body through ``CoupledSolver`` (two-way)."""
+
+    def __init__(self, cfg, a, m, state, control, rigid=HeavyRigid):
+        from i4h_physics.coupling import CoupledSolver, Mounts
+
+        self.inner = runtime(cfg, a, m, state=state, control=control)
+        self.scene, self.systems, self.state, self.control = self.inner.scene, self.inner.systems, state, control
+        self.mounts = Mounts(m, self.scene, self.systems, a.mounts, a.coupling_mode == "two_way")
+        self.solver = CoupledSolver(m, rigid(m), self.inner.solver, self.mounts, rigid_substeps=2)
+        self.dt = self.inner.dt
+
+    def step(self):
+        self.state.body_f.zero_()
+        self.solver.step(self.state, self.state, self.control, None, self.dt)

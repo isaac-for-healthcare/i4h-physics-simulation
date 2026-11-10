@@ -8,7 +8,7 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-from i4h_physics.storage import Declarations, Domain, Field, Owner
+from i4h_physics.storage import Declarations, Domain, Field, Owner, vector_view
 
 FIRST = Domain("system", "first", "i4h:first_rows", (2, 3), "particle")
 SECOND = Domain("system", "second", "i4h:second_rows", (2, 3), "particle")
@@ -454,3 +454,55 @@ def test_package_registration_checks_in_place_array_layout_changes():
     extra.values.shape = (1, 3)
     with pytest.raises(RuntimeError, match='array layout'):
         v.check()
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_uniform_default_fields_author_no_row_values(device, monkeypatch):
+    declarations = declared(FIRST)
+    declarations.add(field(key="rest", owner=Owner.MODEL), np.arange(6).reshape(2, 3))
+    declarations.add(field(key="slot", dtype=wp.int32), default=-1)
+    declarations.add(field(key="offset", dtype=wp.vec3), default=0)
+    declarations.add(field(key="axis", dtype=wp.vec3), default=(0, 1, 0))
+    declarations.add(field(key="share", shape=(2, 3, 6), row_width=6), default=0)
+    with pytest.raises(ValueError, match="uniform default"):
+        declarations.add(field(key="both"), np.zeros((2, 3)), default=0)
+    with pytest.raises(ValueError, match="default has shape"):
+        declarations.add(field(key="wide", dtype=wp.vec3), default=(0, 1))
+    b = newton.ModelBuilder()
+    rows = []
+    add = b.add_custom_values
+    monkeypatch.setattr(b, "add_custom_values", lambda **values: (rows.append(values), add(**values))[1])
+    declarations.register(b)
+    assert len(rows) == 6 and all(set(r) == {"i4h:first_rest", "i4h:first_rows_world", "i4h:first_rows_owner"} for r in rows)
+    m = b.finalize(device=device)
+    s, other = m.state(), m.state()
+    v = declarations.bind(m, s, m.control())
+    assert (v.attr(FIRST, "slot").numpy() == -1).all()
+    assert not v.attr(FIRST, "offset").numpy().any() and not v.attr(FIRST, "share").numpy().any()
+    np.testing.assert_array_equal(v.attr(FIRST, "axis").numpy(), np.broadcast_to(np.float32([0, 1, 0]), (2, 3, 3)))
+    assert v.attr(FIRST, "share").shape == (2, 3, 6) and v.attr(FIRST, "slot").shape == (2, 3)
+    v.attr(FIRST, "slot").fill_(4)
+    assert (other.i4h.first_slot.numpy() == -1).all() and (m.i4h.first_slot.numpy() == -1).all()
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_vector_view_matches_a_natively_allocated_vector_array(device):
+    declarations = declared(FIRST)
+    declarations.add(field(key="share", shape=(2, 3, 6), row_width=6), default=0)
+    b = newton.ModelBuilder()
+    declarations.register(b)
+    m = b.finalize(device=device)
+    s = m.state()
+    scalar = declarations.bind(m, s, m.control()).attr(FIRST, "share")
+    view = vector_view(scalar, wp.vec3, (6, 2))
+    native = wp.zeros((6, 2), dtype=wp.vec3, device=device)
+    assert (view.shape, view.strides, view.dtype, view.device) == (native.shape, native.strides, native.dtype, native.device)
+    assert view.ptr == scalar.ptr == s.i4h.first_share.ptr and view._ref is scalar
+    view.fill_(wp.vec3(1.0, 2.0, 3.0))
+    np.testing.assert_array_equal(s.i4h.first_share.numpy().reshape(6, 2, 3), np.broadcast_to(np.float32([1, 2, 3]), (6, 2, 3)))
+    assert not m.i4h.first_share.numpy().any()
+    for bad in ((6, 3), (5, 2)):
+        with pytest.raises(ValueError, match="does not cover"):
+            vector_view(scalar, wp.vec3, bad)
+    with pytest.raises(ValueError, match="contiguous scalar"):
+        vector_view(view, wp.vec3, (6, 2))
