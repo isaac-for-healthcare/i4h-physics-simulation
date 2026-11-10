@@ -15,7 +15,7 @@ from isaaclab_newton.physics import NewtonCfg, NewtonManager
 
 
 def solver_adapter(coupled):
-    return I4hCoupledLab30Manager if coupled else I4hLab30Manager
+    return NewtonI4hCoupledLab30Manager if coupled else NewtonI4hLab30Manager
 
 
 def physics_cfg(solver_cfg, **kwargs):
@@ -54,7 +54,7 @@ def _rigid():
     return getattr(cfg, "rigid_solver_cfg", None)
 
 
-class I4hLab30Manager(NewtonManager):
+class NewtonI4hLab30Manager(NewtonManager):
     contact_sensors = False
 
     @classmethod
@@ -133,7 +133,7 @@ class I4hLab30Manager(NewtonManager):
             owner.backend = None
 
 
-class I4hCoupledLab30Manager(I4hLab30Manager):
+class NewtonI4hCoupledLab30Manager(NewtonI4hLab30Manager):
     contact_sensors = True
 
     @classmethod

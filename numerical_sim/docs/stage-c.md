@@ -1,3 +1,15 @@
+**C4.0 disposition — 2026-11-10.** The user accepted the C4.0 timing result as a stated
+limitation: `tissue_contact` at 64 worlds is +7.54% (Lab 3.0) and +7.74% (Lab main) over
+the Stage B references, with `aorta_static` 4% to 7% faster. No tuning or attribution is
+authorized. C4.0 is accepted and C4.1 planning may start. After the C4.0 campaign the
+Lab 3.0 managers were renamed to `NewtonI4hLab30Manager` and
+`NewtonI4hCoupledLab30Manager`, because Lab 3.0 selects its backend from the manager's
+class name. That change has focused host verification only (Lab 3.0 121 passed; Lab main
+121 passed with one retained recurrence of the `two_worlds` fluid count intermittent) and
+is qualified by the C4.1 campaign.
+
+---
+
 **C4.0 status — 2026-11-10: campaign clean, timing gate failed, stopped for decision.**
 Three hook-passing commits (`c9339e9`, `7a5291b`, `02ea7f0`): hook exclusions for the
 evidence files, import ordering only in 67 files, timing harness options. The single

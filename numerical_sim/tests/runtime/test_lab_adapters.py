@@ -254,3 +254,23 @@ def test_pure_contact_sensor_registration_is_explicitly_rejected(make):
     manager = owner.backend if hasattr(owner.backend, "add_contact_sensor") else owner.manager
     with pytest.raises(NotImplementedError, match="contact sensors|CONTACT_F"):
         manager.add_contact_sensor(body_names_expr=".*")
+
+
+def test_lab_factories_resolve_the_newton_backend(make):
+    """Lab 3.0 picks backend classes (visualizers, assets) from the physics manager's class name."""
+    from isaaclab.utils.backend_utils import FactoryBase
+
+    env = make()
+    assert SimulationContext.instance() is env.sim
+    assert FactoryBase._get_backend() == "newton"
+
+
+@pytest.mark.parametrize("coupled", [False, True])
+def test_lab30_manager_names_start_with_newton(coupled):
+    from importlib.util import find_spec
+
+    if find_spec("isaaclab_newton.physics.newton_solver") is not None:
+        pytest.skip("Lab main selects the backend from backend_manager.backend_name, not the class name")
+    from i4h_isaaclab.lab30 import solver_adapter
+
+    assert solver_adapter(coupled).__name__.lower().startswith("newton")
