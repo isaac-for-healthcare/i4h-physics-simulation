@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: Apache-2.0
-"""One fresh-process aorta_shell construction sample; no simulation or capture."""
+"""One fresh-process construction sample of a rod-bearing endoluminal case; no simulation or capture."""
 
 import argparse
 import importlib.util
@@ -21,6 +21,7 @@ from i4h_physics.storage import Owner
 root = pathlib.Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser()
 p.add_argument("--worlds", type=int, choices=(1, 64), required=True)
+p.add_argument("--case", choices=("aorta_shell", "aorta_centreline"), default="aorta_shell")
 p.add_argument("--out", type=pathlib.Path, required=True)
 args = p.parse_args()
 assert not args.out.exists()
@@ -38,7 +39,7 @@ wp.synchronize_device(device)
 base = wp.get_mempool_used_mem_current(device)
 started = time.perf_counter()
 timings = {}
-cfg = read_case("aorta_shell")
+cfg = read_case(args.case)
 a = author_case(
     cfg,
     loaders={**physical.LOADERS, **LOADERS},
@@ -134,7 +135,7 @@ for family in ("rod_body_domains", "rod_domains", "rod_material_domains", "endol
                 assert ptrs["template_alias"] == ptrs["template"]
             pointers[f"{family}:{sid}:{key}"] = ptrs
 report = dict(
-    workload="aorta_shell",
+    workload=args.case,
     worlds=args.worlds,
     scope="post-freeze construction only; no stepping or capture",
     timings=timings,
