@@ -1,3 +1,15 @@
+**C4.1 disposition — 2026-11-10.** The user closed C4.1. The two failed groups, standalone
+captured and standalone eager `aorta_shell` catheter impulse, are retained under the C4
+closure rule with no attribution work. The resume claim is accepted as stated in the report:
+bitwise on the CPU only, because CUDA stepping of chole is not bitwise repeatable, with the
+deterministic binding, view-identity and container-isolation checks standing in on CUDA. The
+other deviations of [stage-c41.md](stage-c41.md) stand as reported: the uniform-default storage
+extension, the Centreline refresh at binding, the VolumetricGrasp fallback row domain, no test
+with two control systems, and the three older ownership test helpers not merged. C4.1 is
+accepted and C4.2 planning may start.
+
+---
+
 **C4.1 status — 2026-11-10: implemented; campaign complete, certificate open on two retained `aorta_shell` failures.**
 36 interaction history arrays (Centreline, tool-share residue, Hook, Grasp, VolumetricGrasp,
 Clipping) are Newton State; kernels, hooks and resets are unchanged. The single frozen campaign
