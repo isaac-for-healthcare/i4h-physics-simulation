@@ -13,9 +13,9 @@ pytest.importorskip("mujoco_warp")
 newton = pytest.importorskip("newton")
 import warp as wp  # noqa: E402
 from i4h_isaaclab.coupling import check_rigid_solver_cfg  # noqa: E402
+from i4h_physics.config import build_systems, load_case, load_scene, sim_settings  # noqa: E402
 from i4h_physics.coupling import CoupledSolver, Mounts  # noqa: E402
 from i4h_physics.mount_storage import declare_mounts  # noqa: E402
-from i4h_physics.config import build_systems, load_case, load_scene, sim_settings  # noqa: E402
 from i4h_physics.newton_model import add_env_particles, complete_scene  # noqa: E402
 from i4h_physics.sim import I4hSolver  # noqa: E402
 from i4h_physics.stepper import Stepper  # noqa: E402
@@ -254,8 +254,8 @@ def held_catheter(mode):
 
     cfg = catheter_case(gravity=(0.0, 0.0, -9.81), track=0.0)
     scene = scene_of(cfg)
-    from i4h_physics.rod_storage import declare_rod_direct
     from i4h_endoluminal.rod_storage import declare_catheter_control
+    from i4h_physics.rod_storage import declare_rod_direct
     declare_rod_direct(scene, 'catheter', system_id='rod')
     declare_catheter_control(scene, 'rod', track_length=0.0, tip_edges=2)
     rest_frame = tuple(float(x) for x in scene.body('catheter').rod.frames[0, 0])

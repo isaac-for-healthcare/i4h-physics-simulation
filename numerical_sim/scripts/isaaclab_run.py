@@ -191,8 +191,8 @@ def simulator_pins() -> dict[str, str]:
 
 
 def check_simulator_pins():
-    from importlib.metadata import distribution
     import json
+    from importlib.metadata import distribution
 
     for name, expected in simulator_pins().items():
         installed = distribution(name)

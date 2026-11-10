@@ -7,7 +7,7 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
+from i4h_isaaclab.component import I4hComponent, I4hComponentCfg
 from i4h_physics import Scene, Stepper, author_case
 from i4h_physics.storage import Domain, Field, Owner
 from i4h_physics.systems.base import System
@@ -15,7 +15,6 @@ from i4h_surgical.instrument_storage import STATE_TYPES, declare_instruments
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.scene import SphereSpec
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-from i4h_isaaclab.component import I4hComponent, I4hComponentCfg
 
 MODES = [("cpu", False), ("cuda:0", False), ("cuda:0", True)]
 

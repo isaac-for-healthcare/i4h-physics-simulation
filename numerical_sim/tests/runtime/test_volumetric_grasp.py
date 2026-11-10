@@ -13,9 +13,9 @@ from i4h_isaaclab.composition import data_dir, load_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_tet_grid
 from i4h_physics.systems.mechanics.tet import Tet
+from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.systems.instruments.grasp import Grasp
-from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.volumetric_grasp import VolumetricGrasp
 

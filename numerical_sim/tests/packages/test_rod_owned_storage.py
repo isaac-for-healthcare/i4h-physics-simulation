@@ -2,24 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0
 """C3.2 ownership, history-complete continuation, command interop and accounting."""
 
-import numpy as np
 import newton
+import numpy as np
 import pytest
 import warp as wp
-
-from i4h_physics import Scene, Stepper, author_case
-from i4h_physics.loaders import add_rod
-from i4h_physics.rod_storage import declare_rod_direct, declare_rod_direct_material
-from i4h_physics.storage import Owner
-from i4h_physics.systems.mechanics.particles import Particles
-from i4h_physics.systems.rods.rod_direct import RodDirect, cylinder_inv_inertia
-from i4h_physics.systems.rods.rod_pbd import RodPbd
-from i4h_physics.systems.rods.material import RodDirectMaterial, RodPbdMaterial
 from i4h_endoluminal.loaders.centreline import add_centreline_tree
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
 from i4h_endoluminal.systems.rods.control_layout import ControlLayout
 from i4h_endoluminal.systems.rods.drag import Drag
 from i4h_isaaclab.component import I4hComponent, I4hComponentCfg
+from i4h_physics import Scene, Stepper, author_case
+from i4h_physics.loaders import add_rod
+from i4h_physics.rod_storage import declare_rod_direct, declare_rod_direct_material
+from i4h_physics.storage import Owner
+from i4h_physics.systems.mechanics.particles import Particles
+from i4h_physics.systems.rods.material import RodDirectMaterial, RodPbdMaterial
+from i4h_physics.systems.rods.rod_direct import RodDirect, cylinder_inv_inertia
+from i4h_physics.systems.rods.rod_pbd import RodPbd
 
 MODES = [("cpu", False), ("cuda:0", False), ("cuda:0", True)]
 SYSTEMS = dict(
@@ -450,8 +449,9 @@ def test_solver_alias_replacement_requires_fresh_binding(device, captured, prepa
 def test_catheter_recording_replay_and_host_named_view_lifetime(tmp_path):
     pytest.importorskip("isaaclab.envs")
     pytest.importorskip("h5py")
-    import torch
     from types import SimpleNamespace
+
+    import torch
     from i4h_isaaclab.recording import Recorder, load_demo, replay_episode
     from isaaclab.sim import SimulationContext
 

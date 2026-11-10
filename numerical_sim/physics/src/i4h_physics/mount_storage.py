@@ -8,7 +8,6 @@ from weakref import ref
 import newton
 import numpy as np
 import warp as wp
-
 from i4h_physics.storage import Domain, Field, Owner
 
 IDENTITY = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))

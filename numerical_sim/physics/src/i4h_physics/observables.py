@@ -6,10 +6,10 @@ Rows are world-major, then authored system order, then local tool/capsule/slot.
 Surgical records retain recording-event geometry; reconstructed points use the
 completed-step positions and may belong to tissue cut after recording.
 """
+import json
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
-import json
 
 import newton
 import warp as wp

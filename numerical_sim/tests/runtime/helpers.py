@@ -90,8 +90,8 @@ def run_rates(sim, steps, rates):
 def free_rod(envs=2, backend=RodDirect, tip_edges=8, **control):
     scene = Scene("cuda:0", envs, (0.0, 0.0, 0.0))
     add_rod(scene, "rod", [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], 33, 0.05, 0.02, mass=1.0)
-    from i4h_physics.rod_storage import declare_rod_direct, declare_rod_pbd
     from i4h_endoluminal.rod_storage import declare_catheter_control
+    from i4h_physics.rod_storage import declare_rod_direct, declare_rod_pbd
     if backend is RodPbd:
         declare_rod_pbd(scene, 'rod')
     else:
@@ -268,6 +268,7 @@ def live_surface_is_consistent(sim, env):
 def lab_runtime():
     """Native host allocation on either qualified Lab release (test introspection only)."""
     from types import SimpleNamespace
+
     from isaaclab.sim import SimulationContext
 
     sim = SimulationContext.instance()

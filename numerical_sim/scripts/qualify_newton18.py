@@ -17,11 +17,10 @@ import importlib
 import importlib.metadata as metadata
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
-
+from pathlib import Path
 
 REVISIONS = {
     "newton": "91fb115d685a96311b2f1bac5527754ee4e9c21b",

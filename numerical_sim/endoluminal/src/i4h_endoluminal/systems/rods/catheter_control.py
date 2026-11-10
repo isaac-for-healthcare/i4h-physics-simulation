@@ -105,7 +105,7 @@ class CatheterControl(System):
             raise ValueError("catheter_control.tip_axis is a 3-vector")
         if self.tip_mapping not in ("per_edge", "polyline"):
             raise ValueError(f"catheter_control.tip_mapping must be 'per_edge' or 'polyline', got {self.tip_mapping!r}")
-        from i4h_endoluminal.rod_storage import bind_endoluminal, CATHETER_LIVE
+        from i4h_endoluminal.rod_storage import CATHETER_LIVE, bind_endoluminal
         bind_endoluminal(self, 'catheter_control')
         self.register_live(*CATHETER_LIVE)
         self._prepared_tip_edges = self.tip_edges

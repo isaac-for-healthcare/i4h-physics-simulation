@@ -10,11 +10,10 @@ Unreviewed entries deliberately cannot be mistaken for a complete inventory.
 
 import argparse
 import ast
-from collections import Counter
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
-
 
 PACKAGES = ("physics", "surgical", "endoluminal", "isaaclab", "standalone", "assessment")
 ALLOCATORS = {"array", "zeros", "zeros_like", "ones", "ones_like", "empty", "empty_like", "full", "full_like", "clone", "cat", "stack"}

@@ -121,7 +121,7 @@ class RodPbd(System):
             "accumulators": n * 16 + ns * 20,
         })
         self.variant = b.variant
-        from i4h_physics.rod_storage import alias, bind_rod, PBD_LIVE
+        from i4h_physics.rod_storage import PBD_LIVE, alias, bind_rod
         material = b.rod_material
         if b.regions is not None and material is None:
             raise ValueError("rod_pbd: regional body requires matching material before the solver")

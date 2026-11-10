@@ -174,7 +174,8 @@ def test_coupled_native_forces_and_observable_ownership(make):
 @pytest.mark.parametrize("captured", [False, True])
 @pytest.mark.parametrize("coupled", [False, True])
 def test_custom_output_routing_and_rebuild(make, captured, coupled):
-    from i4h_physics.observables import KINDS, ObservableKind as Kind
+    from i4h_physics.observables import KINDS
+    from i4h_physics.observables import ObservableKind as Kind
     kinds = tuple(KINDS) + ((Kind.CONTACT_F,) if coupled else ())
     with newton_builder_world_hook(rigid_contact_world) if coupled else nullcontext():
         env = make(observables=kinds, captured=captured, rigid_solver_cfg=MJWarpSolverCfg() if coupled else None)

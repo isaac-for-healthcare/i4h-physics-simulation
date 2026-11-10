@@ -8,9 +8,7 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics.storage import Declarations, Domain, Field, Owner
-
 
 FIRST = Domain("system", "first", "i4h:first_rows", (2, 3), "particle")
 SECOND = Domain("system", "second", "i4h:second_rows", (2, 3), "particle")

@@ -19,9 +19,9 @@ from i4h_physics.systems.mechanics.bounds import Bounds
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.mechanics.tet import Tet
 from i4h_standalone.app.instruments import scripted_actions
+from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
-from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.thermal import Thermal
 from i4h_surgical.systems.mechanics.surface import Surface

@@ -83,9 +83,9 @@ def test_pbd_binding_and_appearance_free_surface():
                        {"type": "catheter_control", "rod": "rod", "track_length": 0},
                        {"type": "tet", "body": "solid", "id": "tet"},
                        {"type": "surface", "tet": "tet"}]}
-    from i4h_physics.systems.mechanics.surface import Surface
-    from i4h_endoluminal.systems import SYSTEMS
     from i4h_endoluminal.loaders import LOADERS
+    from i4h_endoluminal.systems import SYSTEMS
+    from i4h_physics.systems.mechanics.surface import Surface
     sim = load_case(cfg, systems={**SYSTEMS, "surface": Surface}, loaders=LOADERS)
     surface = sim.systems[-1]
     sim.prepare()

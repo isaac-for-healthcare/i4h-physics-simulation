@@ -4,7 +4,6 @@
 import newton
 import numpy as np
 import pytest
-
 from helpers import find, push_actions, run
 from i4h_isaaclab.composition import maps, read_case, sim_settings
 from i4h_physics import Stepper, author_case, tet_fields

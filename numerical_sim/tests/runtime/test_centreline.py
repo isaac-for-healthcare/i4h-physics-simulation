@@ -20,11 +20,11 @@ from i4h_endoluminal.loaders.centreline import (
     spline_topology,
     tree_frames,
 )
+from i4h_endoluminal.rod_storage import declare_control_layout, declare_drag
 from i4h_physics import Scene, Stepper
+from i4h_physics.rod_storage import declare_rod_pbd
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.rod_pbd import RodPbd
-from i4h_physics.rod_storage import declare_rod_pbd
-from i4h_endoluminal.rod_storage import declare_drag, declare_control_layout
 
 
 def branch(points, rmin, rmax):

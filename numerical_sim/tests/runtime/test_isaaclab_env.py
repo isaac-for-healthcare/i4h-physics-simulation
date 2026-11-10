@@ -9,11 +9,10 @@ the sole Newton host path, on either qualified Lab release."""
 import json
 
 import numpy as np
-from helpers import lab_runtime
 import pytest
 import warp as wp
 import yaml
-from helpers import needs_external_data
+from helpers import lab_runtime, needs_external_data
 
 torch = pytest.importorskip("torch")
 pytest.importorskip("isaaclab.envs")
@@ -335,7 +334,7 @@ def test_user_stream_ordering(make_env, tmp_path):
     env = make_env(stagger_episodes=False)
     obs_side, roots_side = rollout(env, sequence, stream=torch.cuda.Stream(device=dev))
     def retain_failure(reason, **extra):
-        from i4h_isaaclab.views import observation_views, state_views, state_names
+        from i4h_isaaclab.views import observation_views, state_names, state_views
 
         u = env.unwrapped
         views = observation_views(u.simulator, u.cfg.observe) + state_views(u.simulator)
@@ -984,9 +983,10 @@ def test_staggered_terminal_notification_clears_next_action(make_env, ids):
 
 def test_newton_missing_regional_provider_fails_before_capture():
     from types import SimpleNamespace
+
     from i4h_endoluminal.loaders.rod import add_rod
     from i4h_isaaclab.newton_manager import ConstructionContext
-    from i4h_physics import Scene, PhysicsBinding, I4hSolver
+    from i4h_physics import I4hSolver, PhysicsBinding, Scene
     from i4h_physics.systems.rods.material import RodDirectMaterial
     from i4h_physics.systems.rods.rod_direct import RodDirect
 
@@ -994,7 +994,7 @@ def test_newton_missing_regional_provider_fails_before_capture():
     add_rod(scene, "wire", [0, 0, 0], [1, 0, 0], 5, .02, .002,
             regions={"schema_version": 1, "default": "unassigned",
                      "regions": [{"name": "tip", "interval": [.8, 1]}]})
-    from i4h_physics.rod_storage import declare_rod_direct_material, declare_rod_direct
+    from i4h_physics.rod_storage import declare_rod_direct, declare_rod_direct_material
     declare_rod_direct_material(scene, 'wire')
     declare_rod_direct(scene, 'wire')
     scene.allocate()

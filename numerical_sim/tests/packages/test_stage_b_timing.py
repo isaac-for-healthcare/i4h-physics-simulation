@@ -3,8 +3,8 @@
 """Fake-worker control-flow tests; these create no GPU timing samples."""
 import importlib.util
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest

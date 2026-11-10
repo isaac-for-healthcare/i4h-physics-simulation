@@ -43,7 +43,7 @@ ITERATIONS = 32  # converged Jacobi XPBD: the settled sag agrees within 0.3% ove
 def build(cfg, holder_z, target, mounts_for, mode):
     """Per world a holder on a vertical slide driven to ``target`` from ``holder_z``, then the component's particles."""
     import newton
-    from i4h_isaaclab.composition import maps, load_scene, sim_settings
+    from i4h_isaaclab.composition import load_scene, maps, sim_settings
     from i4h_physics import author_case
     from i4h_physics.coupling import CoupledSolver, Mounts
     from i4h_physics.sim import I4hSolver

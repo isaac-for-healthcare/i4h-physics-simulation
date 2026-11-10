@@ -10,12 +10,11 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
-
 import record_baseline as baseline
 
 C30_NEWTON_REVISION = "7f0c13af6e4dd75253709c31dc65c0edcaf22b44"

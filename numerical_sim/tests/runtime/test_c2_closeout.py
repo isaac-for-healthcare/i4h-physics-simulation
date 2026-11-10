@@ -7,7 +7,6 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from helpers import find, kill
 from i4h_physics import Stepper, author_case
 from i4h_physics.surface_storage import STATE_FIELDS

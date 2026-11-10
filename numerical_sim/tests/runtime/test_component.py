@@ -8,9 +8,9 @@ with the Isaac Lab venv's python (CUDA, MuJoCo-Warp)."""
 from dataclasses import dataclass
 
 import numpy as np
-from helpers import lab_runtime
 import pytest
 import warp as wp
+from helpers import lab_runtime
 
 torch = pytest.importorskip("torch")
 pytest.importorskip("isaaclab.envs")

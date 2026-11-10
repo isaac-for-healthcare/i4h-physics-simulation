@@ -5,7 +5,6 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics import Scene, Stepper, author_case, declare_tet, tet_fields
 from i4h_physics.loaders import add_tet_grid
 from i4h_physics.newton_model import add_env_particles, complete_scene
@@ -200,6 +199,7 @@ def test_scratch_lifetime_and_eager_capture_equivalence(model, capture):
 def test_measurement_accounts_maximum_alias_extent_and_tet_formulas():
     import runpy
     from pathlib import Path
+
     from i4h_physics.tet_storage import estimate_tet_bytes
     helpers = runpy.run_path(str(Path(__file__).resolve().parents[2] / "scripts/measure_stage_c_construction.py"))
     full = wp.zeros(7, dtype=wp.vec3, device="cpu")

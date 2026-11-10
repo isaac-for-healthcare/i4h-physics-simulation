@@ -7,7 +7,6 @@ an independent clock. Standalone bindings delegate restoration to their Stepper.
 """
 
 import warp as wp
-
 from i4h_physics.stepper import select_envs, signature
 
 

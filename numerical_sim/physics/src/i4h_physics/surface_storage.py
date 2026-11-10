@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import newton
 import numpy as np
 import warp as wp
-
 from i4h_physics.storage import Domain, Field, Owner
 from i4h_physics.tet_storage import declare_surface_tet_fields, tet_fields
 

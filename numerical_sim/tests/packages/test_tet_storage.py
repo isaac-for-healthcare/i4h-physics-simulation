@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import newton
 import numpy as np
 import pytest
-
 from i4h_physics.storage import Declarations
 from i4h_physics.tet_storage import declare_surface_tet_fields, declare_tet_fields
 from i4h_surgical.tet_storage import declare_thermal_tet_fields

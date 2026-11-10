@@ -7,14 +7,13 @@ from uuid import uuid4
 
 import newton
 import numpy as np
-
 from i4h_physics.checks import check_int
 from i4h_physics.newton_model import add_env_particles
 
 
 class CaseAuthoring:
     def __init__(self, cfg, loaders=None, systems=None, *, device=None, envs=None, mounts=None, coupling_mode="one_way"):
-        from i4h_physics.config import load_scene, SYSTEMS
+        from i4h_physics.config import SYSTEMS, load_scene
 
         self.cfg = deepcopy(cfg)
         self.constructors = dict(SYSTEMS if systems is None else systems)
@@ -64,8 +63,8 @@ class CaseAuthoring:
                 name=name, namespace="i4h", dtype=str, frequency=newton.Model.AttributeFrequency.ONCE,
                 assignment=assignment, default=self.token))
         if previous is None:
-            from i4h_physics.storage import Declarations
             from i4h_physics.scene_storage import declare_scene, register_scene_finalizers
+            from i4h_physics.storage import Declarations
             self.storage = Declarations()
             declare_scene(self.storage, self.scene)
             self.particle_domain = self.scene.particle_domain

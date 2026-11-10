@@ -105,8 +105,8 @@ def add_env_particles(builder, scene, env: int, xform=None, custom_attributes=No
 
 def declare_scene_particles(builder, scene):
     """Scene-only construction uses the same native schema as case authoring."""
-    from i4h_physics.storage import Declarations
     from i4h_physics.scene_storage import declare_scene, register_scene_finalizers
+    from i4h_physics.storage import Declarations
     scene.declarations = Declarations()
     declare_scene(scene.declarations, scene)
     from i4h_physics.mount_storage import publish_mounts

@@ -12,13 +12,17 @@ from helpers import needs_external_data, regional_case
 from i4h_endoluminal.loaders.centreline import add_centreline_tree, build_tree
 from i4h_endoluminal.loaders.rod import add_rod
 from i4h_endoluminal.regions import instrument_regions, vessel_regions
+from i4h_endoluminal.rod_storage import declare_catheter_control, declare_control_layout
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
 from i4h_isaaclab.composition import read_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.regions import RegionMembership
-from i4h_physics.rod_storage import (declare_rod_direct, declare_rod_pbd,
-                                    declare_rod_direct_material, declare_rod_pbd_material)
-from i4h_endoluminal.rod_storage import declare_catheter_control, declare_control_layout
+from i4h_physics.rod_storage import (
+    declare_rod_direct,
+    declare_rod_direct_material,
+    declare_rod_pbd,
+    declare_rod_pbd_material,
+)
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.material import RodDirectMaterial, RodPbdMaterial
 from i4h_physics.systems.rods.rod_direct import RodDirect

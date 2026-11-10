@@ -14,6 +14,7 @@ from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_tet_grid
 from i4h_physics.systems.fluids.fluid import Fluid
 from i4h_physics.systems.mechanics.tet import Tet
+from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.loaders.instrument_usd import (
     CHAIN_CUT,
     CHAIN_FIXED,
@@ -25,7 +26,6 @@ from i4h_surgical.loaders.instrument_usd import (
 )
 from i4h_surgical.systems.fluids.bleeding import Bleeding
 from i4h_surgical.systems.instruments.cutting import Cutting
-from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.mechanics.centreline import Centreline
 from i4h_surgical.systems.mechanics.surface import Surface

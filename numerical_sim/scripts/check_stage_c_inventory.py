@@ -7,9 +7,9 @@ New allocations or changed source/contracts require an explicit review update.
 """
 
 import argparse
-from collections import Counter
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 
 from inventory_stage_c import PACKAGES, census

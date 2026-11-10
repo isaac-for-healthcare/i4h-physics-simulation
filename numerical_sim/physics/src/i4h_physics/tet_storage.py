@@ -11,7 +11,6 @@ from types import SimpleNamespace
 
 import numpy as np
 import warp as wp
-
 from i4h_physics.storage import Domain, Field, Owner
 
 

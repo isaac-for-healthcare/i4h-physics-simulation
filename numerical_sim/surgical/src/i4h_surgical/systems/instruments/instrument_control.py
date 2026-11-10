@@ -35,8 +35,9 @@ from dataclasses import dataclass
 import numpy as np
 import warp as wp
 from i4h_physics.systems.base import System
+from i4h_surgical.systems.instruments.geometry import PRIM_KINDS as PRIM_KINDS
+from i4h_surgical.systems.instruments.geometry import InstrumentLayout
 
-from i4h_surgical.systems.instruments.geometry import InstrumentLayout, PRIM_KINDS as PRIM_KINDS
 EPS = wp.constant(1.0e-6)
 
 
@@ -60,7 +61,7 @@ class InstrumentControl(System):
 
     @classmethod
     def declare_storage(cls, authoring, declarations, spec, records):
-        from i4h_surgical.instrument_storage import publish_instruments, LIVE_FIELDS
+        from i4h_surgical.instrument_storage import LIVE_FIELDS, publish_instruments
         return publish_instruments(authoring.scene, declarations, spec.get("id", spec["type"]),
                                    **{key: spec.get(key, getattr(cls, key)) for key in LIVE_FIELDS})
 
@@ -69,7 +70,7 @@ class InstrumentControl(System):
         super().prepare(scene)
 
     def __post_init__(self):
-        from i4h_surgical.instrument_storage import bind_instruments, LIVE_FIELDS
+        from i4h_surgical.instrument_storage import LIVE_FIELDS, bind_instruments
         scene = self.scene
         E, dev = scene.envs, scene.device
         records = list(getattr(scene, "instruments", {}).values())

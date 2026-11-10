@@ -1,15 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: Apache-2.0
 """C2.4 aliases, authored identity, restored topology and selected-world reset."""
+import runpy
 from copy import deepcopy
 from pathlib import Path
-import runpy
 
 import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics import Scene, Stepper, author_case, declare_surface, declare_tet, surface_fields
 from i4h_physics.loaders import add_tet_grid
 from i4h_physics.surface_storage import MODEL_FIELDS, STATE_FIELDS, SURFACE_FIELDS, estimate_surface_bytes
@@ -203,8 +202,8 @@ def test_changed_authoring_requires_reconstruction(key):
 
 
 def test_direct_declarations_late_missing_wrong_references_and_appearance_side_effects(monkeypatch):
-    from i4h_surgical.systems.mechanics.surface import Surface as SurgicalSurface
     import i4h_surgical.systems.mechanics.surface as surgical
+    from i4h_surgical.systems.mechanics.surface import Surface as SurgicalSurface
     scene = Scene("cpu", 2)
     add_tet_grid(scene, "body", [1, 1, 1], .02)
     with pytest.raises(ValueError, match="matching Tet"):

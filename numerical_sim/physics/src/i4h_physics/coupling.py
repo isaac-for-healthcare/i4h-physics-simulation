@@ -30,14 +30,14 @@ mass): ``R_e f`` and ``R_e m + (p_root − p_com) × R_e f``."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
+from dataclasses import dataclass, field
 
 import warp as wp
+from i4h_physics.mount_storage import configuration, find_body, group_entries  # noqa: F401
+from i4h_physics.observables import KINDS, ObservableKind, Observables, check_identities, identities
 from newton import ModelFlags
 from newton.solvers import SolverBase
-from i4h_physics.mount_storage import configuration, find_body, group_entries  # noqa: F401
-from i4h_physics.observables import KINDS, ObservableKind, Observables, identities, check_identities
 
 COUPLING_MODES = ("one_way", "two_way")
 IDENTITY = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))

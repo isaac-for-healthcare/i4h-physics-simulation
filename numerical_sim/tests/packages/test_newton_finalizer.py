@@ -7,7 +7,6 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics.newton_compat import NEWTON_REVISION, require_model_finalizer
 
 

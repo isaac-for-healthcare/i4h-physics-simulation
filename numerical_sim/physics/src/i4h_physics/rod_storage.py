@@ -8,7 +8,6 @@ from weakref import ref
 
 import numpy as np
 import warp as wp
-
 from i4h_physics.storage import Domain, Field, Owner, defer_declaration
 
 DIRECT_LIVE = ("young", "torsion", "bend", "twist", "angular_damping")

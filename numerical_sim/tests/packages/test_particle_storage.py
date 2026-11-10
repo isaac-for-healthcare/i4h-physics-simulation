@@ -5,7 +5,6 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics import author_case
 from i4h_physics.newton_model import main_rows
 from i4h_physics.storage import Declarations, Domain, Field, Owner

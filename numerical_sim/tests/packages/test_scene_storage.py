@@ -5,7 +5,6 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics import Scene, Stepper, author_case
 from i4h_physics.newton_model import add_env_particles, complete_scene
 from i4h_physics.scene import Block, ParticleRest, StaticMesh

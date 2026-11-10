@@ -4,15 +4,14 @@
 import newton
 import numpy as np
 import warp as wp
-
 from i4h_physics.particle_storage import declare_particles
 from i4h_physics.storage import Domain, Field, Owner
 
 
 def layout(scene):
     """Frozen capacities, mappings, transforms and mesh-local geometry layouts."""
-    from i4h_physics.tet_storage import tet_layout
     from i4h_physics.surface_storage import surface_layout
+    from i4h_physics.tet_storage import tet_layout
     return (scene.envs, tuple((b.name, b.offset, b.count, b.pool, b.variants,
             tuple((key, getattr(b.rest, key).shape) for key in ("q0", "inv_mass", "radius", "flags")),
             b.variant_of_env.tobytes(), tet_layout(b.tet), surface_layout(b.tet),

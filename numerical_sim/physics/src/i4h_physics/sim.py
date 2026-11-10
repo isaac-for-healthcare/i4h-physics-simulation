@@ -16,10 +16,10 @@ import math
 import warp as wp
 from i4h_physics.checks import check_bool, check_float, check_int
 from i4h_physics.debug import alias_checks
+from i4h_physics.observables import KINDS, ObservableKind, Observables, OutputPublisher, check_identities, identities
 from i4h_physics.scene import Scene, fill_rows
 from newton import ModelFlags, StateFlags
 from newton.solvers import SolverBase
-from i4h_physics.observables import KINDS, ObservableKind, Observables, OutputPublisher, identities, check_identities
 
 
 class I4hSolver(SolverBase):

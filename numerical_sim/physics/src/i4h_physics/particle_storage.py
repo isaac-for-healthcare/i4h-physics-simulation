@@ -3,7 +3,6 @@
 """Exact native particle defaults and history, authored before finalization."""
 import newton
 import warp as wp
-
 from i4h_physics.newton_model import main_rows
 from i4h_physics.storage import Domain, Field, Owner
 

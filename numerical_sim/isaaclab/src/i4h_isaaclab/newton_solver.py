@@ -5,16 +5,14 @@
 from copy import copy
 
 import warp as wp
-
-from isaaclab.physics import PhysicsEvent
-from isaaclab.sim import SimulationContext
-from isaaclab_newton.physics import NewtonCfg, NewtonManager
-from isaaclab_newton.physics.newton_solver import NewtonSolver
-
 from i4h_isaaclab.newton_manager import context
 from i4h_physics.coupling import CoupledSolver
 from i4h_physics.observables import KINDS, identities
 from i4h_physics.sim import I4hSolver
+from isaaclab.physics import PhysicsEvent
+from isaaclab.sim import SimulationContext
+from isaaclab_newton.physics import NewtonCfg, NewtonManager
+from isaaclab_newton.physics.newton_solver import NewtonSolver
 
 
 def solver_adapter(coupled):

@@ -92,7 +92,7 @@ class RodDirect(System):
             "corrections": n * 12 * 2 + ne * 12,
         })
         self.variant = b.variant  # (E,) int32, shared by the body's systems
-        from i4h_physics.rod_storage import bind_rod, DIRECT_LIVE
+        from i4h_physics.rod_storage import DIRECT_LIVE, bind_rod
         material = b.rod_material
         if b.regions is not None and material is None:
             raise ValueError("rod_direct: regional body requires matching material before the solver")

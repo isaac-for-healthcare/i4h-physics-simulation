@@ -6,13 +6,12 @@ All authoring, binding, restoration and numerical loops are shared with main.
 Only this module accesses release manager class state.
 """
 
-from isaaclab.physics import PhysicsEvent, PhysicsManager
-from isaaclab.sim import SimulationContext
-from isaaclab_newton.physics import NewtonCfg, NewtonManager
-
 from i4h_isaaclab.newton_manager import context
 from i4h_physics.coupling import CoupledSolver
 from i4h_physics.sim import I4hSolver
+from isaaclab.physics import PhysicsEvent, PhysicsManager
+from isaaclab.sim import SimulationContext
+from isaaclab_newton.physics import NewtonCfg, NewtonManager
 
 
 def solver_adapter(coupled):

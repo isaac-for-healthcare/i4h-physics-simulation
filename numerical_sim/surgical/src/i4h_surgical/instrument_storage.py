@@ -12,7 +12,6 @@ from weakref import ref
 import newton
 import numpy as np
 import warp as wp
-
 from i4h_physics.storage import Domain, Field, Owner, defer_declaration
 from i4h_surgical.systems.instruments.geometry import InstrumentLayout
 

@@ -452,12 +452,7 @@ class Scene:
         """
         if self.q is not None:
             raise RuntimeError("allocate() called twice; systems and captured graphs hold the existing arrays")
-        from i4h_physics.newton_model import (
-            build_model,
-            finish_model,
-            place_main,
-            rebuild_particle_bvh,
-        )
+        from i4h_physics.newton_model import build_model, finish_model, place_main, rebuild_particle_bvh
 
         dev = self.device
         if model is None:

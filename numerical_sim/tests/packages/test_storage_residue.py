@@ -5,7 +5,6 @@
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics.scene import ACTIVE_INT
 from i4h_surgical.systems.mechanics.tool_delta import apply_average_tools
 

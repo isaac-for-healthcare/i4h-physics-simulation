@@ -8,13 +8,12 @@ from importlib.util import find_spec
 
 import numpy as np
 import warp as wp
-from isaaclab.utils import configclass
-from isaaclab_newton.physics import NewtonSolverCfg
-
 from i4h_isaaclab.composition import check_dt, maps, sim_settings
 from i4h_physics import PhysicsBinding, author_case
 from i4h_physics.coupling import CoupledSolver, Mounts
 from i4h_physics.stepper import signature
+from isaaclab.utils import configclass
+from isaaclab_newton.physics import NewtonSolverCfg
 
 
 def host_api():

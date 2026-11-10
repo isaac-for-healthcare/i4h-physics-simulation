@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from types import MappingProxyType
 
 import warp as wp
-
 from i4h_physics.storage import Owner
 
 

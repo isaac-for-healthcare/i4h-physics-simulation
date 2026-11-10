@@ -8,7 +8,6 @@ import newton
 import numpy as np
 import pytest
 import warp as wp
-
 from i4h_physics import Scene, Stepper, author_case, declare_mounts
 from i4h_physics.coupling import CoupledSolver, Mounts
 from i4h_physics.mount_storage import find_body
@@ -78,8 +77,8 @@ def authored(device="cpu", *, empty=False, two_way=True, mounts=None, catheter=F
     loaders = {"test_tool": tool}
     constructors = {"instrument_control": InstrumentControl, "reaction": Reaction}
     if catheter:
-        from i4h_physics.config import LOADERS, SYSTEMS
         from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
+        from i4h_physics.config import LOADERS, SYSTEMS
         loaders.update(LOADERS)
         constructors.update(SYSTEMS, catheter_control=CatheterControl)
         cfg["systems"].append(dict(type="particles"))
@@ -380,8 +379,8 @@ def test_body_label_and_target_errors():
 
 
 def test_two_way_pbd_and_late_configuration_rejected():
-    from i4h_physics.config import LOADERS, SYSTEMS
     from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
+    from i4h_physics.config import LOADERS, SYSTEMS
     cfg = {"sim": {"device": "cpu", "envs": 1},
            "assets": {"cat": dict(type="rod", start=[0, 0, 0], direction=[1, 0, 0], count=6, segment_length=.02, radius=.002)},
            "systems": [dict(type="rod_pbd", id="rod", body="cat"), dict(type="catheter_control", rod="rod", track_length=.01)]}

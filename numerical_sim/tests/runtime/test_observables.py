@@ -8,7 +8,8 @@ import pytest
 import warp as wp
 from helpers import find, push_actions
 from i4h_isaaclab.composition import load_case, read_case
-from i4h_physics.observables import KINDS, ObservableKind as Kind
+from i4h_physics.observables import KINDS
+from i4h_physics.observables import ObservableKind as Kind
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.tool_force import ToolForce
@@ -169,6 +170,7 @@ def test_partial_empty_reset_and_empty_sources():
 def test_averaged_applied_correction_and_root_moment():
     from i4h_physics.scene import ACTIVE_INT
     from i4h_surgical.systems.mechanics.tool_delta import apply_average_tools
+
     # Two equal contact corrections on one mass-2 particle produce dx=(0,1,0),
     # impulse=(0,2,0), and moment=(0,0,4) about root (1,0,0).
     def array(values, dtype):

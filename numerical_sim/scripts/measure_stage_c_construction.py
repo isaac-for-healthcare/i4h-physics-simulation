@@ -11,14 +11,13 @@ import argparse
 import hashlib
 import inspect
 import json
-from pathlib import Path
 import resource
 import subprocess
 import time
+from pathlib import Path
 
 import newton
 import warp as wp
-
 from i4h_physics import author_case
 from i4h_physics import config as physical
 from i4h_physics.stepper import Stepper

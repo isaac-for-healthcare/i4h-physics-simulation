@@ -6,7 +6,6 @@ from functools import partial
 
 import numpy as np
 import warp as wp
-
 from i4h_physics.rod_storage import Record, alias, bind_record, body_signature
 from i4h_physics.storage import Owner, defer_declaration
 

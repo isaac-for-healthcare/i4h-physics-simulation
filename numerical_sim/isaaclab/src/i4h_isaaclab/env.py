@@ -105,6 +105,7 @@ def sync_teleop_case(cfg):
 def apply_backend(cfg: I4hEnvCfg) -> None:
     """Configure the sole host path, selecting a distinct adapter at cfg construction."""
     from dataclasses import fields, replace
+
     from isaaclab_newton.physics import NewtonCfg
 
     if cfg.backend != "newton":

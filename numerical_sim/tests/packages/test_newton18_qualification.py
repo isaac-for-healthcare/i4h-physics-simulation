@@ -3,14 +3,13 @@
 
 """A successful printout cannot hide a failed qualification process or replace evidence."""
 
-import importlib.util
 import hashlib
+import importlib.util
 import json
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
-
 
 SPEC = importlib.util.spec_from_file_location(
     "qualify_newton18", Path(__file__).parents[2] / "scripts/qualify_newton18.py")
