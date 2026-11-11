@@ -1,3 +1,21 @@
+**C4.3 status — 2026-11-11: implemented; open on four stop conditions.**
+`save_i4h` and `restore_i4h` copy every i4h-owned State and Control row between containers of one
+Model; both rebuild the four contact search trees in place; kernels and existing hooks are unchanged.
+The single frozen campaign on `d3604e4` passed **34/36 groups** (both failures `aorta_shell` catheter
+impulse), **42/48 replays, 14/18 chole trials** (every group at least 2 of 3) and core **1,260**,
+Lab main **123**, Lab 3.0 **122** with zero failures. Stop conditions met, awaiting the user's
+disposition: (1) the `aorta_centreline` construction sample at 64 worlds was 30% above C4.2 (0.642 s
+against 0.493 s), while five repeated samples afterwards show +1.3%; (2) the failed chole trials
+include eight products that never failed in C3.3 to C4.2 (Grasp and VolumetricGrasp slots,
+`stretch_breaking/max_stretch`, `surface/visual`), cause not investigated; (3) the two private
+reaches of `CoupledSolver` into `I4hSolver` remain, because removing them changes a hook; (4) Isaac
+Lab's cache reset can follow a restore, handled by a documented call order. Also not delivered: a
+fresh-runtime resume test for tet containment. The frozen
+auditor failed on two errors of its own and was corrected after the campaign without rerunning any
+simulation. See [stage-c43.md](stage-c43.md). **Stop before C4.4.** No push.
+
+---
+
 **C4.2 disposition — 2026-11-11.** The user closed C4.2. No reference group failed; the one
 failed chole trial (Lab 3.0 eager, trial 1) is retained. The deviations of
 [stage-c42.md](stage-c42.md) stand as reported: TipEvidence stays host-owned assessment state
