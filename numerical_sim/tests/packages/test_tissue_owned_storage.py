@@ -373,3 +373,41 @@ def test_restored_candidate_cache_is_used_as_saved():
         rebuilds.append(rebuilt[0])
     assert not rebuilds[0], "the first step rebuilt the cache, so the restored candidate lists were never read"
     assert any(rebuilds), "no later rebuild, so rebuild timing after the restore was not compared"
+
+
+@pytest.mark.parametrize("build,names", cases())
+@pytest.mark.parametrize("device,captured", MODES)
+def test_empty_and_repeated_reset_masks(device, captured, build, names):
+    """An empty selection writes nothing anywhere; resetting the same world twice equals resetting it once."""
+    cfg, a, m = build(device)
+    state, control = m.state(), m.control()
+    sim = runtime(cfg, a, m, captured, state=state, control=control)
+    poison(sim, names)
+    before = snapshot(state, control)
+    sim.reset_physics(mask=wp.array([False, False], dtype=wp.bool, device=device))
+    sim.reset_physics([])
+    assert snapshot(state, control) == before
+    mask = wp.array([False, True], dtype=wp.bool, device=device)
+    sim.reset_physics(mask=mask)
+    once = snapshot(state, control)
+    sim.reset_physics(mask=mask)
+    assert snapshot(state, control) == once
+
+
+@pytest.mark.parametrize("build,advance,written", [
+    pytest.param(authored, lambda sim: chole_episode(sim), set(), id="chole"),
+    pytest.param(aorta, lambda sim: drive(sim, 20), {"i4h:lumen_containment_rebuild"}, id="aorta_centreline")])
+@pytest.mark.parametrize("device,captured", MODES)
+def test_preparation_and_cache_reset_write_only_the_recorded_history(device, captured, build, advance, written):
+    """The record of what a continuation must not be routed through: on a stepped State, preparation and the
+    cache-only reset write nothing but graph containment's rebuild request."""
+    cfg, a, m = build(device)
+    state, control = m.state(), m.control()
+    sim = runtime(cfg, a, m, captured, state=state, control=control)
+    advance(sim)
+    for write in (sim.prepare, lambda: sim.solver.reset(state, None, flags=0)):
+        before = snapshot(state, control)
+        write()
+        after = snapshot(state, control)
+        changed = {key for old, new in zip(before, after) for key in old if old[key] != new[key]}
+        assert changed <= written, sorted(changed)
