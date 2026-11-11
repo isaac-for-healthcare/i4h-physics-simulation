@@ -1,3 +1,17 @@
+**C4.2 status — 2026-11-11: implemented; campaign passed every gate.**
+25 history arrays (Thermal, surface colour, fluid counters, Bleeding, Emitter, Smoke, Suction,
+GraphContainment) are Newton State; kernels, hooks and resets are unchanged. The single frozen
+campaign on `bec96e6` passed **36/36 groups, 47/48 replays, 17/18 chole trials** and core **1,219**,
+Lab main **122**, Lab 3.0 **121** with zero failures. Two stop conditions fired before the freeze and
+the user decided both: `FluidContact` builds its triangle BVH at construction, so a fresh binding
+does not resume bitwise with fluid surface contact (stated; examined in C4.3), and `aorta_centreline`
+construction at 64 worlds grew 11.5% (60 ms) in repeated development samples (accepted). TipEvidence
+stays host-owned assessment state and GraphContainment keeps its forced rebuild at preparation (user
+decisions). Chole retains 1,120,000 bytes less at 64 worlds; `aorta_centreline` 14,231,808 more,
+explained to the byte. See [stage-c42.md](stage-c42.md). **Stop before C4.3.** No push.
+
+---
+
 **C4.1 disposition — 2026-11-10.** The user closed C4.1. The two failed groups, standalone
 captured and standalone eager `aorta_shell` catheter impulse, are retained under the C4
 closure rule with no attribution work. The resume claim is accepted as stated in the report:

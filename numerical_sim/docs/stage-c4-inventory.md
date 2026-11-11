@@ -88,3 +88,7 @@ Each needs a pre-migration test that records today's behaviour, as the C4 plan r
 - `tet_storage.py:193,206` and `surface_storage.py:116,131` keep pending declarations and field caches in `scene.__dict__`; `storage.py:555` does the same for deferred declarations.
 - `mount_storage.py:58-65,157`, `scene_storage.py:24` and `coupling.py:129` use `scene._mount_declaration`.
 - No package writes `storage._identities` or `storage._checks` any more.
+
+## Outcome after C4.2
+
+C4.1 migrated families 1 to 6 (36 arrays) and C4.2 families 7 to 14 (25 arrays). Family 15, TipEvidence, stays host-owned assessment state by user decision (2026-11-10) and is excluded from the continuation claim; the allocation inventory codes its four sites `A`. One correction to the table above: `isaaclab/appearance.py` reads authored appearance metadata, not the `visual` State array.
