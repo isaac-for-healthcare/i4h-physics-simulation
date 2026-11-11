@@ -1,3 +1,16 @@
+**C4.2 disposition — 2026-11-11.** The user closed C4.2. No reference group failed; the one
+failed chole trial (Lab 3.0 eager, trial 1) is retained. The deviations of
+[stage-c42.md](stage-c42.md) stand as reported: TipEvidence stays host-owned assessment state
+outside the continuation claim, GraphContainment keeps its forced rebuild at preparation, the
+bitwise resume claim is CPU-only, part of the chole resume state is written directly, and
+`aorta_centreline` construction at 64 worlds grew 11.5%. Carried to C4.3: the construction-time
+BVH of `FluidContact`, the same unexamined pattern in `tissue_contact` and in Shell and Tet
+containment, empty and repeated reset masks for the 25 arrays, the public save and restore call,
+the remaining private storage reaches and the merge of the ownership test helpers. C4.2 is
+accepted and C4.3 planning may start.
+
+---
+
 **C4.2 status — 2026-11-11: implemented; campaign passed every gate.**
 25 history arrays (Thermal, surface colour, fluid counters, Bleeding, Emitter, Smoke, Suction,
 GraphContainment) are Newton State; kernels, hooks and resets are unchanged. The single frozen
