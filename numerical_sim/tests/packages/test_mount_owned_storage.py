@@ -16,8 +16,8 @@ from i4h_physics.systems.base import System
 from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
+from ownership_helpers import MODES, ExposedRigid, copy_container, snapshot
 
-MODES = [("cpu", False), ("cuda:0", False), ("cuda:0", True)]
 DT = .01
 XFORMS = [((.5 * e, -.1 * e, 0.), (0., 0., float(np.sin(e * .2)), float(np.cos(e * .2)))) for e in range(3)]
 MOUNTS = {name: {"body": "holder", "offset": ((.01 * (i + 1), .02, 0.), (0., 0., .3, .7))}
@@ -47,24 +47,6 @@ class Reaction(System):
 
     def step_start(self, scene, dt):
         wp.launch(source_values, self.impulse.shape, [self.instruments.root], [self.impulse, self.moment], device=scene.device)
-
-
-@wp.kernel
-def rigid_advance(q: wp.array(dtype=wp.transform), qd: wp.array(dtype=wp.spatial_vector),
-                  force: wp.array(dtype=wp.spatial_vector), dt: float):
-    i = wp.tid()
-    v = wp.spatial_top(qd[i]) + wp.spatial_top(force[i]) * dt
-    qd[i] = wp.spatial_vector(v, wp.spatial_bottom(qd[i]))
-    q[i] = wp.transform(wp.transform_get_translation(q[i]) + v * dt, wp.transform_get_rotation(q[i]))
-
-
-class ExposedRigid(newton.solvers.SolverBase):
-    """Test solver: ALL integration history is native State.body_q and body_qd."""
-    def step(self, state_in, state_out, control, contacts, dt, observables=None):
-        wp.launch(rigid_advance, self.model.body_count, [state_in.body_q, state_in.body_qd, state_in.body_f, dt], device=self.model.device)
-
-    def reset(self, state, world_mask=None, flags=0):
-        pass
 
 
 def authored(device="cpu", *, empty=False, two_way=True, mounts=None, catheter=False, duplicate=False, bad_label=False):
@@ -130,23 +112,6 @@ def runtime(a, m, captured=False, state=None, control=None):
         advance = step
     return SimpleNamespace(sim=sim, scene=scene, systems=systems, mounts=mounts, coupled=coupled,
                            state=state, control=control, step=advance)
-
-
-def arrays(container):
-    for namespace in (container, getattr(container, "i4h", SimpleNamespace())):
-        for key, value in vars(namespace).items():
-            if isinstance(value, wp.array):
-                yield ("i4h." if namespace is not container else "") + key, value
-
-
-def snapshot(*containers):
-    return tuple(tuple((key, value.numpy().tobytes()) for key, value in arrays(container)) for container in containers)
-
-
-def copy_container(source, dest):
-    source_arrays = dict(arrays(source))
-    for key, value in arrays(dest):
-        wp.copy(value, source_arrays[key])
 
 
 @pytest.mark.parametrize("device,captured", MODES)

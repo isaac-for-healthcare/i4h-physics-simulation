@@ -19,8 +19,8 @@ from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.material import RodDirectMaterial, RodPbdMaterial
 from i4h_physics.systems.rods.rod_direct import RodDirect, cylinder_inv_inertia
 from i4h_physics.systems.rods.rod_pbd import RodPbd
+from ownership_helpers import MODES
 
-MODES = [("cpu", False), ("cuda:0", False), ("cuda:0", True)]
 SYSTEMS = dict(
     particles=Particles,
     rod_direct=RodDirect,

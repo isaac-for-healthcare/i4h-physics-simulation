@@ -9,8 +9,15 @@ from i4h_physics import config as physical
 from i4h_physics.stepper import Stepper
 from i4h_surgical import read_case
 from i4h_surgical.config import LOADERS, SYSTEMS
+from ownership_helpers import (  # noqa: F401 - re-exported for the interaction and tissue test modules
+    MODES,
+    ExposedRigid,
+    arrays,
+    copy_container,
+    first_difference,
+    snapshot,
+)
 
-MODES = [("cpu", False), ("cuda:0", False), ("cuda:0", True)]
 # Systems whose history C4.1 owns, and the arrays each one keeps across steps.
 HISTORY = {
     "Centreline": ("positions", "active_count"),
@@ -88,41 +95,6 @@ def poison(sim, seed=7):
 LATER = ("thermal", "bleeding", "emitter", "suction", "smoke", "fluid", "fluid_contact")
 
 
-def arrays(container):
-    """Every Warp array of a Newton Model, State or Control, including the i4h namespace."""
-    found = {}
-    for key, value in vars(container).items():
-        if isinstance(value, wp.array):
-            found[key] = value
-        elif isinstance(value, newton.Model.AttributeNamespace):
-            found.update({f"{key}:{k}": v for k, v in vars(value).items() if isinstance(v, wp.array)})
-    return found
-
-
-def snapshot(*containers):
-    wp.synchronize()
-    return [{key: a.numpy().tobytes() for key, a in arrays(c).items()} for c in containers]
-
-
-def copy_container(source, destination):
-    """Checkpoint copy between containers of one Model: every array, nothing else."""
-    src, dst = arrays(source), arrays(destination)
-    assert src.keys() == dst.keys()
-    for key, a in src.items():
-        if a.size:
-            wp.copy(dst[key], a)
-    wp.synchronize()
-
-
-def first_difference(a, b):
-    """Name the first array (in container order) whose bytes differ, for a readable resume failure."""
-    for index, (x, y) in enumerate(zip(a, b)):
-        for key in x:
-            if x[key] != y[key]:
-                return f"container {index}: {key}"
-    return None
-
-
 class Episode:
     """A scripted chole episode: tools travel to the tissue, jaws close, the applier fires a clip."""
 
@@ -170,30 +142,10 @@ def set_hook(sim):
     wp.synchronize()
 
 
-@wp.kernel
-def heavy_advance(q: wp.array(dtype=wp.transform), qd: wp.array(dtype=wp.spatial_vector),
-                  force: wp.array(dtype=wp.spatial_vector), inverse_mass: float, dt: float):
-    i = wp.tid()
-    v = wp.spatial_top(qd[i]) + wp.spatial_top(force[i]) * inverse_mass * dt
-    qd[i] = wp.spatial_vector(v, wp.spatial_bottom(qd[i]))
-    q[i] = wp.transform(wp.transform_get_translation(q[i]) + v * dt, wp.transform_get_rotation(q[i]))
-
-
-class HeavyRigid(newton.solvers.SolverBase):
-    """Test rigid solver: a heavy free body per world; ALL of its history is native State.body_q and body_qd."""
-
-    def step(self, state_in, state_out, control, contacts, dt, observables=None):
-        wp.launch(heavy_advance, self.model.body_count, [state_in.body_q, state_in.body_qd, state_in.body_f, 1.0e-6, dt],
-                  device=self.model.device)
-
-    def reset(self, state, world_mask=None, flags=0):
-        pass
-
-
 class Coupled:
     """A chole runtime whose mounted tool is carried by a rigid body through ``CoupledSolver`` (two-way)."""
 
-    def __init__(self, cfg, a, m, state, control, rigid=HeavyRigid):
+    def __init__(self, cfg, a, m, state, control, rigid=lambda m: ExposedRigid(m, inverse_mass=1.0e-6)):
         from i4h_physics.coupling import CoupledSolver, Mounts
 
         self.inner = runtime(cfg, a, m, state=state, control=control)

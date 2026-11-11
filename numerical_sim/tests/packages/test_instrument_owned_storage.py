@@ -15,8 +15,7 @@ from i4h_surgical.instrument_storage import STATE_TYPES, declare_instruments
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.scene import SphereSpec
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-MODES = [("cpu", False), ("cuda:0", False), ("cuda:0", True)]
+from ownership_helpers import MODES
 
 
 def tool(scene, name, **kwargs):
