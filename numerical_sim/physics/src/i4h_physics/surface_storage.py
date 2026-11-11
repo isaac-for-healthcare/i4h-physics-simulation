@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import newton
 import numpy as np
 import warp as wp
-from i4h_physics.storage import Domain, Field, Owner
+from i4h_physics.storage import Domain, Field, Owner, scene_record
 from i4h_physics.tet_storage import declare_surface_tet_fields, tet_fields
 
 MODEL_FIELDS = ("tet_edges", "face_neighbor", "face_tri", "tris0", "tri_tet0", "tri_part",
@@ -122,9 +122,9 @@ def declare_surface(scene, *, tet_id="tet", system_id="surface"):
     if hasattr(scene, "declarations") or scene.q is not None:
         raise RuntimeError("declare_surface before allocation or schema registration; reconstruct the model")
     system_id, tet_id = system_id or "surface", tet_id or "tet"
-    if tet_id not in getattr(scene, "_tet_declarations", {}):
+    if tet_id not in scene_record(scene).tets:
         raise ValueError("declare_surface requires matching Tet predeclaration; reconstruct the model")
-    pending = scene.__dict__.setdefault("_surface_declarations", {})
+    pending = scene_record(scene).surfaces
     if system_id in pending:
         raise ValueError(f"duplicate Surface declaration {system_id!r}")
     pending[system_id] = tet_id
@@ -139,7 +139,7 @@ def surface_fields(scene, system_id="surface"):
     from i4h_physics.scene_storage import validate_scene
     validate_scene(scene)
     scene.storage.check()
-    cache = scene.__dict__.setdefault("_surface_fields", {})
+    cache = scene_record(scene).surface_fields
     if system_id not in cache:
         record = records[system_id]
         fields = SimpleNamespace(body=record["body"], domains=record, tet_id=record["tet_id"],
@@ -165,8 +165,8 @@ def estimate_surface_bytes(scene):
     if hasattr(scene, "surface_domains"):
         bodies = [r["body"] for r in scene.surface_domains.values()]
     else:
-        bodies = [scene.body(scene._tet_declarations[tet])
-                  for tet in getattr(scene, "_surface_declarations", {}).values()]
+        bodies = [scene.body(scene_record(scene).tets[tet])
+                  for tet in scene_record(scene).surfaces.values()]
     total = 0
     for body in bodies:
         m = body.tet

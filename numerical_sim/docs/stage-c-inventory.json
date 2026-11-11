@@ -1,16 +1,17 @@
 {
-  "status": "source inventory reconciled; runtime poison and continuation qualification pending",
+  "status": "source inventory reconciled; runtime poison and continuation call added in C4.3",
   "contracts_sha256": "aa6524f619760a9c19e0a708d00d5f0e92f7c2940b85184f49a88e99f37c3459",
   "source_sha256": {
     "physics/src/i4h_physics/__init__.py": "9220bcf520eee3bdbb0596c88f95e689c93723f7b8e75bbd31d3abdd9d25256a",
     "physics/src/i4h_physics/array_copy.py": "83a4b24358755f9fff4469fb185ee63f8dafb3b853d5becffc3398ef91d6653f",
-    "physics/src/i4h_physics/authoring.py": "b80e4f108f1d73986c4ea65de2b05f8fd8b32a1551aa24a5abca380bb7e62e4f",
-    "physics/src/i4h_physics/bindings.py": "b453edd9be97a53c57e2e0ae00e8fa68feae9e49779a44c0d3943aa9691e2a3f",
+    "physics/src/i4h_physics/authoring.py": "f33e87ff8f2bd5c813f71cc3d17e9b682fde02ce832f7680fa803dc1c1f1dbaf",
+    "physics/src/i4h_physics/bindings.py": "6d7ae33a3ae6fb13bb9725e9cfbd4d0217f52536693e52ad53ca7e6ab8bc9221",
     "physics/src/i4h_physics/checks.py": "f70d7c0a15acb92cfdea996d77d946a6b4b7c4242f981d6e4ef70b77877a8a59",
     "physics/src/i4h_physics/commands.py": "623e2e682486b5a8f9bb5e1d20d48699bb421d75b7a132638978e4f0f4c1b058",
     "physics/src/i4h_physics/config.py": "e338ca755028de52f2b61fb6c950742f7f3f55d86640a22d9bfe087047b27ed5",
-    "physics/src/i4h_physics/containment_storage.py": "624eb73df846e39d223804dd3a5b3a0cf84fc496e53eed20d4083b4a90bedd99",
-    "physics/src/i4h_physics/coupling.py": "6b915addd9c48f6b434b73cc9814be1e7f977da48fe1e873a5ac59b4134bc118",
+    "physics/src/i4h_physics/containment_storage.py": "2a8d1ce8392051236cad075bc6029823ec749608e00de6bcc04a347c0305e4b3",
+    "physics/src/i4h_physics/continuation.py": "d25e60335bc3e95a7062a959bb6860e96a4714ffd576f2809c2dc0a0350674d2",
+    "physics/src/i4h_physics/coupling.py": "63f046a88b42268d164b7db940509a6987c1eed0ede206dcfeb790eeeef0639c",
     "physics/src/i4h_physics/debug.py": "5e4df588252639710ad1d1976feae5007caffbe845a9304f46285aeb50401712",
     "physics/src/i4h_physics/fluid_storage.py": "97be683549465d03896eb5ced05391bfed9410190cbe84bccac067580142513d",
     "physics/src/i4h_physics/history_storage.py": "268d489475b84db243e8fdaf6dbddc96e212c412c6f5ef32be052203cfb42dcf",
@@ -22,31 +23,31 @@
     "physics/src/i4h_physics/loaders/tet_bundle.py": "6cf5c07e252ffd337ce662a9fd792fd056ab60d7b80d1f429f3e956d874a05b4",
     "physics/src/i4h_physics/loaders/tet_vtu.py": "d23fffe61915d77fc7d81c7b7335ccd14248fdd10f1e60a8279faaf762d8ad73",
     "physics/src/i4h_physics/mesh_utils.py": "b2dc5e4aff5cf97ed030033e092334551fb248930868ead127ca8dd603eed008",
-    "physics/src/i4h_physics/mount_storage.py": "ed4f2c62b6000db5ca4798db43c5205f31d6af1aef99c18ef0715c07aa6492bd",
+    "physics/src/i4h_physics/mount_storage.py": "91268ad61c7365f9d5263c715c83c806b4c4741293dcf70eee84072898e59e5d",
     "physics/src/i4h_physics/newton_compat.py": "0798550a5c5c659ebc8f02fe3a2f7c8dc1ecc1cd591b54fe16109b6b8a2d93d4",
-    "physics/src/i4h_physics/newton_model.py": "67f6c0c18f991a19ecdf1db263308cf914e3a2551baf491d5c9ddb470a0efab3",
+    "physics/src/i4h_physics/newton_model.py": "4ac90c7d1072ba058ed5e75c48f046d48df8d782ec0aeb0eb5c4aaadbf6fa7b1",
     "physics/src/i4h_physics/observables.py": "9b2ebdac75db77e7112478738233481b22e1c2aa44cc4f567fe27ccda45f2121",
     "physics/src/i4h_physics/particle_storage.py": "e5b8f7616631bd021b607ff4e1548f16341623267655a1e0c9655efd4c6995ea",
     "physics/src/i4h_physics/quat.py": "5781810f6b1fb9063834a10f0fe69a40719f9c8fb4ede168907c251437e5be4c",
     "physics/src/i4h_physics/regions.py": "d7deebce204644c170ba68aa6308235aecfefa8b015547769539ee3337269bd7",
-    "physics/src/i4h_physics/rod_storage.py": "05e0241f70ff7a6a659f97224bdd9847cd077c8b27b2d294fc75ca56f969eab7",
+    "physics/src/i4h_physics/rod_storage.py": "485a2a5fd5600b5dc00eca0b9db0fd0fb628b8dc62bfe7524ace4e16c5270025",
     "physics/src/i4h_physics/scene.py": "bd22cf7d9d3f5097f379c21217bbc67c991e3f71c823b77300f13df86d32a841",
-    "physics/src/i4h_physics/scene_storage.py": "c421861cbfd799b1a1ca18d8eeac8169df36bc369b8e5d1936d02c88840deddb",
-    "physics/src/i4h_physics/sim.py": "09ef208b3c9479688ea3e689615b2974d6532860ac84eecac94588b73be02f53",
+    "physics/src/i4h_physics/scene_storage.py": "8c89ad7b319678c766670765faef2512d6bc31d393289128711818d57a125730",
+    "physics/src/i4h_physics/sim.py": "a8b40108ad47c1b87198c5b441fe8a3bf683d8a28af69f3965d37129c965d4c9",
     "physics/src/i4h_physics/stepper.py": "b0c4c267357bd7e190ee2943ba3ab49cd2af598e8983345fd1d69153ddf76a83",
-    "physics/src/i4h_physics/storage.py": "b2499c574fa51384df79d2764887babba5d37df7b55c7058965fc2dcfd5dfe0c",
-    "physics/src/i4h_physics/surface_storage.py": "a3d4e1b37c6257e2034e896ef02107f942b58ef86f6a7c882b7c30d750f05107",
+    "physics/src/i4h_physics/storage.py": "8dae16fd73843cf4aa1e4d4086ae60bf151ca1bbc9362a9cac76dd22855277e8",
+    "physics/src/i4h_physics/surface_storage.py": "8d57e764e3e5f8c740d0a8f230954c9abb937b2044ca0b4a204f8fe9ad6b4d47",
     "physics/src/i4h_physics/systems/__init__.py": "6c210e1d46456b19dc950af65e0643828acf5f348fd1d85bb8dd29ddf3d771f4",
-    "physics/src/i4h_physics/systems/base.py": "50166a73a25414af7b8b57fd816bd18502d75722d352f8b63f9f2134927eed44",
+    "physics/src/i4h_physics/systems/base.py": "43c7bddf64c9aa1c50660cdb185c6bba68c208443e782ab19069c2f04a52f557",
     "physics/src/i4h_physics/systems/contact/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
-    "physics/src/i4h_physics/systems/contact/fluid_contact.py": "1a48f3c47b0905ae0d25915ef5d3c89ddf22cf4fca0733186517d8801fdd5ee2",
+    "physics/src/i4h_physics/systems/contact/fluid_contact.py": "98752a120e9ad9f14c84096ce05ce470c799aa82b398bb111686600e53d74bde",
     "physics/src/i4h_physics/systems/contact/geometry.py": "56cb6e6711fbb78bff3a1bb82d5bebe6dabe9430b5c07364a4c358251d26b1f0",
     "physics/src/i4h_physics/systems/contact/graph_containment.py": "815a97f2887c82b6b98abe7134d02f1e30e39d20f688b5264bced83ea9d43522",
-    "physics/src/i4h_physics/systems/contact/part_contact.py": "8ea71ea099691348d98d4eed52ac04edd91276236e1b97dadb128608bbc70423",
+    "physics/src/i4h_physics/systems/contact/part_contact.py": "541c1932233c5612ef2b739210a236cb8be3e2fe71a813f06b50b5b612951cfc",
     "physics/src/i4h_physics/systems/contact/rod_containment.py": "c20ec92c5dae75a72310efb965d67db772aadb9930f047e814be9d0220d3d2c9",
-    "physics/src/i4h_physics/systems/contact/shell_containment.py": "5fa3dcb09a172c66a3d414e55e26e64b06e72bcc33026f8afd6f3b80774fda76",
+    "physics/src/i4h_physics/systems/contact/shell_containment.py": "f2c2a3c6f5c98f4808834a9956fd1253393b3d00adfb74f7eca741f41bff3ecf",
     "physics/src/i4h_physics/systems/contact/static_contact.py": "a66a2df7eb2285b89b993eb5e72fbd4da247ffaacae2d4459e599234cc944ae3",
-    "physics/src/i4h_physics/systems/contact/tet_containment.py": "55162505bd1b68f5eea9a88ddcdb0e6324c6b27eb3225867f5bea8250b285e61",
+    "physics/src/i4h_physics/systems/contact/tet_containment.py": "348ee264db4f3eb6f93528f1e0c22c82a558647bb57df974f350d7e7285b7347",
     "physics/src/i4h_physics/systems/fluids/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
     "physics/src/i4h_physics/systems/fluids/fluid.py": "d7373cb1042b6514c32b0116dc9d6c1b156aff5a0562818d45436a9b7cc5f123",
     "physics/src/i4h_physics/systems/fluids/fluid_kernels.py": "30fa8b255b4ed6b381eca5752bd0bd0b6cf5f44d2b4d3984a3cd99f77b9e176b",
@@ -65,13 +66,13 @@
     "physics/src/i4h_physics/systems/rods/rod_direct.py": "0159051577858d267cd716255fa61c85c649c2d23978dfe5ff740f0bd22cf52b",
     "physics/src/i4h_physics/systems/rods/rod_direct_kernels.py": "385acae1b0b599a5d7b39bbad3a4318e1fa6c992aef173cadb93d8dbbae80be2",
     "physics/src/i4h_physics/systems/rods/rod_pbd.py": "5ce21e9b658bfecc5f0a692fe3baf553281256ffb9dde70901c6d8811d34306a",
-    "physics/src/i4h_physics/tet_storage.py": "2886c45bfd4968d176a4edbcc8b0243207e7461ef74cbfa76947ce6f41e4b908",
+    "physics/src/i4h_physics/tet_storage.py": "a599960ebb888dd985de60e2e3d4177688bedfd3f3e1602f25b4296eb6ae1ad0",
     "physics/src/i4h_physics/usd.py": "6fa36a7beed0a289aa5abce379c55b2e0baf2a7d9c08c27b494c94e9b191c360",
     "surgical/src/i4h_surgical/__init__.py": "7f08898a312416edefd03cb263ace373f2e3334df5cfda81e6eefb8d1eddc2f4",
     "surgical/src/i4h_surgical/assessment.py": "c7f4816197a52e2de4b7b269ad219902291615c5ed4f35f4d4c08ce6e445fb66",
     "surgical/src/i4h_surgical/config.py": "b08f2deccc3e87e25b1dc2c2dd80550cb8b9252b858d68ce6cea79857d726dcf",
     "surgical/src/i4h_surgical/instrument_storage.py": "a904e649930ce4b4b4af39ab3283cbc38d582636fe9cf72a21dd33522b39aaa6",
-    "surgical/src/i4h_surgical/interaction_storage.py": "b7a424aa0d9950f8ea95fa6f9fa5cd7dc57921b3c8b5d59fc3a63508c5c4940a",
+    "surgical/src/i4h_surgical/interaction_storage.py": "70903e2c39e9f35230ff9f79acdcc351cf8d173615289d7da054f968b1d83ff9",
     "surgical/src/i4h_surgical/loaders/__init__.py": "47731272d51a9473be64c10effaa4fad4e97a4c4c7fa7119e06cda50ba98435a",
     "surgical/src/i4h_surgical/loaders/instrument_usd.py": "48e3e387504ef304f65bc53726aedd6428e78aa9ce5781af1f2913fbe06c53ae",
     "surgical/src/i4h_surgical/loaders/presentation.py": "53342411e56b9073c4e60ed41f90c2052ec55beb41bee70c9116566ceb194c5a",
@@ -127,7 +128,7 @@
     "isaaclab/src/i4h_isaaclab/camera/camera.py": "e0f85c5e031b6865c67c07b72dee8d8466bc2dbedc0ee169311affd613311d57",
     "isaaclab/src/i4h_isaaclab/camera/rig.py": "743d65d1a1e017959f3bf4e7f6e12235aa6d61ef636c1b20db10ee2590c5fcfd",
     "isaaclab/src/i4h_isaaclab/camera/tiled.py": "ad6d5d5a25ed62aa72b3c82297a446ebe475c33aeb31c4927bd13f74164f9b1b",
-    "isaaclab/src/i4h_isaaclab/component.py": "89ed4c68d5e428f7ce02eecb79c14e94de02e163cff5332534185ba487c5111b",
+    "isaaclab/src/i4h_isaaclab/component.py": "d3a8d185c6d49ba21a12a8c1e025a25cdb316f9dbdd895a5856965943da88684",
     "isaaclab/src/i4h_isaaclab/composition.py": "1aab51ba0002746ff1413b6ad1aa393416e3b8250bd0d0e954cbc03f6f2cea61",
     "isaaclab/src/i4h_isaaclab/coupling.py": "d488e14bd0b17c127d6a5779268ac0b1b3ae755f7ea60ccb341cbf035ff8241b",
     "isaaclab/src/i4h_isaaclab/env.py": "e08fe26915252e05150803f673093bc1a1599420978138a8092fd1f536bfdc5e",
@@ -2361,6 +2362,11 @@
       "section": "C4.2 Tip evidence",
       "label": "Host-owned assessment state",
       "text": "A, per-action tip samples consumed by the assessment Procedure; created after binding by the host; excluded from the continuation claim with Procedure state (user decision 2026-11-10)"
+    },
+    "c43-continuation": {
+      "section": "C4.3 Continuation",
+      "label": "Continuation row maps, masks and views",
+      "text": "M-derived, host-built at binding: row-to-world maps, the all-worlds mask and non-owning word views used by save_i4h and restore_i4h; never history, rebuilt by any fresh binding"
     }
   },
   "sites": [
@@ -2412,6 +2418,98 @@
         "CommandViews views"
       ],
       "basis": "C3.1 explicit review: aliases allocate no backing; temporary finalizer arrays are released after initialization"
+    },
+    {
+      "path": "physics/src/i4h_physics/continuation.py",
+      "line": 38,
+      "scope": "words",
+      "kind": "view",
+      "target": "view",
+      "expression": "wp.array(ptr=array.ptr, dtype=dtype, shape=(array.shape[0], row_bytes // size), device=array.device,\n                    capacity=array.shape[0] * row_bytes, copy=False)",
+      "dtype_expression": "dtype",
+      "shape_or_source_expression": "(array.shape[0], row_bytes // size)",
+      "review": {
+        "status": "pending",
+        "owner": null,
+        "indexing": null,
+        "authored_value": null,
+        "reset": null,
+        "aliases": null,
+        "first_subsequent_reader_writer": null
+      },
+      "contracts": [
+        "c43-continuation"
+      ],
+      "basis": "C4.3 addition"
+    },
+    {
+      "path": "physics/src/i4h_physics/continuation.py",
+      "line": 65,
+      "scope": "Continuation.__init__.particle_map",
+      "kind": "allocation",
+      "target": "maps['particles']",
+      "expression": "wp.array(particles, dtype=wp.int32, device=dev)",
+      "dtype_expression": "wp.int32",
+      "shape_or_source_expression": "particles",
+      "review": {
+        "status": "pending",
+        "owner": null,
+        "indexing": null,
+        "authored_value": null,
+        "reset": null,
+        "aliases": null,
+        "first_subsequent_reader_writer": null
+      },
+      "contracts": [
+        "c43-continuation"
+      ],
+      "basis": "C4.3 addition"
+    },
+    {
+      "path": "physics/src/i4h_physics/continuation.py",
+      "line": 83,
+      "scope": "Continuation.__init__.row_map",
+      "kind": "allocation",
+      "target": "device",
+      "expression": "wp.array(host, dtype=wp.int32, device=dev)",
+      "dtype_expression": "wp.int32",
+      "shape_or_source_expression": "host",
+      "review": {
+        "status": "pending",
+        "owner": null,
+        "indexing": null,
+        "authored_value": null,
+        "reset": null,
+        "aliases": null,
+        "first_subsequent_reader_writer": null
+      },
+      "contracts": [
+        "c43-continuation"
+      ],
+      "basis": "C4.3 addition"
+    },
+    {
+      "path": "physics/src/i4h_physics/continuation.py",
+      "line": 101,
+      "scope": "Continuation.__init__",
+      "kind": "allocation",
+      "target": "self._all",
+      "expression": "wp.ones(E + 1, dtype=wp.bool, device=dev)",
+      "dtype_expression": "wp.bool",
+      "shape_or_source_expression": "E + 1",
+      "review": {
+        "status": "pending",
+        "owner": null,
+        "indexing": null,
+        "authored_value": null,
+        "reset": null,
+        "aliases": null,
+        "first_subsequent_reader_writer": null
+      },
+      "contracts": [
+        "c43-continuation"
+      ],
+      "basis": "C4.3 addition"
     },
     {
       "path": "physics/src/i4h_physics/regions.py",
@@ -2623,7 +2721,7 @@
     {
       "path": "physics/src/i4h_physics/storage.py",
       "scope": "_finalize_empty_native",
-      "line": 415,
+      "line": 439,
       "expression": "attribute.build_array(max(1, count), device=model.device, requires_grad=model.requires_grad)",
       "target": "data",
       "kind": "newton_backing_allocation",
@@ -2637,7 +2735,7 @@
     },
     {
       "path": "physics/src/i4h_physics/storage.py",
-      "line": 448,
+      "line": 473,
       "scope": "Views.__init__",
       "kind": "allocation",
       "target": "array",
@@ -2653,7 +2751,7 @@
     {
       "path": "physics/src/i4h_physics/storage.py",
       "scope": "Views.__init__",
-      "line": 478,
+      "line": 503,
       "expression": "wp.array(ptr=rows.ptr, dtype=field.dtype, shape=field.shape,\n                                           strides=(stride * item_bytes, *strides[1:]), device=array.device,\n                                           capacity=array.capacity - start * item_bytes, copy=False)",
       "target": "self._views[key]",
       "kind": "view",
@@ -2667,7 +2765,7 @@
     },
     {
       "path": "physics/src/i4h_physics/storage.py",
-      "line": 587,
+      "line": 637,
       "scope": "vector_view",
       "kind": "view",
       "target": "view",
@@ -10094,7 +10192,7 @@
   },
   "certificate": {
     "scope": "Static source inventory for the recorded source hashes; no migration or dynamic continuation certification",
-    "site_count": 450,
+    "site_count": 454,
     "runtime_gates": "Scratch poisoning, reset/restore byte checks and fresh-runtime replay remain mandatory in C2-C4.",
     "boundary": "External native Newton allocations are accounted by container/template byte reports; external renderer factories are source-linked but excluded from physics continuation.",
     "residue_evidence": ".tmp_tests/stage-c-inventory-20261105/tool-residue.json",
@@ -10107,7 +10205,8 @@
     "c33_scope": "Mount ownership only; frozen gates determine disposition independently of C3.2 progression acceptance.",
     "c40_scope": "Import-order-only formatting; sites re-anchored by line, no classification change. Baseline for C4.",
     "c41_scope": "Interaction history (centreline, tool-share residue, hook, grasp, volumetric grasp, clipping) as Newton State; frozen gates determine disposition.",
-    "c42_scope": "Tissue, fluid and containment history (thermal, appearance, fluid counters, bleeding, emitter, smoke, suction, graph containment) as Newton State; frozen gates determine disposition."
+    "c42_scope": "Tissue, fluid and containment history (thermal, appearance, fluid counters, bleeding, emitter, smoke, suction, graph containment) as Newton State; frozen gates determine disposition.",
+    "c43_scope": "Continuation call (save_i4h, restore_i4h), tree rebuild hook, public storage accessors; frozen gates determine disposition."
   },
   "c2_migration": {
     "slice": "C2.4",
@@ -13319,5 +13418,92 @@
       "self.overflow"
     ],
     "ownership": "25 system-owned State arrays become declared Newton State; resets and hooks unchanged; TipEvidence stays host-owned assessment state by user decision"
+  },
+  "codes": {
+    "A": "host-owned assessment state (C4.2 user decision); not in the hashed field-contract legend"
+  },
+  "c43_continuation": {
+    "slice": "C4.3",
+    "removed_sites": [],
+    "added_sites": [
+      {
+        "path": "physics/src/i4h_physics/continuation.py",
+        "line": 38,
+        "scope": "words",
+        "kind": "view",
+        "target": "view",
+        "expression": "wp.array(ptr=array.ptr, dtype=dtype, shape=(array.shape[0], row_bytes // size), device=array.device,\n                    capacity=array.shape[0] * row_bytes, copy=False)",
+        "dtype_expression": "dtype",
+        "shape_or_source_expression": "(array.shape[0], row_bytes // size)",
+        "review": {
+          "status": "pending",
+          "owner": null,
+          "indexing": null,
+          "authored_value": null,
+          "reset": null,
+          "aliases": null,
+          "first_subsequent_reader_writer": null
+        }
+      },
+      {
+        "path": "physics/src/i4h_physics/continuation.py",
+        "line": 65,
+        "scope": "Continuation.__init__.particle_map",
+        "kind": "allocation",
+        "target": "maps['particles']",
+        "expression": "wp.array(particles, dtype=wp.int32, device=dev)",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "particles",
+        "review": {
+          "status": "pending",
+          "owner": null,
+          "indexing": null,
+          "authored_value": null,
+          "reset": null,
+          "aliases": null,
+          "first_subsequent_reader_writer": null
+        }
+      },
+      {
+        "path": "physics/src/i4h_physics/continuation.py",
+        "line": 83,
+        "scope": "Continuation.__init__.row_map",
+        "kind": "allocation",
+        "target": "device",
+        "expression": "wp.array(host, dtype=wp.int32, device=dev)",
+        "dtype_expression": "wp.int32",
+        "shape_or_source_expression": "host",
+        "review": {
+          "status": "pending",
+          "owner": null,
+          "indexing": null,
+          "authored_value": null,
+          "reset": null,
+          "aliases": null,
+          "first_subsequent_reader_writer": null
+        }
+      },
+      {
+        "path": "physics/src/i4h_physics/continuation.py",
+        "line": 101,
+        "scope": "Continuation.__init__",
+        "kind": "allocation",
+        "target": "self._all",
+        "expression": "wp.ones(E + 1, dtype=wp.bool, device=dev)",
+        "dtype_expression": "wp.bool",
+        "shape_or_source_expression": "E + 1",
+        "review": {
+          "status": "pending",
+          "owner": null,
+          "indexing": null,
+          "authored_value": null,
+          "reset": null,
+          "aliases": null,
+          "first_subsequent_reader_writer": null
+        }
+      }
+    ],
+    "line_moves": 4,
+    "ownership": "no ownership change; additions are binding-time row maps, masks and views of the continuation call"
   }
 }

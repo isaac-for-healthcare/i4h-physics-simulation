@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import numpy as np
 from i4h_physics.scene import _F32, _I32, _VEC3
+from i4h_physics.storage import scene_record
 
 HASH_GRID_BYTES = 2 * 128**3 * 4  # Newton's model.particle_grid (a 128^3 wp.HashGrid) whenever there are particles
 
@@ -86,11 +87,11 @@ def add_env_particles(builder, scene, env: int, xform=None, custom_attributes=No
         if not hasattr(scene, "declarations"):
             declare_scene_particles(builder, scene)
         custom_attributes = scene.declarations.entity_values(scene.particle_domain, env * scene.main.width, scene.main.width)
-    if hasattr(scene, "_storage_worlds"):
-        if env in scene._storage_worlds:
+    if scene_record(scene).worlds is not None:
+        if env in scene_record(scene).worlds:
             raise ValueError(f"duplicate Scene world: {env}")
-        scene._storage_worlds.add(env)
-        scene._storage_starts[env] = builder.particle_count
+        scene_record(scene).worlds.add(env)
+        scene_record(scene).starts[env] = builder.particle_count
     if xform is not None:
         if scene.world_starts is None:
             scene.world_starts, scene.env_xforms = [None] * scene.envs, [None] * scene.envs

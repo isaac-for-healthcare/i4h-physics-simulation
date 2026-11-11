@@ -234,6 +234,7 @@ def main():
         surface_storage=surface_accounting(scene),
         instrument_storage=instrument_accounting(scene),
         interaction_storage=interaction_accounting(scene),
+        continuation_bytes=sim.solver.continuation.allocated_bytes,
         ordinary_shared_live_control=dict(same_container=True, additional_bytes=0,
                                          aliases_template=control is shared,
                                          buffer_bytes=byte_count(buffers(control).values())),

@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 import warp as wp
 from i4h_physics.mount_storage import configuration, find_body, group_entries  # noqa: F401
 from i4h_physics.observables import KINDS, ObservableKind, Observables, check_identities, identities
+from i4h_physics.storage import scene_record
 from newton import ModelFlags
 from newton.solvers import SolverBase
 
@@ -126,7 +127,7 @@ class Mounts:
         scene.storage.register_package(checks=(self._check_layout,))
 
     def _check_layout(self):
-        if self.two_way != self._config[1] or getattr(self.scene, "_mount_declaration", None) != self._config:
+        if self.two_way != self._config[1] or scene_record(self.scene).mounts != self._config:
             raise RuntimeError("mount configuration changed; reconstruct the model")
         if len(self.groups) != len(self._groups) or any(a is not b for a, b in zip(self.groups, self._groups)):
             raise RuntimeError("mount groups changed; bind a fresh runtime")
@@ -266,6 +267,13 @@ class CoupledSolver(SolverBase):
         selected = int(StateFlags.ALL) if flags is None else int(flags)
         self.rigid.reset(state, world_mask=world_mask, flags=selected & ~particle)
         self.ours.reset(state, world_mask=world_mask, flags=selected & particle)
+
+    def save_i4h(self, dst_state, dst_control, mask=None) -> None:
+        """i4h rows only (pending mount reactions included); rigid body state is the host's to copy."""
+        self.ours.save_i4h(dst_state, dst_control, mask)
+
+    def restore_i4h(self, src_state, src_control, mask=None) -> None:
+        self.ours.restore_i4h(src_state, src_control, mask)
 
     def restore_episode(self, state, control, world_mask=None) -> None:
         if self.mounts is not None:

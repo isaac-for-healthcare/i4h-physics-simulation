@@ -146,6 +146,7 @@ report = dict(
     declared_bytes=scene.storage.allocated_bytes(),
     rod_and_control_storage=records,
     interaction_storage=account.interaction_accounting(scene),
+    continuation_bytes=sim.solver.continuation.allocated_bytes,
     pointers=pointers,
     container_bytes={
         k: account.byte_count(v.values())

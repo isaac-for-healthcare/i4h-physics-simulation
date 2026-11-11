@@ -8,6 +8,7 @@ This module does not construct or schedule systems.
 """
 
 from dataclasses import dataclass
+from dataclasses import field as record_field
 from enum import Enum
 from math import prod
 from types import MappingProxyType
@@ -178,6 +179,29 @@ class Declarations:
     @property
     def fields(self):
         return MappingProxyType(self._fields)
+
+    @property
+    def authored(self):
+        """True once every declared row has been authored on the builder."""
+        return self._authored
+
+    @property
+    def token(self):
+        """The identity every container of this authoring's finalized Model carries."""
+        return self._token
+
+    @property
+    def domains(self):
+        """Declared row domains, in declaration order."""
+        return tuple(self._domains)
+
+    def rows(self, domain):
+        """Host ``(worlds, owners)`` columns of a custom row domain (read-only, flat), or None for a native domain."""
+        return self._domains[domain]
+
+    def name(self, key):
+        """Newton attribute name of the field declared under ``(domain, key)``."""
+        return self._names[key]
 
     def domain(self, domain, *, worlds=None, owners=None):
         """Declare custom row identities, or deferred host-only identity resolvers.
@@ -424,20 +448,21 @@ class Views:
         self._objects = {Owner.MODEL: model, Owner.STATE: state, Owner.CONTROL: control}
         self._identities, self._arrays, self._views = [], [], {}
         self._checks = []
-        if any(d not in declarations._domains or d.custom for d in placements):
+        self._placements = dict(placements)
+        if any(d not in declarations.domains or d.custom for d in placements):
             raise ValueError("placements must name declared native domains")
         model_namespace = getattr(model, "i4h", None)
         for owner, container in self._objects.items():
             namespace = getattr(container, "i4h", None)
             name = f"storage_{owner.value}_id"
             marker = getattr(namespace, name, None)
-            if marker != [declarations._token] or marker is not getattr(model_namespace, name, None):
+            if marker != [declarations.token] or marker is not getattr(model_namespace, name, None):
                 raise ValueError(f"foreign {owner.value} container for this finalized model")
             self._identities.extend(((container, "i4h", namespace), (namespace, name, marker),
                                      (model_namespace, name, marker)))
         for key, field in declarations.fields.items():
             container = self._objects[field.owner] if field.native_attribute else self._objects[field.owner].i4h
-            name = field.native_attribute or declarations._names[key]
+            name = field.native_attribute or declarations.name(key)
             array = getattr(container, name, None)
             count = model._attribute_frequency_count(field.domain.frequency)
             size = count if field.native_attribute else max(1, count)
@@ -481,7 +506,7 @@ class Views:
                 self._views[key]._ref = array
             view = self._views[key]
             self._arrays.append((view, (view.ptr, view.shape, view.strides, view.dtype, view.device)))
-        for domain in declarations._domains:
+        for domain in declarations.domains:
             if domain.custom:
                 for column in ("world", "owner"):
                     name = f"{domain.frequency[4:]}_{column}"
@@ -544,6 +569,31 @@ class Views:
     def attr(self, domain, key):
         return self._views[domain, key]
 
+    @property
+    def declarations(self):
+        return self._declarations
+
+    def backing(self, key, container=None):
+        """The whole Newton array behind a declared State or Control field, padding and foreign rows included;
+        ``container`` selects another State or Control of the same Model instead of the bound one."""
+        field = self._declarations.fields[key]
+        if field.owner is Owner.MODEL:
+            raise ValueError("backing() serves State and Control fields")
+        return getattr((self._objects[field.owner] if container is None else container).i4h, self._declarations.name(key))
+
+    def placement(self, domain):
+        """``(start, stride)`` of a native world-major domain inside its host array, or None."""
+        return self._placements.get(domain)
+
+    def check_containers(self, state, control):
+        """Reject a State or Control that does not belong to this binding's finalized Model."""
+        model_namespace = self._objects[Owner.MODEL].i4h
+        for owner, container in ((Owner.STATE, state), (Owner.CONTROL, control)):
+            name = f"storage_{owner.value}_id"
+            marker = getattr(getattr(container, "i4h", None), name, None)
+            if marker != [self._declarations.token] or marker is not getattr(model_namespace, name, None):
+                raise ValueError(f"foreign {owner.value} container for this finalized model")
+
     def allocated_bytes(self):
         """Declared backing bytes only; excludes native arrays and construction peak.
 
@@ -553,11 +603,11 @@ class Views:
         """
         totals = {"model": 0, "templates": 0, "state": 0, "control": 0, "control_shared_with_template": 0}
         model = self._objects[Owner.MODEL]
-        totals["model"] += sum(max(1, d.count) * 8 for d in self._declarations._domains if d.custom)
+        totals["model"] += sum(max(1, d.count) * 8 for d in self._declarations.domains if d.custom)
         for key, field in self._declarations.fields.items():
             if field.native_attribute is not None:
                 continue  # Native buffers are counted by their existing owner.
-            name = self._declarations._names[key]
+            name = self._declarations.name(key)
             backing = getattr(self._objects[field.owner].i4h, name)
             nbytes = backing.size * wp.types.type_size_in_bytes(backing.dtype)
             if field.owner is Owner.MODEL and any(
@@ -594,7 +644,32 @@ def defer_declaration(scene, key, callback, settings):
     """Queue a package's host-only declaration for direct Scene construction."""
     if hasattr(scene, "declarations") or scene.q is not None:
         raise RuntimeError("declare storage before allocation or schema registration; reconstruct the model")
-    pending = scene.__dict__.setdefault("_deferred_storage", {})
+    pending = scene_record(scene).deferred
     if key in pending:
         raise ValueError(f"duplicate storage declaration {key!r}")
     pending[key] = (callback, tuple(settings.items()))
+
+
+@dataclass
+class Pending:
+    """Host-only declaration bookkeeping of one Scene: what packages declared before schema registration, the
+    particle start of every authored world, and the layout the finalized Model must still match."""
+    deferred: dict = record_field(default_factory=dict)  # {key: (callback, settings)} of direct-Scene package declarations
+    tets: dict = record_field(default_factory=dict)  # {tet system id: body name}
+    surfaces: dict = record_field(default_factory=dict)  # {surface system id: tet system id}
+    tet_fields: dict = record_field(default_factory=dict)  # alias caches of the bound scene
+    surface_fields: dict = record_field(default_factory=dict)
+    mounts: tuple | None = None  # the declared mount configuration
+    starts: dict = record_field(default_factory=dict)  # {world: first native particle of the scene's block}
+    worlds: set | None = None  # authored worlds; None before the scene schema is declared
+    layout: tuple | None = None
+    completed: bool = False
+    transforms: tuple | None = None
+
+
+def scene_record(scene) -> Pending:
+    """The scene's declaration bookkeeping, created on first use."""
+    record = getattr(scene, "pending_storage", None)
+    if record is None:
+        record = scene.pending_storage = Pending()
+    return record

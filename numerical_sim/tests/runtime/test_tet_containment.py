@@ -128,3 +128,31 @@ def test_eager_captured_agreement(tmp_path):
             sim.step()
     np.testing.assert_allclose(eager[0].scene.q.numpy(), captured[0].scene.q.numpy(), atol=1e-6, rtol=1e-6)
     np.testing.assert_array_equal(eager[-1].contact_count.numpy(), captured[-1].contact_count.numpy())
+
+
+@pytest.mark.parametrize("graph", [False, True])
+def test_save_and_restore_replay_the_same_steps(tmp_path, graph):
+    """Continuation on the direct Scene path: a replay from the saved State reaches the bytes of the first pass,
+    with the two-way wall in contact and its tree rebuilt in place at the save and at the restore. This shows the
+    rebuilt tree is valid and the copy complete. It cannot show that the rebuild is needed: one runtime keeps its
+    tree shape across a replay either way."""
+    sim, rod, wall, surf, cont = contact(tmp_path, graph, two_way=True)
+    scene = sim.scene
+    sim.step()
+    assert cont.contact_count.numpy().all()
+    saved = scene.model.state(), scene.model.control()
+    sim.physics.save(*saved)
+
+    def advance():
+        counts = []
+        for _ in range(4):
+            sim.step()
+            counts.append(cont.contact_count.numpy().copy())
+        return [scene.field(name, body).numpy().tobytes() for name in ("q", "qd", "q_prev") for body in (rod, wall)], counts
+
+    first, counts = advance()
+    assert any(count.any() for count in counts), "the wall is not in contact after the save point"
+    sim.physics.restore(*saved)
+    np.testing.assert_array_equal(scene.field("q", wall).numpy(), saved[0].particle_q.numpy().reshape(2, -1, 3)[:, 1:])
+    again, _ = advance()
+    assert again == first

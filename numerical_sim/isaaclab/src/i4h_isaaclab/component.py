@@ -255,6 +255,22 @@ class I4hComponent:
         self._order("in")
         self._live().physics.reset(env_ids, mask=mask)
 
+    def save(self, dst_state, dst_control, env_ids=None, *, mask=None) -> None:
+        """Copy the selected worlds' i4h-owned rows into another State and Control of the host's Model."""
+        self._order("in")
+        self._live().physics.save(dst_state, dst_control, env_ids, mask=mask)
+
+    def restore(self, src_state, src_control, env_ids=None, *, mask=None) -> None:
+        """Copy saved i4h-owned rows back into the live State and Control. Rigid body state, host time, assessment
+        and procedure state are the host's to restore; no reset or cache refresh runs here.
+
+        Order matters: Isaac Lab runs the solver's cache reset for every world whose state was written through its
+        asset API, at the next forward or step. Write the host's own state first, call the simulation's
+        ``forward()``, and restore the i4h rows last; otherwise that cache reset follows the restore and replaces
+        graph containment's saved rebuild request with a forced rebuild."""
+        self._order("in")
+        self._live().physics.restore(src_state, src_control, env_ids, mask=mask)
+
     def initialize_particle_history(self, env_ids=None, *, mask=None) -> None:
         """After host position edits, initialize selected history on Warp's stream.
 

@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import warp as wp
-from i4h_physics.storage import Domain, Field, Owner
+from i4h_physics.storage import Domain, Field, Owner, scene_record
 
 
 def tet_domain(declarations, body, system_id, particle_starts, *, variants):
@@ -190,7 +190,7 @@ def declare_tet(scene, body, *, system_id="tet"):
     if not any(body is b for b in scene.bodies) or body.tet is None:
         raise ValueError("declare_tet requires a Scene body with a tet mesh")
     system_id = system_id or "tet"
-    pending = scene.__dict__.setdefault("_tet_declarations", {})
+    pending = scene_record(scene).tets
     if system_id in pending:
         raise ValueError(f"duplicate Tet declaration {system_id!r}")
     pending[system_id] = body.name
@@ -203,7 +203,7 @@ def tet_fields(scene, system_id="tet"):
     if system_id not in records:
         raise RuntimeError(f"Tet {system_id!r} storage is missing; call declare_tet before allocation and reconstruct the model")
     scene.storage.check()
-    cache = scene.__dict__.setdefault("_tet_fields", {})
+    cache = scene_record(scene).tet_fields
     if system_id not in cache:
         record = records[system_id]
         fields = SimpleNamespace(body=record["body"], domains=record, variant=record["body"].variant,
@@ -235,7 +235,7 @@ def tet_layout(mesh):
 def estimate_tet_bytes(scene):
     """Model, one State, templates and identities, including empty backing rows."""
     bodies = ([record["body"] for record in scene.tet_domains.values()] if hasattr(scene, "tet_domains") else
-              [scene.body(name) for name in getattr(scene, "_tet_declarations", {}).values()])
+              [scene.body(name) for name in scene_record(scene).tets.values()])
     total = 0
     for body in bodies:
         V, T = body.tet.active0.shape

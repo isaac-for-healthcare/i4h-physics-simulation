@@ -8,7 +8,7 @@ from weakref import ref
 
 import numpy as np
 import warp as wp
-from i4h_physics.storage import Domain, Field, Owner, defer_declaration
+from i4h_physics.storage import Domain, Field, Owner, defer_declaration, scene_record
 
 DIRECT_LIVE = ("young", "torsion", "bend", "twist", "angular_damping")
 PBD_LIVE = ("stretch", "bend", "twist", "angular_damping")
@@ -114,7 +114,7 @@ class Record:
 
                 def owners():
                     s = self.scene_ref()
-                    starts = np.asarray([s._storage_starts[e] + offset for e in range(s.envs)])
+                    starts = np.asarray([scene_record(s).starts[e] + offset for e in range(s.envs)])
                     base = starts.reshape((s.envs,) + (1,) * (len(rowshape) - 1)) if runtime else starts[0]
                     return np.where(local < 0, -1, local + base)
 
@@ -307,7 +307,7 @@ def initialize_inertia(model, *, scene_ref, record):
     scene, body = scene_ref(), record.body
     if scene is None:
         raise RuntimeError("rod authoring expired before finalization")
-    start = scene._storage_starts[0] + body.offset
+    start = scene_record(scene).starts[0] + body.offset
     # Read this finalized Model's exact i4h inverse mass and native radius, preserving the original float64 arithmetic.
     proxy = SimpleNamespace(
         field=lambda name, b: (model.i4h.particle_inv_mass if name == "inv_mass" else model.particle_radius)[
@@ -381,7 +381,7 @@ def publish_material(scene, declarations, system_id, *, body, backend, settings,
     if solver_specs is None:
         solver_specs = [
             dict(values)
-            for callback, values in getattr(scene, "_deferred_storage", {}).values()
+            for callback, values in scene_record(scene).deferred.values()
             if callback is publish_rod
         ]
     matches = [spec for spec in solver_specs if spec["body"] == body.name]

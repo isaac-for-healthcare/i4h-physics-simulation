@@ -5,7 +5,7 @@ import newton
 import numpy as np
 import warp as wp
 from i4h_physics.particle_storage import declare_particles
-from i4h_physics.storage import Domain, Field, Owner
+from i4h_physics.storage import Domain, Field, Owner, scene_record
 
 
 def layout(scene):
@@ -18,10 +18,10 @@ def layout(scene):
             tuple((name, p.index, p.particle_start, p.particle_count, p.tri_start, p.tri_count) for name, p in b.parts.items()))
             for b in scene.bodies + scene.pools),
             tuple((m.name, m.points.shape, m.indices.shape) for m in scene.static_meshes),
-            tuple(getattr(scene, "_tet_declarations", {}).items()),
-            tuple(getattr(scene, "_surface_declarations", {}).items()),
-            tuple(getattr(scene, "_deferred_storage", {}).items()),
-            getattr(scene, "_mount_declaration", None))
+            tuple(scene_record(scene).tets.items()),
+            tuple(scene_record(scene).surfaces.items()),
+            tuple(scene_record(scene).deferred.items()),
+            scene_record(scene).mounts)
 
 
 def declare_scene(declarations, scene):
@@ -70,21 +70,21 @@ def declare_scene(declarations, scene):
         raise ValueError("static mesh names must be unique")
     scene.tet_domains = {}
     from i4h_physics.tet_storage import publish_tet
-    for system_id, name in getattr(scene, "_tet_declarations", {}).items():
+    for system_id, name in scene_record(scene).tets.items():
         body = scene.body(name)
         publish_tet(scene, declarations, body, system_id,
-                    lambda body=body: [scene._storage_starts[e] + body.offset for e in range(scene.envs)])
+                    lambda body=body: [scene_record(scene).starts[e] + body.offset for e in range(scene.envs)])
     scene.surface_domains = {}
     from i4h_physics.surface_storage import publish_surface
-    for system_id, tet_id in getattr(scene, "_surface_declarations", {}).items():
+    for system_id, tet_id in scene_record(scene).surfaces.items():
         body = scene.tet_domains[tet_id]["body"]
         publish_surface(scene, declarations, system_id, tet_id,
-                        lambda body=body: [scene._storage_starts[e] + body.offset for e in range(scene.envs)])
-    scene._storage_starts = {}
-    scene._storage_layout = layout(scene)
-    scene._storage_worlds = set()
-    scene._storage_completed = False
-    for key, (callback, settings) in getattr(scene, "_deferred_storage", {}).items():
+                        lambda body=body: [scene_record(scene).starts[e] + body.offset for e in range(scene.envs)])
+    scene_record(scene).starts = {}
+    scene_record(scene).layout = layout(scene)
+    scene_record(scene).worlds = set()
+    scene_record(scene).completed = False
+    for key, (callback, settings) in scene_record(scene).deferred.items():
         callback(scene, declarations, key, **dict(settings))
 
 
@@ -92,7 +92,7 @@ def register_scene_finalizers(builder, scene):
     from i4h_physics.newton_compat import require_model_finalizer
     register = require_model_finalizer(builder)
     def gravity_finalizer(builder, model, attribute):
-        if not scene._storage_completed:
+        if not scene_record(scene).completed:
             raise RuntimeError("complete Scene storage before finalization")
         validate_scene(scene)
         from i4h_physics.newton_model import component_gravity
@@ -105,24 +105,24 @@ def register_scene_finalizers(builder, scene):
 
 def complete_scene(builder, scene):
     """Direct-builder completion, also used by CaseAuthoring.complete; idempotent."""
-    if layout(scene) != scene._storage_layout:
+    if layout(scene) != scene_record(scene).layout:
         raise RuntimeError("Scene capacities, body mappings or geometry layout changed; reconstruct the model")
-    if scene._storage_worlds != set(range(scene.envs)) or builder.world_count != scene.envs:
+    if scene_record(scene).worlds != set(range(scene.envs)) or builder.world_count != scene.envs:
         raise RuntimeError("Scene completion requires all authored worlds")
     if scene.env_xforms is not None and any(x is None for x in scene.env_xforms):
         raise RuntimeError("Scene completion requires complete world transforms")
     transforms = None if scene.env_xforms is None else tuple((p.tobytes(), q.tobytes()) for p, q in scene.env_xforms)
-    if scene._storage_completed and transforms != scene._storage_transforms:
+    if scene_record(scene).completed and transforms != scene_record(scene).transforms:
         raise RuntimeError("Scene world transforms changed; reconstruct the model")
     scene.declarations.author_rows(builder)
-    scene._storage_transforms = transforms
-    scene._storage_completed = True
+    scene_record(scene).transforms = transforms
+    scene_record(scene).completed = True
 
 
 def validate_scene(scene):
-    if not scene._storage_completed:
+    if not scene_record(scene).completed:
         raise RuntimeError("complete Scene storage before binding")
     transforms = None if scene.env_xforms is None else tuple(
         None if x is None else (x[0].tobytes(), x[1].tobytes()) for x in scene.env_xforms)
-    if layout(scene) != scene._storage_layout or transforms != scene._storage_transforms:
+    if layout(scene) != scene_record(scene).layout or transforms != scene_record(scene).transforms:
         raise RuntimeError("Scene layout or world transforms changed; reconstruct the model")

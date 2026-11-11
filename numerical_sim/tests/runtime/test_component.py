@@ -345,38 +345,53 @@ def test_views_read_after_the_physics_step_on_any_torch_stream(host):
         assert counts == [counts[0] + k for k in range(4)], f"stale reads {counts} (rebuilt={rebuilt})"
 
 
-def test_configure_preserves_the_hosts_newton_settings():
-    """Adding the component swaps only the solver and the substep split: the host's shape contact defaults,
-    determinism, visual-shape loading and graph setting stay as the workflow set them."""
-    from isaaclab_newton.physics.newton_manager_cfg import NewtonShapeCfg
+def test_save_and_restore_through_the_component(host, monkeypatch):
+    """A host saves the i4h rows of its live State and Control and restores them later: positions return exactly,
+    the host's own bodies are not written, and no cache reset or preparation runs after the restore."""
+    from i4h_physics.sim import I4hSolver
 
-    shape = NewtonShapeCfg(margin=0.015, gap=0.02, ke=1.0e4, kd=50.0, mu=0.25)
-    sim_cfg = SimulationCfg(dt=1.0 / 120, physics=NewtonCfg(solver_cfg=MJWarpSolverCfg(), num_substeps=2,
-                                                            deterministic_mode="run_to_run", default_shape_cfg=shape,
-                                                            load_visual_shapes=True, use_cuda_graph=False))
-    I4hComponent(component_cfg()).configure(sim_cfg)
-    physics = sim_cfg.physics
-    assert (physics.default_shape_cfg.mu, physics.default_shape_cfg.margin) == (0.25, 0.015)
-    assert physics.deterministic_mode == "run_to_run" and physics.load_visual_shapes is True
-    assert physics.use_cuda_graph is False and physics.num_substeps == 1
-    assert physics.solver_cfg.rigid_substeps == 2 and isinstance(physics.solver_cfg.rigid_solver_cfg, MJWarpSolverCfg)
-
-
-def test_configure_rejects_an_unsupported_rigid_backend():
-    """rigid=True needs NewtonCfg(MJWarpSolverCfg): a PhysX host would otherwise lose its rigid simulation silently.
-    i4h alone stays an explicit rigid=False."""
-    from isaaclab_physx.physics import PhysxCfg
-
-    host = SimulationCfg(dt=1.0 / 120, physics=PhysxCfg())
-    with pytest.raises(ValueError, match="NewtonCfg\\(solver_cfg=MJWarpSolverCfg"):
-        I4hComponent(component_cfg()).configure(host)
-    assert isinstance(host.physics, PhysxCfg), "a rejected configure leaves the host untouched"
-    I4hComponent(component_cfg()).configure(host, rigid=False)
-    assert host.physics.solver_cfg.rigid_solver_cfg is None
-    from isaaclab_newton.physics.newton_collision_cfg import NewtonCollisionPipelineCfg
-
-    collide = NewtonCfg(solver_cfg=MJWarpSolverCfg(use_mujoco_contacts=False), collision_cfg=NewtonCollisionPipelineCfg())
-    with pytest.raises(ValueError, match="use_mujoco_contacts=False"):
-        I4hComponent(component_cfg()).configure(SimulationCfg(dt=1.0 / 120, physics=collide))
-    with pytest.raises(ValueError, match="collision_cfg"):  # even without rigid bodies: no Newton pipeline runs
-        I4hComponent(component_cfg()).configure(SimulationCfg(dt=1.0 / 120, physics=collide), rigid=False)
+    env, component = host()
+    env.reset()
+    actions = torch.tensor([[2.0, 0.0], [0.0, 1.0]], device=env.device)
+    for _ in range(5):
+        env.step(actions)
+    model = component.scene.model
+    saved = model.state(), model.control()
+    component.save(*saved)
+    component.sync_views()
+    at_save = component.positions("tissue").clone()
+    for _ in range(5):
+        env.step(actions)
+    component.sync_views()
+    assert not torch.equal(component.positions("tissue"), at_save)
+    arm = lab_runtime().state_0.body_q.numpy().copy()
+    resets = []
+    reset = I4hSolver.reset
+    monkeypatch.setattr(I4hSolver, "reset", lambda self, *args, **kwargs: (resets.append(args), reset(self, *args, **kwargs))[1])
+    component.restore(*saved, env_ids=[1])
+    component.sync_views()
+    assert torch.equal(component.positions("tissue")[1], at_save[1]) and not torch.equal(component.positions("tissue")[0], at_save[0])
+    component.restore(*saved)
+    component.sync_views()
+    assert torch.equal(component.positions("tissue"), at_save)
+    np.testing.assert_array_equal(lab_runtime().state_0.body_q.numpy(), arm)
+    env.step(actions)
+    assert not resets, "a cache reset ran after the restore"
+    # A host that also restores its own bodies writes them through Lab, which schedules the solver's cache reset
+    # for those worlds. Written first and forwarded, that reset runs before the i4h rows are restored.
+    sim = SimulationContext.instance()
+    manager = sim.backend_manager if hasattr(sim, "backend_manager") else sim.physics_manager
+    worlds = wp.ones(2, dtype=wp.bool, device=model.device)
+    manager.invalidate_fk(env_mask=worlds)
+    manager.forward()
+    assert resets, "the host's forward did not run the cache reset"
+    resets.clear()
+    component.restore(*saved)
+    env.step(actions)
+    assert not resets, "a cache reset ran after the restore"
+    component.restore(*saved)
+    manager.invalidate_fk(env_mask=worlds)  # the wrong order: the cache reset follows the restore
+    env.step(actions)
+    assert resets
+    component.sync_views()
+    assert torch.isfinite(component.positions("tissue")).all()

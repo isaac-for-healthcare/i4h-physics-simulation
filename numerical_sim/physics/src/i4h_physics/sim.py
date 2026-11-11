@@ -61,6 +61,9 @@ class I4hSolver(SolverBase):
         self._bound_arrays += [(scene, name, getattr(scene, name))
                                for name in ("q", "qd", "q_prev", "q0", "inv_mass", "radius", "flags", "flags0")]
 
+        from i4h_physics.continuation import Continuation
+        self.continuation = Continuation(scene) if self.control is not None else None
+
         from i4h_physics.commands import CommandViews
         self._command_views = {}
         for system in self.systems:
@@ -194,6 +197,53 @@ class I4hSolver(SolverBase):
             self.reset(state, mask, flags=0)
             for output in self._outputs:
                 self.publisher.clear(output, mask)
+
+    def save_i4h(self, dst_state, dst_control, mask=None) -> None:
+        """Copy this runtime's i4h-owned State and Control rows into another State and Control of the same Model.
+
+        Copied: every declared State and Control field and the scene's own rows of ``particle_q``, ``particle_qd``
+        and ``particle_f``. Never written: foreign host particles, padding rows, body and joint fields, Model fields
+        and initialization templates. ``mask`` is an ``(E+1,)`` world mask whose last slot selects rows shared by
+        all worlds; None selects everything. Call it at a completed step boundary, outside graph capture.
+
+        Together with ``restore_i4h`` this is continuation: bind and prepare a runtime, restore a saved pair into
+        it, and stepping continues from the saved step. It is distinct from episode reset and from the cache-only
+        reset, and runs neither. Not saved: a rigid solver's own history (including MuJoCo-Warp's), host time and
+        episode counters, assessment, procedure and tip evidence, renderer state and recordings.
+
+        Side effect: both calls rebuild the contact search trees from current positions, which is what makes a
+        restored runtime reproduce the saving one. A runtime that saves therefore differs at rounding level from
+        one that never saved. The trees span all worlds, so with a partial mask unselected worlds keep their State
+        and Control bytes but may also differ at rounding level in later steps.
+        """
+        self._continue(dst_state, dst_control, mask, True)
+
+    def restore_i4h(self, src_state, src_control, mask=None) -> None:
+        """Copy saved i4h-owned rows into this runtime's State and Control; see ``save_i4h``. Completed-step
+        outputs of the selected worlds are cleared; system products refresh at the next step."""
+        self._continue(src_state, src_control, mask, False)
+
+    def _continue(self, state, control, world_mask, save) -> None:
+        self.check_binding()
+        if self.continuation is None:
+            raise RuntimeError("continuation needs a bound Control")
+        if self.scene.device.is_capturing:
+            raise RuntimeError("save and restore run outside graph capture")
+        mask = None if world_mask is None else self._normalize_reset_world_mask(world_mask)
+        if mask is not None and (mask.dtype is not wp.bool or mask.shape != (self.scene.envs + 1,) or mask.device != self.scene.device):
+            raise ValueError(f"continuation mask must be a ({self.scene.envs + 1},) bool array on {self.scene.device}; "
+                             "the last slot selects rows shared by all worlds")
+        self.continuation.copy(state, control, mask, save)
+        for system in self.systems:
+            system.rebuild_caches(self.scene)
+        if not save:
+            for output in self._outputs:
+                self.publisher.clear(output, self.all_worlds if mask is None else mask)
+
+    @property
+    def all_worlds(self):
+        """The ``(E+1,)`` mask selecting every world and the shared rows."""
+        return self._all
 
     def notify_model_changed(self, flags) -> None:
         """Gravity (``MODEL_PROPERTIES``) is read live from ``model.gravity``, except by a rotated component, whose

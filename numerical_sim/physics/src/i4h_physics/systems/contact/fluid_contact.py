@@ -68,6 +68,11 @@ class FluidContact(System):
                   inputs=[self.q_t, self.surface.tris, self.grow, self.margin],
                   outputs=[self.lowers, self.uppers], device=scene.device)
 
+    def rebuild_caches(self, scene):
+        """The tree is built once and only refit while stepping, so its shape depends on when it was built."""
+        self._bounds(scene)
+        self.bvh.rebuild()
+
     def substep_start(self, scene, dt, s, substeps):
         self._bounds(scene)  # the tissue was predicted by ``particles`` earlier in the list
         self.bvh.refit()

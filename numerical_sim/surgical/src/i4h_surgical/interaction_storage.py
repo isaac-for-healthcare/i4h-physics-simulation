@@ -10,7 +10,7 @@ Capacities come from the authored scene and the system settings, never from syst
 import numpy as np
 import warp as wp
 from i4h_physics.history_storage import RECORDS, Layout, bind_history, published
-from i4h_physics.storage import defer_declaration
+from i4h_physics.storage import defer_declaration, scene_record
 from i4h_physics.surface_storage import support_domain
 
 
@@ -35,7 +35,7 @@ def tool_rows(scene, shape, names, tool):
 
 
 def particle_starts(scene, body):
-    return lambda: [scene._storage_starts[e] + body.offset for e in range(scene.envs)]
+    return lambda: [scene_record(scene).starts[e] + body.offset for e in range(scene.envs)]
 
 
 def residue_domain(layout, body, starts):

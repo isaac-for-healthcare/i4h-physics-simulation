@@ -153,6 +153,29 @@ class PhysicsBinding:
         self.scene.initialize_particle_history(selection)
         return True
 
+    def save(self, dst_state, dst_control, env_ids=None, *, mask=None):
+        """Copy the selected worlds' i4h rows into another State and Control of this Model (``I4hSolver.save_i4h``);
+        every world and the shared rows when neither ``env_ids`` nor ``mask`` is given."""
+        return self._continue("save_i4h", dst_state, dst_control, env_ids, mask)
+
+    def restore(self, src_state, src_control, env_ids=None, *, mask=None):
+        """Copy saved i4h rows back into the bound State and Control (``I4hSolver.restore_i4h``). No reset, cache
+        refresh or preparation runs; with a rigid solver the host restores body state itself."""
+        return self._continue("restore_i4h", src_state, src_control, env_ids, mask)
+
+    def _continue(self, call, state, control, env_ids, mask):
+        self.check_valid()
+        runtime = self._standalone.solver if self._standalone is not None else self._runtime
+        if env_ids is None and mask is None:
+            getattr(runtime, call)(state, control, None)
+            return True
+        selection, worlds = ((self._standalone._mask, self._standalone.world_mask) if self._standalone is not None
+                             else (self._mask, self.world_mask))
+        if not select_envs(selection, env_ids, mask, debug=self.debug):
+            return False
+        getattr(runtime, call)(state, control, worlds)
+        return True
+
     def reset_physics(self, env_ids=None, *, mask=None):
         self.check_valid()
         if self._standalone is not None:

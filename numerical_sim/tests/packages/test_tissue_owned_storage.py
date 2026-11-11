@@ -260,8 +260,8 @@ def test_fresh_runtime_resumes_an_episode_with_tissue_and_fluid_history(device, 
     equal.
 
     Fluid contact keeps one thing outside State: the shape of its triangle tree, built from the positions at
-    construction and only refitted afterwards. The uninterrupted runtime therefore rebuilds that tree at the save
-    point, which is what a fresh binding does implicitly. Without the rebuild the two diverge in the pool positions.
+    construction and only refitted afterwards. ``save_i4h`` rebuilds that tree in the saving runtime, which is what
+    a fresh binding does implicitly. Without the rebuild the two diverge in the pool positions.
     """
     cfg, a, m = authored(device)
     state, control = m.state(), m.control()
@@ -272,16 +272,13 @@ def test_fresh_runtime_resumes_an_episode_with_tissue_and_fluid_history(device, 
             if (name, key) != ("Smoke", "acc"):  # the spawn kernel zeroes it in every step without a smoking contact
                 assert field(sim, name, key).numpy().any(), f"the episode left {name}.{key} at its default"
     saved_state, saved_control = m.state(), m.control()
-    copy_container(state, saved_state)
-    copy_container(control, saved_control)
+    sim.physics.save(saved_state, saved_control)
     saved = snapshot(saved_state, saved_control)
+    assert saved == snapshot(state, control)
     resumed = runtime(cfg, a, m, captured, state=saved_state, control=saved_control)
     TissueEpisode(resumed)
     assert snapshot(saved_state, saved_control) == saved, first_difference(snapshot(saved_state, saved_control), saved)
     if device == "cpu":
-        contact = system(sim, "FluidContact")
-        contact._bounds(sim.scene)
-        contact.bvh.rebuild()
         for closed in (True, False):
             episode.run(6, closed, resumed)
             left, right = snapshot(state, control), snapshot(saved_state, saved_control)

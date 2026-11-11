@@ -8,7 +8,7 @@ from weakref import ref
 import newton
 import numpy as np
 import warp as wp
-from i4h_physics.storage import Domain, Field, Owner
+from i4h_physics.storage import Domain, Field, Owner, scene_record
 
 IDENTITY = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
 
@@ -55,14 +55,14 @@ def declare_mounts(scene, mounts, *, two_way=False):
     """Direct Scene path: after target declarations, before schema registration."""
     if hasattr(scene, "declarations") or scene.q is not None:
         raise RuntimeError("declare mounts before allocation or schema registration; reconstruct the model")
-    if hasattr(scene, "_mount_declaration"):
+    if scene_record(scene).mounts is not None:
         raise ValueError("duplicate mount declaration")
-    scene._mount_declaration = configuration(mounts, two_way)
+    scene_record(scene).mounts = configuration(mounts, two_way)
 
 
 def mounted_defaults(builder, *, scene_ref, names):
     scene = scene_ref()
-    configured = {entry[0] for entry in getattr(scene, "_mount_declaration", ((), False))[0]}
+    configured = {entry[0] for entry in (scene_record(scene).mounts or ((), False))[0]}
     return np.asarray([int(name in configured) for name in names] or [0], np.int32)
 
 
@@ -154,7 +154,7 @@ def group_entries(descriptors, config):
 
 
 def publish_mounts(scene, declarations, builder):
-    config = getattr(scene, "_mount_declaration", None)
+    config = scene_record(scene).mounts
     if config is None:
         return
     if hasattr(scene, "mount_domains"):

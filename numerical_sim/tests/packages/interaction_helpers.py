@@ -29,18 +29,21 @@ HISTORY = {
 }
 
 
-def chole_cfg(disable=()):
+def chole_cfg(disable=(), enable=()):
     cfg = read_case("chole_tet_med")
     cfg["assets"].update({name: {"type": "instrument", **record} for name, record in cfg.get("instruments", {}).items()})
     for spec in cfg["systems"]:
         if spec["type"] in disable:
             spec["enabled"] = False
+        if spec["type"] in enable:
+            spec["enabled"] = True
     return cfg
 
 
-def authored(device, envs=2, disable=(), mount=None):
-    """``mount``: an instrument name to mount two-way on a free rigid body ``holder`` added to every world."""
-    cfg = chole_cfg(disable)
+def authored(device, envs=2, disable=(), mount=None, enable=()):
+    """``mount``: an instrument name to mount two-way on a free rigid body ``holder`` added to every world.
+    ``enable``: system types the case ships disabled (its liver-gallbladder ``tissue_contact``)."""
+    cfg = chole_cfg(disable, enable)
     a = author_case(cfg, loaders={**physical.LOADERS, **LOADERS}, systems={**physical.SYSTEMS, **SYSTEMS}, device=device, envs=envs,
                     mounts={mount: {"body": "holder"}} if mount else None, coupling_mode="two_way" if mount else "one_way")
     b = newton.ModelBuilder()

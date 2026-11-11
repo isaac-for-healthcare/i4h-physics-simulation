@@ -146,7 +146,7 @@ class CaseAuthoring:
             value = getattr(getattr(obj, "i4h", None), field, None)
             if value != [self.token] or (obj is not model and value is not getattr(model.i4h, field)):
                 raise ValueError(f"foreign model/state/control: missing matching i4h {field}")
-        if self.storage is None or not self.storage._authored:
+        if self.storage is None or not self.storage.authored:
             raise RuntimeError("call authoring.complete(builder) before model finalization")
         if self.cfg != self._declared_cfg or self._layout() != self._declared_layout:
             raise RuntimeError("persistent systems or capacities changed; reconstruct the model")

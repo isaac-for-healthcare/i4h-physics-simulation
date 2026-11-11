@@ -9,7 +9,7 @@ node holds the tree's reference position; one row per world holds the rebuild re
 import numpy as np
 import warp as wp
 from i4h_physics.history_storage import Layout
-from i4h_physics.storage import defer_declaration
+from i4h_physics.storage import defer_declaration, scene_record
 
 EDGE_SAMPLES = 3  # samples inside each catheter edge (graph_containment.EDGE_SAMPLES)
 
@@ -25,7 +25,7 @@ def publish_graph_containment(scene, declarations, system_id, *, body, centrelin
     anchor = np.concatenate([np.arange(Pc), np.repeat(np.arange(Pc - 1), EDGE_SAMPLES)]).astype(np.int64)
 
     def owners(part, local):
-        return lambda: np.asarray([scene._storage_starts[e] + part.offset for e in range(E)], np.int64)[:, None] + local[None]
+        return lambda: np.asarray([scene_record(scene).starts[e] + part.offset for e in range(E)], np.int64)[:, None] + local[None]
 
     layout = Layout(scene, declarations, system_id, "graph_containment")
     sample = layout.domain("sample", (E, n), "particle", owners(b, anchor))

@@ -197,6 +197,12 @@ class System:
         """Restore existing episode defaults; live parameters retain their established policy."""
         self.reset(scene, mask)
 
+    def rebuild_caches(self, scene: Scene) -> None:
+        """Rebuild search structures whose shape depends on when they were built, from current State. Called by
+        ``save_i4h`` and ``restore_i4h`` only, so that a restored runtime and the saving one hold the same
+        structure; never part of a step, reset or preparation. Writes no State or Control."""
+        pass
+
     def refresh(self, scene: Scene, mask: wp.array) -> None:
         """Refresh derived caches without changing history, commands, topology or measurements.
 
