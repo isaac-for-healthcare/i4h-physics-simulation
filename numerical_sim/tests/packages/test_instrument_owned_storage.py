@@ -212,7 +212,7 @@ def test_replacements_rejected_even_by_prepare(replacement):
     elif replacement == 'host':
         sim.scene.instruments['a'].spheres.pop()
     else:
-        sim.solver._command_views['first'].torch_views()['position'].transpose_(0, 1)
+        sim.solver.command_view('first').torch_views()['position'].transpose_(0, 1)
     for f in (sim.prepare, sim.step, lambda: sim.physics.command_views('first')):
         with pytest.raises((RuntimeError, ValueError), match="changed|replaced|fresh runtime|reconstruct"):
             f()

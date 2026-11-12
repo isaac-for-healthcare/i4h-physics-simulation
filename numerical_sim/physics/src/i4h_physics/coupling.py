@@ -187,14 +187,14 @@ class CoupledSolver(SolverBase):
 
     @dataclass(eq=False)
     class Observables(Observables):
-        _rigid: object = field(default=None, repr=False)
-        _ours: object = field(default=None, repr=False)
+        rigid: object = field(default=None, repr=False)
+        ours: object = field(default=None, repr=False)
 
         def select(self, kinds):
             selected = super().select(kinds)
-            selected._rigid = self._rigid.select(selected.kinds - KINDS)
-            selected._ours = self._ours.select(selected.kinds & KINDS)
-            selected._identities = identities(selected)
+            selected.rigid = self.rigid.select(selected.kinds - KINDS)
+            selected.ours = self.ours.select(selected.kinds & KINDS)
+            selected.identities = identities(selected)
             return selected
 
     @property
@@ -203,12 +203,12 @@ class CoupledSolver(SolverBase):
 
     def observables(self, kinds, *, contacts=None, requires_grad=None):
         result = super().observables(kinds, contacts=contacts, requires_grad=requires_grad)
-        result._rigid = self.rigid.observables(result.kinds - KINDS, contacts=contacts, requires_grad=requires_grad)
-        result._ours = self.ours.observables(result.kinds & KINDS, requires_grad=requires_grad)
+        result.rigid = self.rigid.observables(result.kinds - KINDS, contacts=contacts, requires_grad=requires_grad)
+        result.ours = self.ours.observables(result.kinds & KINDS, requires_grad=requires_grad)
         for kind in result.kinds & KINDS:
-            setattr(result, kind, getattr(result._ours, kind))
-        result.row_keys = result._ours.row_keys
-        result._identities = identities(result)
+            setattr(result, kind, getattr(result.ours, kind))
+        result.row_keys = result.ours.row_keys
+        result.identities = identities(result)
         return result
 
     def __init__(self, model, rigid: SolverBase, ours: SolverBase, mounts: Mounts | None = None, rigid_substeps: int = 1):
@@ -220,10 +220,10 @@ class CoupledSolver(SolverBase):
     def step(self, state_in, state_out, control, contacts, dt: float, observables=None) -> None:
         self.validate_observables(observables, contacts)
         if observables is not None:
-            check_identities(observables._identities)
+            check_identities(observables.identities)
         if state_out is not state_in:
             raise RuntimeError("CoupledSolver steps one state in place (NewtonManager._use_single_state)")
-        self.ours._check_state(state_in, "coupled step")
+        self.ours.check_state(state_in, "coupled step")
         if control is not self.ours.control:
             raise ValueError("CoupledSolver: only the bound control is supported")
         self.ours.check_binding()
@@ -234,13 +234,13 @@ class CoupledSolver(SolverBase):
             self.mounts.apply(state_in, self.model)
         for _ in range(self.rigid_substeps):  # MuJoCo-Warp: its own contacts; particles untouched; body_f held
             self.rigid.step(state_in, state_in, control, contacts if observables is not None else None,
-                            dt / self.rigid_substeps, observables=None if observables is None else observables._rigid)
+                            dt / self.rigid_substeps, observables=None if observables is None else observables.rigid)
         if self.mounts is not None:
             self.mounts.drive(state_in)
         self.ours.step(state_in, state_in, control, None, dt,
-                       observables=None if observables is None else observables._ours)
+                       observables=None if observables is None else observables.ours)
         if observables is not None and observables.contact_f is not None:
-            wp.copy(observables.contact_f, observables._rigid.contact_f)
+            wp.copy(observables.contact_f, observables.rigid.contact_f)
         if self.mounts is not None:
             self.mounts.fill(self.ours.substeps, dt)
 
@@ -259,7 +259,7 @@ class CoupledSolver(SolverBase):
         """Refresh child caches; pending reactions belong to the current episode."""
         from newton import StateFlags
 
-        self.ours._check_state(state, "coupled reset")
+        self.ours.check_state(state, "coupled reset")
         self.ours.check_binding()
         if self.mounts is not None:
             self.mounts.check(state, self.model, self.ours.control)
@@ -281,7 +281,7 @@ class CoupledSolver(SolverBase):
         self.ours.restore_episode(state, control, world_mask)
         self.rigid.reset(state, world_mask=world_mask, flags=0)
         if self.mounts is not None:
-            self.mounts.reset(self.ours._all if world_mask is None else world_mask)
+            self.mounts.reset(self.ours.all_worlds if world_mask is None else world_mask)
 
 
 @wp.kernel

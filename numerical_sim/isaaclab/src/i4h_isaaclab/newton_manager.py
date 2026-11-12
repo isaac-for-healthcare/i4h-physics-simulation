@@ -134,12 +134,12 @@ class ConstructionContext:
             self._output_kinds = tuple(self.cfg.observables)
             if self.cfg.observables:
                 binding.observables = binding._runtime.observables(self.cfg.observables, contacts=binding.contacts)
-                containers = [binding.observables, getattr(binding.observables, "_rigid", None),
-                              getattr(binding.observables, "_ours", None)]
+                containers = [binding.observables, getattr(binding.observables, "rigid", None),
+                              getattr(binding.observables, "ours", None)]
                 binding._output_arrays = [(owner, name, value) for owner in containers if owner is not None
                                           for name, value in vars(owner).items() if isinstance(value, wp.array)]
                 binding._output_arrays.extend((binding.observables, name, getattr(binding.observables, name))
-                                              for name in ("_rigid", "_ours") if hasattr(binding.observables, name))
+                                              for name in ("rigid", "ours") if hasattr(binding.observables, name))
             binding._output_arrays.append((binding, "observables", binding.observables))
             if self.on_solver is not None:
                 self.on_solver(self.binding)

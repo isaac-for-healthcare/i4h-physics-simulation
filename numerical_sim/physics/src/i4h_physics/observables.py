@@ -60,7 +60,7 @@ class Observables(SolverBase.Observables):
 
     def select(self, kinds):
         result = super().select(kinds)
-        result._identities = identities(result)
+        result.identities = identities(result)
         return result
 
 
@@ -144,17 +144,17 @@ class OutputPublisher:
             capsule_offset = next(i for i, row in enumerate(self.layout["capsule"]) if row[0] == sid)
             record_offset = next((i for i, row in enumerate(self.layout["record"]) if row[0] == sid), 0)
             self.contacts.append((source, capsule_offset, record_offset, scene.field("q", source.body)))
-        self._identities = []
+        self.identities = []
         for control, sources, _, _ in self.wrenches:
             for source in sources:
-                self._identities.extend((source, name, getattr(source, name)) for name in ("impulse", "moment"))
+                self.identities.extend((source, name, getattr(source, name)) for name in ("impulse", "moment"))
         for source, _ in self.depths:
-            self._identities.extend((source, name, getattr(source, name)) for name in ("contact_depth", "contact_count"))
+            self.identities.extend((source, name, getattr(source, name)) for name in ("contact_depth", "contact_count"))
         for source, _, _, _ in self.contacts:
-            self._identities.extend((source, name, getattr(source, name)) for name in
+            self.identities.extend((source, name, getattr(source, name)) for name in
                                     ("record_count", "rec_tri", "rec_tet", "rec_verts", "rec_bary", "rec_pen", "rec_t", "rec_normal"))
             ic = getattr(source, "instruments")
-            self._identities.extend((ic, name, getattr(ic, name)) for name in ("sphere_q", "prim_a", "prim_b"))
+            self.identities.extend((ic, name, getattr(ic, name)) for name in ("sphere_q", "prim_a", "prim_b"))
 
     def initialize(self, obs):
         obs.row_keys = MappingProxyType({

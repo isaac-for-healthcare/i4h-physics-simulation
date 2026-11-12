@@ -123,11 +123,11 @@ class I4hNewtonSolver(NewtonSolver):
         # output and the component's i4h output in one non-owning container.
         combined = copy(sensor_output)
         combined._kinds = sensor_output.kinds | output.kinds
-        combined._ours = output._ours
+        combined.ours = output.ours
         combined.row_keys = output.row_keys
         for kind in KINDS:
             setattr(combined, kind, getattr(output, kind))
-        combined._identities = identities(combined)
+        combined.identities = identities(combined)
         self._combined_output = combined
 
     def step(self, state_in, state_out, control, contacts, dt, *, observables=None):
@@ -137,7 +137,7 @@ class I4hNewtonSolver(NewtonSolver):
         self.native.step(state_in, state_out, control, contacts, dt, observables=output)
         if observables is not None and binding.observables is not None and binding.observables.contact_f is not None:
             wp.copy(binding.observables.contact_f, observables.contact_f)
-            wp.copy(binding.observables._rigid.contact_f, observables.contact_f)
+            wp.copy(binding.observables.rigid.contact_f, observables.contact_f)
 
     def post_step(self, state):
         context(self.cfg).physics_step()

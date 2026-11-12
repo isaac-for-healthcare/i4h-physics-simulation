@@ -135,7 +135,7 @@ class PhysicsBinding:
             raise KeyError(system_id)
         if system.command_view_spec is None:
             raise NotImplementedError(f"system {system_id!r} does not supply command views")
-        return self.solver._command_views[system_id].views
+        return self.solver.command_view(system_id).views
 
     def reset(self, env_ids=None, *, mask=None):
         return self.reset_physics(env_ids, mask=mask)

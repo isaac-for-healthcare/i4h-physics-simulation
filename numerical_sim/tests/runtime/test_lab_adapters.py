@@ -134,16 +134,16 @@ def test_coupled_native_forces_and_observable_ownership(make):
     output = binding.observables
     contacts = lab_runtime().contacts
     assert output._solver is solver
-    assert output._rigid._solver is solver.rigid and output._ours._solver is solver.ours
-    assert output.contact_f.ptr != output._rigid.contact_f.ptr
+    assert output.rigid._solver is solver.rigid and output.ours._solver is solver.ours
+    assert output.contact_f.ptr != output.rigid.contact_f.ptr
     selected = output.select((SolverBase.ObservableKind.CONTACT_F,))
-    assert selected.contact_f is output.contact_f and selected._rigid._solver is solver.rigid
+    assert selected.contact_f is output.contact_f and selected.rigid._solver is solver.rigid
     ptr = output.contact_f.ptr
     for _ in range(10):
         env.step(torch.zeros((2, 10), device=env.device))
     assert output.contact_f.ptr == ptr
     assert np.isfinite(output.contact_f.numpy()).all() and np.abs(output.contact_f.numpy()).max() > 0
-    np.testing.assert_array_equal(output.contact_f.numpy(), output._rigid.contact_f.numpy())
+    np.testing.assert_array_equal(output.contact_f.numpy(), output.rigid.contact_f.numpy())
     solver.update_contacts(contacts, binding.state)
     assert np.abs(contacts.force.numpy()).max() > 0, "native rigid force export is real"
     with pytest.raises(TypeError, match="instance of Observables"):
@@ -153,7 +153,7 @@ def test_coupled_native_forces_and_observable_ownership(make):
     with pytest.raises(ValueError, match="does not support"):
         solver.ours.observables((SolverBase.ObservableKind.CONTACT_F,))
     for owner, name, replacement in ((output, "contact_f", wp.clone(output.contact_f)),
-                                      (output, "_rigid", output._rigid.select(output._rigid.kinds)),
+                                      (output, "rigid", output.rigid.select(output.rigid.kinds)),
                                       (binding, "observables", selected)):
         original = getattr(owner, name)
         setattr(owner, name, replacement)
@@ -187,14 +187,14 @@ def test_custom_output_routing_and_rebuild(make, captured, coupled):
     assert output.i4h_wrench.shape == (2,)
     assert output.i4h_surgical_count.shape == (2,)
     if coupled:
-        assert output._rigid.kinds == {Kind.CONTACT_F}
-        assert output._ours.kinds == KINDS
-        assert output.i4h_wrench is output._ours.i4h_wrench
+        assert output.rigid.kinds == {Kind.CONTACT_F}
+        assert output.ours.kinds == KINDS
+        assert output.i4h_wrench is output.ours.i4h_wrench
         selected = output.select((Kind.I4H_WRENCH,))
-        assert not selected._rigid.kinds and selected._ours.kinds == {Kind.I4H_WRENCH}
+        assert not selected.rigid.kinds and selected.ours.kinds == {Kind.I4H_WRENCH}
         assert selected.contact_f is None
         binding.coupled.step(binding.state, binding.state, binding.control, binding.contacts, binding.dt, selected)
-        assert output.select(())._ours.kinds == frozenset()
+        assert output.select(()).ours.kinds == frozenset()
     before = binding.state.particle_q.numpy().copy()
     original = output.i4h_wrench
     output.i4h_wrench = wp.clone(original)
@@ -240,7 +240,7 @@ def test_contact_sensor_and_component_exports_coexist(make, captured, component_
     assert np.abs(sensor.total_force.numpy()).max() > 0
     if component_contact:
         assert np.abs(output.contact_f.numpy()).max() > 0
-        np.testing.assert_array_equal(output.contact_f.numpy(), output._rigid.contact_f.numpy())
+        np.testing.assert_array_equal(output.contact_f.numpy(), output.rigid.contact_f.numpy())
     if hasattr(manager, "contact_observables"):
         assert manager.contact_observables._solver is env.simulator.coupled
         assert manager.add_contact_sensor(body_names_expr=".*") is sensor

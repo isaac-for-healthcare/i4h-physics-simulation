@@ -238,7 +238,7 @@ class I4hComponent:
         """Cached writable Torch slices; use the existing stream-ordering boundary."""
         binding = self._live().physics
         binding.command_views(system_id)
-        return binding.solver._command_views[system_id].torch_views()
+        return binding.solver.command_view(system_id).torch_views()
 
     def action_bounds(self, workspace: float = 0.1) -> tuple[np.ndarray, np.ndarray]:
         """Physical ``(A,)`` bounds of the concatenated control columns, as each control declares them."""

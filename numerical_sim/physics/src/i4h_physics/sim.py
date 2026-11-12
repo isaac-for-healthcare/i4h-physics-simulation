@@ -81,7 +81,7 @@ class I4hSolver(SolverBase):
             self.publisher = OutputPublisher(self)
         result = super().observables(kinds, contacts=contacts, requires_grad=requires_grad)
         self.publisher.initialize(result)
-        result._identities = identities(result)
+        result.identities = identities(result)
         self._outputs.append(result)
         self._output_identities.extend(identities(result))
         return result
@@ -89,17 +89,17 @@ class I4hSolver(SolverBase):
     def validate_observables(self, observables, contacts=None):
         super().validate_observables(observables, contacts)
         if observables is not None:
-            check_identities(observables._identities)
+            check_identities(observables.identities)
 
     def check_binding(self):
         """Host boundary check; capture never performs structural or buffer validation."""
-        self._check_state(self.state, "check_binding")
+        self.check_state(self.state, "check_binding")
         self.scene.storage.check()
         for commands in self._command_views.values():
             commands.check()
         check_identities(self._output_identities)
         if self.publisher is not None:
-            check_identities(self.publisher._identities)
+            check_identities(self.publisher.identities)
         for owner, name, array in self._bound_arrays:
             if getattr(owner, name) is not array:
                 raise RuntimeError(f"bound {name} buffer was replaced; construct and bind a fresh runtime")
@@ -114,7 +114,7 @@ class I4hSolver(SolverBase):
         self.substeps, self.iterations = check_int("substeps", substeps, 1), check_int("iterations", iterations, 1)
         self.active = [s for s in self.systems if check_bool(f"{s.id or type(s).__name__}.enabled", s.enabled)]  # structural
 
-    def _check_state(self, state, what: str) -> None:
+    def check_state(self, state, what: str) -> None:
         if self.scene is None:
             raise RuntimeError("I4hSolver is unbound")
         if state is not self.state:
@@ -123,7 +123,7 @@ class I4hSolver(SolverBase):
     # SolverBase -------------------------------------------------------------------------------------------------
 
     def step(self, state_in, state_out, control, contacts, dt: float, observables=None) -> None:
-        self._check_state(state_in, "step")
+        self.check_state(state_in, "step")
         if self.control is not None and control is not self.control:
             raise ValueError("I4hSolver.step: only the bound control is supported")
         if contacts is not None:
@@ -161,7 +161,7 @@ class I4hSolver(SolverBase):
 
     def reset(self, state, world_mask=None, flags=0) -> None:
         """Refresh caches against current state, optionally restoring supported particle fields."""
-        self._check_state(state, "reset")
+        self.check_state(state, "reset")
         supported = int(StateFlags.PARTICLE_Q | StateFlags.PARTICLE_QD | StateFlags.PARTICLE_F)
         flags = supported if flags is None else int(flags)
         if flags & ~supported:
@@ -182,7 +182,7 @@ class I4hSolver(SolverBase):
 
     def restore_episode(self, state, control, world_mask=None) -> None:
         """Restore authored physical state, history and command defaults for selected worlds."""
-        self._check_state(state, "restore_episode")
+        self.check_state(state, "restore_episode")
         if self.control is not None and control is not self.control:
             raise ValueError("I4hSolver.restore_episode: only the bound control is supported")
         mask = self._all if world_mask is None else self._normalize_reset_world_mask(world_mask)
@@ -239,6 +239,15 @@ class I4hSolver(SolverBase):
         if not save:
             for output in self._outputs:
                 self.publisher.clear(output, self.all_worlds if mask is None else mask)
+
+    @property
+    def outputs(self):
+        """The observable containers this solver allocated, in allocation order."""
+        return tuple(self._outputs)
+
+    def command_view(self, system_id):
+        """The command view record of one control system (``views``, ``torch_views()``, ``check()``)."""
+        return self._command_views[system_id]
 
     @property
     def all_worlds(self):

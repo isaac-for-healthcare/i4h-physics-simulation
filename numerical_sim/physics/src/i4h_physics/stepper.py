@@ -162,7 +162,7 @@ def signature(owner, systems) -> tuple:
     every system's (identity included, so a replaced system counts as a change), plus the buffer of each live array
     (a rebound one counts as a change; a scalar or reshaped one raises in ``System.live_pointers``)."""
     own = tuple(getattr(owner, name) for name in owner.structural)
-    own += (tuple(id(output) for output in owner.solver._outputs),)
+    own += (tuple(id(output) for output in owner.solver.outputs),)
     return own, tuple((type(s).__name__, id(s)) + tuple(getattr(s, name) for name in s.structural) + (s.live_pointers(),)
                       for s in systems)
 
