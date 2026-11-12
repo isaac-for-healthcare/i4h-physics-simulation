@@ -51,7 +51,7 @@ paths, revisions, package versions and patch state were checked. The preserved
 checkouts and environments were not upgraded.
 
 **C3.0 did not modify the supplied checkout at
-`/home/pkorzeniowsk/Projects/newton/newton-1.8`.** C3.0's independent Newton clone
+`~/Projects/newton/newton-1.8`.** C3.0's independent Newton clone
 came from `.tmp_tests/newton18/newton` with `--no-hardlinks`; the environments
 installed the exact Git revision into their own site-packages, as their import
 records show. [The read-only checkout check][supplied-newton] finds a clean

@@ -365,16 +365,16 @@ Compute processes recorded at entry (raw nvidia-smi output):
 
 ```text
 65109, /tmp/.mount_solvecCKlfCk/usr/bin/solvecraft, 1071 MiB
-983357, /home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-sim-rod-physical/physics_simulation/i4h-sim/.venv/bin/python, 938 MiB
-983384, /home/pkorzeniowsk/Projects/i4h/i4h-validation/catheter/.venv-newton18/bin/python, 652 MiB
+983357, ~/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-sim-rod-physical/physics_simulation/i4h-sim/.venv/bin/python, 938 MiB
+983384, ~/Projects/i4h/i4h-validation/catheter/.venv-newton18/bin/python, 652 MiB
 ```
 
 64 world(s):
 
 ```text
 65109, /tmp/.mount_solvecCKlfCk/usr/bin/solvecraft, 1071 MiB
-983357, /home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-sim-rod-physical/physics_simulation/i4h-sim/.venv/bin/python, 938 MiB
-983384, /home/pkorzeniowsk/Projects/i4h/i4h-validation/catheter/.venv-newton18/bin/python, 652 MiB
+983357, ~/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-sim-rod-physical/physics_simulation/i4h-sim/.venv/bin/python, 938 MiB
+983384, ~/Projects/i4h/i4h-validation/catheter/.venv-newton18/bin/python, 652 MiB
 ```
 
 ## Carried historical construction and memory evidence

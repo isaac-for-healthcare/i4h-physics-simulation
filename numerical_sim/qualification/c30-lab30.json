@@ -1,5 +1,5 @@
 {
-  "status": "candidate; not accepted",
+  "status": "accepted by the user on 2026-11-12; the final frozen campaign and the timing gate are deferred",
   "host": "lab30",
   "python": "3.12.12",
   "newton": {
@@ -18,7 +18,7 @@
       "isaaclab_visualizers": "isaaclab-visualizers @ git+https://github.com/isaac-sim/IsaacLab.git@e53cd288727a5ca3dae7187d1d415b4d32b67e11#subdirectory=source/isaaclab_visualizers",
       "isaaclab_assets": "isaaclab-assets @ git+https://github.com/isaac-sim/IsaacLab.git@e53cd288727a5ca3dae7187d1d415b4d32b67e11#subdirectory=source/isaaclab_assets"
     },
-    "local_checkout": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/.tmp_tests/stage-c30-20261109/lab30",
+    "local_checkout": ".tmp_tests/stage-c30-20261109/lab30",
     "patch": "docs/newton18-lab30-cloner.patch"
   },
   "warp": {
