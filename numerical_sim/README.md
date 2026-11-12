@@ -34,10 +34,15 @@ sim.step()
 sim.reset([1])  # physical reset only
 ```
 
+Newton owns the simulation data: particles, topology, history and commands are fields of the Newton Model, State and
+Control, declared before finalize. Systems hold views of them and keep only scratch, outputs and tables. A State and
+Control pair can be saved and restored with `sim.physics.save(state, control)` and `sim.physics.restore(state, control)`;
+see `docs/component-contracts.md` for what that covers.
+
 There is no `i4h_sim` compatibility package. Assessment is constructed and advanced by the host after each completed physics sample, before rewards or terminations. Episode reset explicitly resets both physical state and the assessment object. Constructor maps are passed explicitly; systems may receive ordinary sidecars from factories without registration or a sidecar lifecycle framework.
 
 Build members with `uv build --all-packages`. Use Python `>=3.12,<3.13`; development
-continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton 1.8.0rc1; coupling uses MuJoCo and MuJoCo-Warp 3.17.0.
+continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton at revision `7f0c13af` (1.9.0.dev0, pinned in `physics/pyproject.toml`); coupling uses MuJoCo and MuJoCo-Warp 3.17.0.
 
 Camera observations are owned by Isaac Lab and do not require standalone. Teleoperation
 adapters now import from `i4h_standalone.devices` and `i4h_standalone.teleop`.

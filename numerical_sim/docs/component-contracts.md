@@ -43,6 +43,19 @@ They come from the feasibility spike recorded at the end, and every test of thos
 
 - A masked reset resets our rows (positions, velocities, `q_prev`, flags, system products) and the host rigid solver's selected worlds in one call.
 - An empty selection changes nothing.
+- This is the episode reset. The cache reset (`I4hSolver.reset(flags=0)`, which Lab calls after state is written through its asset API) refreshes derived caches and keeps history.
+
+**Continuation.**
+
+- `I4hSolver.save_i4h(dst_state, dst_control, mask=None)` and `restore_i4h(src_state, src_control, mask=None)` copy between the bound containers and another State and Control of the same Model. `PhysicsBinding.save` / `restore` and `I4hComponent.save` / `restore` forward to them and accept `env_ids`.
+- **Copied:** every declared State and Control field and the scene's own rows of `particle_q`, `particle_qd` and `particle_f`. **Never written:** foreign host particles, padding rows, body and joint fields, Model fields and initialization templates.
+- **Mask:** `(E+1,)` bool; the last slot selects rows shared by all worlds. `None` selects everything.
+- **Rejected:** the bound containers themselves, containers of another Model or another finalize, replaced arrays, and a Control that shares its buffers with the Model templates (`model.control(clone_variables=False)`).
+- **Recipe:** bind, prepare, then restore. A restore runs no reset, cache refresh or preparation. Call both at a completed step boundary, outside graph capture.
+- **Side effect:** both calls rebuild the contact search trees from current positions. A runtime that saves differs at rounding level from one that never saved. With a partial mask, unselected worlds keep their State and Control bytes but may differ at rounding level in later steps.
+- **Hosted order:** write the host's own state, call the simulation's `forward()`, and restore the i4h rows last. Otherwise Lab's cache reset follows the restore.
+- **Not saved:** a rigid solver's own history (including MuJoCo-Warp's), host time and episode counters, assessment, procedure and tip evidence, renderer state and recordings. With a rigid solver the host restores body state itself.
+- **Bitwise resume** is tested on the CPU for every case, and on CUDA for the rod and mount fixtures only; chole and the aorta cases are not repeatable on CUDA.
 
 ## 2. Coordinate frames
 

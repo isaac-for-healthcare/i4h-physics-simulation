@@ -89,8 +89,8 @@ results privately and summarize passed, failed, skipped and unavailable checks c
   instrument-box handle is a property of a pose device (`settings.handle: {box, channel}`, `input/avatar.py`): the box
   itself has no pose and binds no tool; it supplies grip and pedals and receives the tool's `jaw_load` as the handle force.
 - **Isaac Lab drives the loop.** The simulator owns no loop, thread or window.
-  `Stepper.step()` advances one physics sample; `NewtonSim.step()` calls the manager
-  with its configured decimation. `reset(env_ids)` resets selected envs; per-env inputs
+  `Stepper.step()` advances one standalone physics sample; in Isaac Lab the native manager
+  advances physics and owns decimation. `reset(env_ids)` resets selected envs; per-env inputs
   and outputs are device arrays viewable with `wp.to_torch`; device is a constructor
   parameter. Every system implements masked `reset`.
 - **Systems do not reach into other systems.** Shared data lives in `Scene`. A system
@@ -100,9 +100,14 @@ results privately and summarize passed, failed, skipped and unavailable checks c
   takes `body:` and uploads the host records the loader attached to that `Body`
   (`TetMesh`, `ConnectorSet`, `PinSet`, `CentrelineSet`, `RodMesh`, `ShellMesh`, `CentrelineTree`,
   `SkinMesh`; domain records are attached by their owning loaders; `ParticleRest` is uploaded by
-  `Scene.allocate()`); it owns the device arrays. Topology changes go through the
+  `Scene.allocate()`). State and Control arrays are Newton's: a system declares them in
+  `declare_storage` before finalize and binds views; it allocates only scratch, outputs and tables. Topology changes go through the
   `surface` system: it owns the live per-env triangles, support counters; appearance belongs to the surgical sidecar, and `deactivate_tet` is the one way to remove a tet. No string registries, no
   `__getattr__` forwarding.
+- **Three operations, kept apart.** Episode reset (`restore_episode`, `Stepper.reset`) restores authored state,
+  history and command defaults of the selected worlds. Cache reset (`I4hSolver.reset(flags=0)`) refreshes derived
+  caches and keeps history. Continuation (`save_i4h`, `restore_i4h`) copies State and Control rows between containers
+  and runs neither. A system with a search tree built at binding implements `rebuild_caches`.
 - **Defaults live on the system class** as dataclass fields; YAML states only what
   differs. The config loader is `SYSTEMS[type](scene, **entry)` in list order and
   nothing else. Unknown keys fail through the dataclass constructor. Never author a

@@ -11,17 +11,23 @@ import i4h_isaaclab.tasks  # registers the preserved Gym task IDs
 
 ## Isaac Lab compatibility
 
-Isaac Lab is installed from source. The Stage A dependency probes qualify Newton
-1.8.0rc1 (`91fb115d685a96311b2f1bac5527754ee4e9c21b`), Warp 1.17.0,
-MuJoCo/MuJoCo-Warp 3.17.0, Lab main `dc01ec356052f2acd04246752a92a55162f6cd68`,
-and patched Lab 3.0 `e53cd288727a5ca3dae7187d1d415b4d32b67e11`.
-Stage B now supplies main pure/coupled solver adapters and a narrow release 3.0
+Isaac Lab is installed from source. The qualified stack is Newton
+`7f0c13af6e4dd75253709c31dc65c0edcaf22b44` (1.9.0.dev0), Warp 1.17.0,
+MuJoCo/MuJoCo-Warp 3.17.0, Lab main `4cfdfcfa52d7cb64eb83ab293b2fcfc92452aaf1`,
+and patched Lab 3.0 `e53cd288727a5ca3dae7187d1d415b4d32b67e11`; the exact pins are in
+`qualification/c30-{core,main,lab30}.json`.
+The package supplies main pure/coupled solver adapters and a narrow release 3.0
 manager bridge over the same authoring, binding and numerical core. Lab owns
 allocation, stepping and capture; component bindings own views and episode
 restoration. The alternate backend and `NewtonSim` have been removed.
 
+`I4hComponent.save(state, control)` and `restore(state, control)` copy the i4h-owned rows of the live State and
+Control to and from another pair of the host's Model. Rigid body state, host time and assessment are the host's to
+restore. Restore last: write the host's own state, call the simulation's `forward()`, then restore the i4h rows,
+because Lab runs the solver's cache reset for worlds written through its asset API at the next forward or step.
+
 Patched 3.0 additionally needs the explicit
-[cloner compatibility delta](../docs/newton18-lab30-cloner.patch): RC1 uses public
+[cloner compatibility delta](../docs/newton18-lab30-cloner.patch): Newton uses public
 `surface_label` / `volume_label` and their corresponding private particle starts.
 The supplied checkout remains unchanged; qualification uses an isolated worktree
 based on e53cd288 with that patch. See [adapter evidence](../docs/stage-b-host.md)
