@@ -9,7 +9,7 @@
 | Reference groups | 35 of 36; the failure is `aorta_shell` catheter impulse on Lab 3.0 eager | [stage-c44.md](stage-c44.md) |
 | Chole trials | 17 of 18; every group at least 2 of 3 | same |
 | Test suites | core 1,261, Lab main 123, Lab 3.0 122 passed; 0 failed | same |
-| Step time | all eight hosted comparisons within +5% of the Stage B references (report-only by user decision) | same |
+| Step time | all eight hosted comparisons within +5% of the Stage B references (report-only by user decision); standalone `aorta_static` at one world is +5.8% over Stage A | same |
 | Kernels | unchanged by AST across C4.0 to C4.4 | each checkpoint's preservation audit |
 | Stack | Newton `7f0c13af` (1.9.0.dev0), Warp 1.17.0, MuJoCo and MuJoCo-Warp 3.17.0, Lab main `4cfdfcfa`, patched Lab 3.0 `e53cd288` | `qualification/c30-*.json` |
 
@@ -17,7 +17,7 @@ The closure rule (user, 2026-11-10): Stage C may close if the only failed refere
 
 ## Ownership
 
-Newton Model, State and Control hold the fields below, declared on the builder before finalize. Systems hold views of them.
+Newton Model, State and Control hold the fields below, declared on the builder before finalize. Systems hold views of them. The table is by data family, not per system. Its chole rows were checked against the declarations of a bound `chole_tet_med` runtime; the rod and catheter row is taken from the C3.2 report.
 
 | Data | Owner | Since |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ The allocation inventory (`docs/stage-c-inventory.json`, 454 sites in 192 files)
 | Cache reset | `I4hSolver.reset(state, mask, flags=0)` | Derived caches are refreshed from current state; history is kept |
 | Continuation | `save_i4h` / `restore_i4h` and their binding and component forms | Every declared State and Control field and the scene's own particle rows are copied between containers of one Model; no reset or preparation runs |
 
-Each system's reset keeps its exact earlier behaviour, including what it leaves alone: stale Grasp, VolumetricGrasp and Hook slot bytes, the drag node and target, mounted flags and the instrument's current pose. Two lifecycle writes outside episode reset remain as named exceptions: Hook's disabled `prepare` zeroes `active`, and GraphContainment's `prepare` forces a rebuild.
+Each system's reset keeps its exact earlier behaviour, including what it leaves alone: stale Grasp, VolumetricGrasp and Hook slot bytes, the drag node and target, mounted flags and the instrument's current pose. Three lifecycle writes outside episode reset remain as named exceptions: Hook's disabled `prepare` zeroes `active`, GraphContainment's `prepare` forces a rebuild, and Centreline rewrites its positions and counts from the current particles at binding.
 
 ## Continuation contract
 
@@ -86,7 +86,7 @@ Certificates and approved references are in the git-ignored `.tmp_tests`. The re
 
 - **Third-party private access** remains in the Isaac Lab 3.0 bridge, the env hooks, the storage layer (Newton custom-attribute internals) and Warp array views. Each is tied to a pinned revision; `scripts/check_private_reaches.py` lists them.
 - **The standalone renderer** shares private names inside its own package.
-- **Construction time** at 64 worlds is about 15 s for chole, spent authoring custom rows one world at a time.
+- **Construction time** at 64 worlds is about 15 s for chole, of which about 12 s is authoring custom rows.
 - **Memory:** chole retains 1.36 GB of Warp memory at 64 worlds, including initialization templates.
 
 ## Deferred beyond Stage C

@@ -1,6 +1,6 @@
 # C4.4 — Private-name cleanup, final campaign and timing
 
-**Implemented; the final campaign meets the closure rule and every timing comparison is within 5%.** The simulator and its hosts no longer use each other's underscore-prefixed names. The single frozen campaign on `95c8f4c` passed 35 of 36 groups, with the one failure in `aorta_shell` catheter impulse, and all three suites with zero failures. The timing campaign on the same commit was run report-only. Closing Stage C is the user's decision; the summary for it is [stage-c-closure.md](stage-c-closure.md). Nothing was pushed.
+**Implemented; the final campaign meets the closure rule, and all eight hosted timing comparisons are within 5% of the Stage B references.** The simulator and its hosts no longer use each other's underscore-prefixed names. The single frozen campaign on `95c8f4c` passed 35 of 36 groups, with the one failure in `aorta_shell` catheter impulse, and all three suites with zero failures. The timing campaign on the same commit was run report-only. Closing Stage C is the user's decision; the summary for it is [stage-c-closure.md](stage-c-closure.md). Nothing was pushed.
 
 Unchanged: all 223 kernels, verified by AST against the C4.3 commit `d3604e4`; storage layout and every byte count; capacity 256, comparator, zero floors, factor three, approved references, chole 2-of-3, dependency pins and the retained environments.
 
@@ -9,9 +9,11 @@ Unchanged: all 223 kernels, verified by AST against the C4.3 commit `d3604e4`; s
 1. **Groups 2 to 5 were tested together.** The plan said each cleanup commit is followed by its tests. The first commit was tested alone (665 tests); the other four were tested in one trial run of all three suites, then again in the development selection.
 2. **Some names differ from the plan's table.** Delivered: `measure_step` (not `measure`, which is a module function), `resolved_case`, `adopt_gravity`, `region_membership`, `bind_callback`, `VEC3_BYTES`/`F32_BYTES`/`I32_BYTES`, and `mark_prepared()` without an argument.
 3. **A standalone `PhysicsBinding` has no `env_mask`.** The stepper and the hosted binding have it; the standalone binding forwards to its stepper.
-4. **The timing harness ran once before the freeze as a smoke test**, on the same commit, to prove the renamed code still runs under it. Those numbers are not used. The reported timing campaign ran once after the frozen campaign.
+4. **The timing harness ran twice.** A full 16-worker run before the freeze, on the same commit, proved the renamed code still runs under it; an auditor self-comparison ran on the CPU at the same time, so it is not a clean measurement. The reported campaign ran once after the frozen campaign. Both sets of percentages are in the timing section.
 5. **Standalone timing was bracketed, not monitored.** Two GPU process snapshots before and after show no compute process; the hosted campaign was monitored continuously.
-6. **The certificate's status field reads "OPEN".** The inherited auditor writes "complete" only at 36 of 36 groups. The closure rule allows the one failure.
+6. **The auditor does not derive the continuation bytes from row-domain counts**, as the plan said. For C4.4 it requires every construction count to equal C4.3. In its dry run on the C4.3 evidence it accepts the byte count the code reports and checks only that it is consistent with the particle count.
+7. **The preservation audit covers the physics, surgical and endoluminal packages only.** The assessment, Isaac Lab and standalone changes are covered by the suites alone.
+8. **The certificate's status field reads "OPEN".** The inherited auditor writes "complete" only at 36 of 36 groups. The closure rule allows the one failure.
 
 ## Cleanup
 
@@ -47,6 +49,13 @@ Old names were removed, not aliased. Tests and `scripts/qualify_procedures.py` u
 The checker does not see private methods of third-party base classes that i4h overrides or calls through `self` (for example the Isaac Lab env hooks).
 
 **Preservation audit** (`.tmp_tests/stage-c44-20261112/preservation-audit.json`): no kernel differs. Six hooks differ, and each is identical to its old version after applying the renames: `step`, `reset` and `restore_episode` of `I4hSolver` and of `CoupledSolver`.
+
+Changes that are more than a renamed name, all without a change in behaviour:
+
+- new accessors: `I4hSolver.outputs` and `command_view`, `PhysicsBinding.runtime`, `prepared`, `mark_prepared`, `invalidate_preparation` and `register_outputs`, `Stepper.prepared`, `Scene.adopt_gravity`, `I4hComponent.order_inputs`;
+- `ConstructionContext.prepare` and `publish` call those binding methods where they assigned private attributes;
+- `TiledCamera.prepare` reads `prepared`; `check_host_gravity` calls `adopt_gravity`;
+- `detach` reads the declared `bind_callback` attribute where it used `getattr` with a default.
 
 **Inventory:** 454 sites in 192 files, no classification change; two sites changed expression through a rename.
 
@@ -100,9 +109,21 @@ Median step time in ms, against the Stage B references and against C4.0:
 | `aorta_static` | 64 | Lab main | 10.270203 | 9.821954 | 10.235698 | -0.34% | +4.21% |
 
 - All eight comparisons are within +5% of the Stage B references. The two `tissue_contact` 64-world comparisons that exceeded 5% in C4.0 (+7.5%, +7.7%) are now +2.6% and +2.9%.
-- `aorta_static` is 4.2% to 4.6% slower than in C4.0 and still at or below its Stage B references. The causes of either movement were not investigated; the two campaigns ran two days apart on a shared machine.
+- `aorta_static` is 4.2% to 4.6% slower than in C4.0 and still at or below its Stage B references. The causes of either movement were not investigated. The two campaigns ran two days apart on a shared machine, and the OS kernel changed in between (`7.0.0-42` to `7.0.0-43`; GPU driver 615.71.09 at C4.4).
+- The pre-freeze run on the same commit gave, against Stage B (Lab 3.0, Lab main): `tissue_contact` +3.42% and +3.91% (1 world), +2.91% and +3.17% (64 worlds); `aorta_static` +1.63% and -2.80% (1 world), -1.38% and +2.81% (64 worlds). The two runs differ by up to 3.2 points on `aorta_static`, which bounds what one run can resolve.
 - Export overhead is at most +0.22%.
-- Retained Warp bytes per hosted run: `tissue_contact` 8,546 (1 world) and 424,346 (64 worlds); `aorta_static` 7,143,540 and 21,198,588. Construction took 0.67 s to 1.37 s.
+- Construction took 0.67 s to 1.37 s per hosted run.
+
+Retained and peak Warp bytes per hosted run against the Stage B Lab 3.0 references (the Lab main references do not record memory):
+
+| Workload | Worlds | Stage B retained | C4.4 retained | Stage B peak | C4.4 peak |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `tissue_contact` | 1 | 6,064 | 8,546 | 16,779,500 | 16,783,484 |
+| `tissue_contact` | 64 | 310,669 | 424,346 | 16,899,767 | 17,056,967 |
+| `aorta_static` | 1 | 5,855,154 | 7,143,540 | 16,822,188 | 18,938,172 |
+| `aorta_static` | 64 | 18,163,527 | 21,198,588 | 20,486,429 | 24,239,237 |
+
+The growth is the Newton-owned storage added in Stage C: initialization templates beside each State and Control field, row identity columns, and the continuation row maps.
 
 Standalone (`scripts/measure.py`, p50 step time in ms, not gated):
 
@@ -113,7 +134,7 @@ Standalone (`scripts/measure.py`, p50 step time in ms, not gated):
 | `aorta_static` | 1 | 7.378 | 7.395 | 7.806 |
 | `aorta_static` | 64 | 10.183 | 9.907 | 10.417 |
 
-Standalone `aorta_static` is 5.8% (1 world) and 2.3% (64 worlds) above Stage A.
+Standalone `aorta_static` is 5.8% (1 world) and 2.3% (64 worlds) above Stage A, and 5.6% and 5.1% above C4.0. Standalone timing has no gate and was not monitored.
 
 ## After the freeze
 

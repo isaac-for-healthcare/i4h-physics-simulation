@@ -241,3 +241,4 @@ acd91e14e254b1f12e10b91e0ec0411bf1c9caebeff71aac57cad9edbe3fcfb2  .tmp_tests/sta
 539b8285ea3a72a9094870c0a2d9a82eee6df3772e096176722238ac263c9c7a  .tmp_tests/stage-c44-20261112/timing/main-tissue_contact-64.log
 13ac8103242e9376b179b17b8580d857489185ee80db41d077de2df11d067b9e  .tmp_tests/stage-c44-20261112/timing/process-observations.jsonl
 820a32531f9485b07b34761d42904af3c0a6c2e0bc6015c22a01e855d8975bc0  .tmp_tests/stage-c44-20261112/timing/results.json
+9d624d8fe96e5795353457584e3c9e87326a70069ad20e47c2e272eebf158e4f  .tmp_tests/stage-c44-20261112/timing-smoke/decision.json
