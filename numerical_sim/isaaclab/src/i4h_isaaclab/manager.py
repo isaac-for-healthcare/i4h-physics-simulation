@@ -197,7 +197,7 @@ class I4hActionTerm(ActionTerm):
         self._raw.copy_(actions)
         task = self._env.i4h_task
         if task is not None:
-            self._env.i4h._order("in")
+            self._env.i4h.order_inputs()
             task.begin_action(self._env.extras)
         if self.cfg.mode == "physical":
             self._processed.copy_(actions)

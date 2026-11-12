@@ -74,6 +74,7 @@ class ConstructionContext:
         self.on_solver = on_solver
         self.authoring = self._author()
         self.binding = self.manager = self.backend = None
+        self.bind_callback = None  # the solver-init callback registered with a Lab main backend
         self.subscriptions = []
         self.closed = False
         self.api = host_api()

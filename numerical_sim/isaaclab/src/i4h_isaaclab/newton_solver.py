@@ -33,8 +33,8 @@ def attach(owner):
 
 def _ready(owner):
     owner.backend = owner.manager.backend
-    owner._bind_main = lambda: _bind_main(owner)
-    owner.manager.register_solver_init_callback(owner._bind_main)
+    owner.bind_callback = lambda: _bind_main(owner)
+    owner.manager.register_solver_init_callback(owner.bind_callback)
 
 
 def _bind_main(owner):
@@ -51,7 +51,7 @@ def _stop(owner):
 
 def detach(owner):
     if owner.backend is not None:
-        callback = getattr(owner, "_bind_main", None)
+        callback = owner.bind_callback
         if callback in owner.backend.solver_init_callbacks:
             owner.backend.solver_init_callbacks.remove(callback)
     owner.backend = None

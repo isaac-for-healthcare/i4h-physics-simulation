@@ -291,6 +291,10 @@ class I4hComponent:
         self._live()
         self._order("out")
 
+    def order_inputs(self) -> None:
+        """Order Warp after Torch's current stream, before a Warp write that follows Torch writes into shared views."""
+        self._order("in")
+
     def _order(self, direction: str) -> None:
         dev = self.scene.device
         if not dev.is_cuda:

@@ -89,7 +89,7 @@ class Recorder:
         cfg = u.cfg
         self.handler.add_env_args({
             "format_version": FORMAT_VERSION, "case": str(cfg.case), "data_root": root,
-            "case_yaml": yaml.safe_dump(unresolve_data_path(u._case, root), sort_keys=False),
+            "case_yaml": yaml.safe_dump(unresolve_data_path(u.resolved_case, root), sort_keys=False),
             "backend": cfg.backend, "num_envs": int(u.num_envs), "decimation": int(cfg.decimation),
             "physics_dt": float(u.physics_dt), "workspace": float(cfg.workspace), "observe": str(cfg.observe),
             "camera": int(cfg.camera), "camera_mode": str(cfg.camera_mode), "episode_length_s": float(cfg.episode_length_s),
@@ -125,7 +125,7 @@ class Recorder:
         u = self.u
         action = self.teleop.physical[0]
         ep.add("actions", action)
-        ep.add("actions_normalized", torch.clamp((action - u._mid) / u._half, -1.0, 1.0), clone=False)
+        ep.add("actions_normalized", torch.clamp((action - u.action_mid) / u.action_half, -1.0, 1.0), clone=False)
         ep.add("obs/policy", obs["policy"][0])
         if self.record_camera:
             for key in ("rgb", "depth"):

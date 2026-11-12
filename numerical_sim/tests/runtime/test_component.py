@@ -312,7 +312,7 @@ def test_component_from_a_case_without_rigid_bodies(host):
         assert component.command_views("instrument_control") is commands
         assert commands["position"].shape == (2, 1, 3)
         commands["energy"].fill_(.75)
-        component._order("in")
+        component.order_inputs()
         np.testing.assert_array_equal(component.sim.physics.command_views("instrument_control")["energy"].numpy(), .75)
         component.detach()
         with pytest.raises(RuntimeError, match="invalidated"):

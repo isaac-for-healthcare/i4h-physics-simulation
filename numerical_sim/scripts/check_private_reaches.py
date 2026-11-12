@@ -52,13 +52,6 @@ ALLOWED = {
         "standalone/src/i4h_standalone/render/smoke.py": {"_default", "_frame", "_render_state", "_texture"},
         "standalone/src/i4h_standalone/render/xr.py": {"_ensure_targets", "_frame_uniforms"},
     },
-    "to be removed in C4.4": {
-        "assessment/src/i4h_assessment/executor.py": {"_measure", "_qualify"},
-        "isaaclab/src/i4h_isaaclab/manager.py": {"_order"},
-        "isaaclab/src/i4h_isaaclab/newton_solver.py": {"_bind_main"},
-        "isaaclab/src/i4h_isaaclab/recording.py": {"_case", "_half", "_mid"},
-        "standalone/src/i4h_standalone/devices.py": {"_half", "_mid"},
-    },
 }
 
 

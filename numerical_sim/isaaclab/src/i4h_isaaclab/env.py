@@ -148,10 +148,10 @@ class I4hEnv(DirectRLEnv):
         sync_teleop_case(cfg)
         apply_backend(cfg)
         case = read_case(cfg.case)  # once per construction
-        self._case = with_gravity(case, resolve_gravity(cfg, case))  # _setup_scene runs inside super().__init__
+        self.resolved_case = with_gravity(case, resolve_gravity(cfg, case))  # _setup_scene runs inside super().__init__
         from i4h_isaaclab.newton_manager import construction_context
 
-        cfg.sim.physics.solver_cfg.case = self._case
+        cfg.sim.physics.solver_cfg.case = self.resolved_case
         self._construction = None
         try:
             with construction_context(cfg.sim.physics.solver_cfg, device=cfg.sim.device,
@@ -169,7 +169,7 @@ class I4hEnv(DirectRLEnv):
             raise
 
     def _setup_scene(self):
-        case = self._case
+        case = self.resolved_case
         check_dt(self.physics_dt, sim_settings(case)["dt"])  # the physics dt is Isaac Lab's; the manager checks it again
         self._torch_device = torch.device(self.device)
         self._zero_reward = torch.zeros(self.num_envs, device=self._torch_device)
@@ -229,7 +229,7 @@ class I4hEnv(DirectRLEnv):
 
     def _bind(self, sim):
         """Zero-copy views, bounds and camera over the current PhysicsBinding."""
-        case = self._case
+        case = self.resolved_case
         from i4h_isaaclab.composition import build_procedure
 
         self.procedure = build_procedure(case, sim, horizon_s=self.max_episode_length * self.step_dt)
@@ -245,7 +245,7 @@ class I4hEnv(DirectRLEnv):
         self.action_views = action_views(sim)
         low, high = action_bounds(sim, self.cfg.workspace)
         self.low, self.high = torch.as_tensor(low, device=self._torch_device), torch.as_tensor(high, device=self._torch_device)
-        self._mid, self._half = (self.low + self.high) / 2.0, (self.high - self.low) / 2.0
+        self.action_mid, self.action_half = (self.low + self.high) / 2.0, (self.high - self.low) / 2.0
         self._actions = torch.zeros((self.num_envs, low.shape[0]), device=self._torch_device)
         self.obs_views = observation_views(sim, self.cfg.observe)
         self.state_views = state_views(sim)
@@ -284,7 +284,7 @@ class I4hEnv(DirectRLEnv):
         if self.cfg.action_mode == "physical":  # the teleop rows (poses in sim units, quaternion, grip, energy, fire) as they are
             self._actions.copy_(actions)
         else:
-            map_actions(actions, self._mid, self._half, self._actions)
+            map_actions(actions, self.action_mid, self.action_half, self._actions)
 
     def _apply_action(self):
         self.simulator.check_prepared()

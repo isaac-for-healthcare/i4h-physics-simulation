@@ -151,7 +151,7 @@ def test_physical_mode_equals_normalized_mode(make_env):
         u = env.unwrapped
         env.reset()
         for a in sequence:
-            obs, *_ = env.step(a if mode == "normalized" else u._mid + u._half * a)
+            obs, *_ = env.step(a if mode == "normalized" else u.action_mid + u.action_half * a)
         torch.cuda.synchronize()
         results[mode] = obs["policy"].clone()
     assert torch.allclose(results["normalized"], results["physical"], atol=1e-5)

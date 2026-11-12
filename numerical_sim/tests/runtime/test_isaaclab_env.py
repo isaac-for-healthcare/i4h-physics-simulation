@@ -677,13 +677,13 @@ def test_standalone_matches_host(make_env, case, tmp_path):
 
     env = make_env(case=case, stagger_episodes=False)
     u = env.unwrapped
-    standalone = load_case(u._case, envs=2)
+    standalone = load_case(u.resolved_case, envs=2)
     standalone.reset()
     env.reset()
     gen = torch.Generator(device=u.device).manual_seed(3)
     for _ in range(40):
         action = torch.rand((2, u.low.numel()), generator=gen, device=u.device) * 2 - 1
-        physical = (u._mid + u._half * action).cpu().numpy()
+        physical = (u.action_mid + u.action_half * action).cpu().numpy()
         offset = 0
         for control in controls(standalone):
             width = int(np.prod(control.actions.shape[1:]))

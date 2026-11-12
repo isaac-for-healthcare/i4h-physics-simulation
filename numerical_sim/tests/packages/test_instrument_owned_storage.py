@@ -113,7 +113,7 @@ def test_templates_domains_and_named_views(device, captured, empty):
     assert not np.array_equal(s.sphere_q.numpy()[:, 0], s.sphere_q.numpy()[:, 1])
     for key, (start, stop) in s.command_view_spec.items():
         t[key].fill_(start + .25)
-        component._order("in")
+        component.order_inputs()
         np.testing.assert_array_equal(s.actions.numpy()[..., start:stop], start+.25)
         v[key].fill_(start+.5)
         component.sync_views()

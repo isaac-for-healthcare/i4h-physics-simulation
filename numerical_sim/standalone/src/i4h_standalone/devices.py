@@ -165,7 +165,7 @@ class I4hTeleopDevice(DeviceBase):
                 break
             offset += int(s.actions.size // sim.scene.envs)
         columns = slice(offset, offset + 10 * control.count)
-        self._mid, self._half = u._mid[columns].to(self.cfg.sim_device), u._half[columns].to(self.cfg.sim_device)
+        self._mid, self._half = u.action_mid[columns].to(self.cfg.sim_device), u.action_half[columns].to(self.cfg.sim_device)
         if self.haptics_cfg.enabled:
             if self._servo is not None:
                 raise ValueError("push_force already drives the servo: attach haptics or push forces, not both")
