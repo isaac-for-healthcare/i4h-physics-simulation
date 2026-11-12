@@ -1,3 +1,18 @@
+**C4.4 status — 2026-11-12: implemented; the final campaign meets the closure rule.**
+The simulator and its hosts no longer use each other's private names (a checker lists the 50
+remaining uses, all third-party, renderer or stored attributes); kernels are unchanged and six hooks
+differ by renames only. The single frozen campaign on `95c8f4c` passed **35/36 groups** (the failure
+is `aorta_shell` catheter impulse on Lab 3.0 eager), **46/48 replays, 17/18 chole trials** and core
+**1,261**, Lab main **123**, Lab 3.0 **122** with zero failures. Construction bytes equal C4.3
+exactly. The timing campaign, report-only by user decision, is within +5% of the Stage B references
+in all eight comparisons (`tissue_contact` at 64 worlds +2.6% and +2.9%). Of the C4.3 stop
+conditions, the construction time and the new chole failure pattern did not repeat, the
+`CoupledSolver` reaches are removed, and the Lab call order stays a documented contract awaiting
+acceptance. See [stage-c44.md](stage-c44.md) and [stage-c-closure.md](stage-c-closure.md).
+**Closing Stage C is the user's decision.** No push.
+
+---
+
 **Closure housekeeping — 2026-11-12.** The user moved the timing campaign and the final frozen
 campaign to after C4.4 and asked for the housekeeping now. Done: the qualification records are
 marked accepted with both campaigns deferred, home-directory paths are gone from tracked files, the
