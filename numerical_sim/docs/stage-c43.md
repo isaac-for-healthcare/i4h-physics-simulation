@@ -104,8 +104,25 @@ Core had one failure before the freeze: `test_env_isolation.py::test_chole_batch
 - **Time, stop condition.** `aorta_centreline` at 64 worlds is +30.2% and chole +5.0% against C4.2; the limit is 10% for both. The centreline difference is in row authoring (0.376 s against 0.244 s), which C4.3 does not change in behaviour.
 - **Diagnostic after the campaign, not campaign evidence.** Five samples each of `aorta_centreline` at 64 worlds on `09bec9f` and on `d3604e4` gave medians of 0.593 s and 0.601 s (+1.3%), with row authoring at 0.241 s and 0.243 s (`.tmp_tests/stage-c43-20261111/diagnostic-centreline/`). The five new samples ran first, then the five old ones; they did not alternate. The old source now measures 0.593 s against its own C4.2 campaign sample of 0.493 s, so the reference moved with the machine. All six campaign samples are slower than C4.2, and `aorta_shell` at 64 worlds is +14.2%.
 
+## Housekeeping after the campaign (2026-11-12)
+
+The user's instruction: move the timing campaign and the final frozen campaign to after C4.4, do the closure housekeeping now, and update this report. I read "1" and "2" as those two C4.4 campaigns. If the C4.3 stop conditions 1 and 2 were meant instead, the outcome is the same: nothing was rerun and both stay open. Stop conditions 3 and 4 were not addressed and stay open. Stage C is not closed and no closure report was written.
+
+Done, in commits `0a3216b` and the document commit after it:
+
+- **Qualification records.** `qualification/c30-{core,main,lab30}.json` now say accepted by the user on 2026-11-12, with the final campaign and timing gate deferred. Their `local_checkout` paths are relative to `numerical_sim`.
+- **Home paths.** The home prefix in `docs/stage-c21-closure.md` (four process-list lines) and `docs/stage-c30.md` (one line) is shortened to `~`. No tracked file names the home directory any more.
+- **References and certificate.** They stay in the git-ignored `.tmp_tests`; 32 MB and 134 MB were not committed. `qualification/approved-references.sha256` lists the 72 files of `approved-v3`, and `qualification/c43-certificate.sha256` lists 201 files of the C4.3 certificate, the corrected auditor and the three audit logs (receipts and pytest caches left out). This certificate is the latest, not a final one: its status is open and the corrected auditor produced it. An archive location outside the worktree is still the user's to name.
+- **Documents.** The READMEs, `CONTRIBUTING.md`, `docs/package-migration.md` and `docs/component-contracts.md` were corrected against the code and extended, not rewritten in full: Newton and Lab revisions now match the pins, the removed `NewtonSim` is gone, and Newton ownership, the three reset-like operations, the continuation call with its exclusions, and the hosted call order are described. Rod material keys were checked and are unchanged (`young`, `torsion`, `bend`, `twist`).
+
+Consequences:
+
+- **The frozen manifest no longer matches the tree.** The three qualification JSON files differ from the C4.3 manifest. They hold no code and nothing reads their status, but the change is unqualified until the deferred campaign.
+- **Not done:** host-layer private reaches and the two `CoupledSolver` reaches (production code, with no campaign to qualify a change), the closure report, the timing gate and the final campaign.
+
 ## Open and unverified
 
+- The timing campaign and the final frozen campaign are deferred to after C4.4 (user, 2026-11-12).
 - The four stop conditions await the user's disposition: construction time, the new chole failure pattern, the two `CoupledSolver` reaches, and Lab's cache reset after a restore.
 - Four failed chole trials, retained; cause not investigated.
 - `aorta_shell` catheter impulse failures, retained without attribution (user decision).

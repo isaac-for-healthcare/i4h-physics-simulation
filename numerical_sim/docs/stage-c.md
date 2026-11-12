@@ -1,3 +1,14 @@
+**Closure housekeeping — 2026-11-12.** The user moved the timing campaign and the final frozen
+campaign to after C4.4 and asked for the housekeeping now. Done: the qualification records are
+marked accepted with both campaigns deferred, home-directory paths are gone from tracked files, the
+approved references and the C4.3 certificate are recorded by SHA-256 in `qualification/` (the files
+stay in `.tmp_tests`; an archive location is still to be named), and the READMEs, contributing
+guide, migration notes and component contracts match the implementation. The three qualification
+JSON files now differ from the C4.3 manifest, unqualified until the deferred campaign. The four C4.3
+stop conditions stay open; Stage C is not closed. See [stage-c43.md](stage-c43.md).
+
+---
+
 **C4.3 status — 2026-11-11: implemented; open on four stop conditions.**
 `save_i4h` and `restore_i4h` copy every i4h-owned State and Control row between containers of one
 Model; both rebuild the four contact search trees in place; kernels and existing hooks are unchanged.
