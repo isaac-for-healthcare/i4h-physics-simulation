@@ -11,7 +11,6 @@ import warp as wp
 from i4h_isaaclab.composition import check_dt, maps, sim_settings
 from i4h_physics import PhysicsBinding, author_case
 from i4h_physics.coupling import CoupledSolver, Mounts
-from i4h_physics.stepper import signature
 from isaaclab.utils import configclass
 from isaaclab_newton.physics import NewtonSolverCfg
 
@@ -133,14 +132,14 @@ class ConstructionContext:
             binding.contacts = self.api.contacts(self)
             self._output_kinds = tuple(self.cfg.observables)
             if self.cfg.observables:
-                binding.observables = binding._runtime.observables(self.cfg.observables, contacts=binding.contacts)
+                binding.observables = binding.runtime.observables(self.cfg.observables, contacts=binding.contacts)
                 containers = [binding.observables, getattr(binding.observables, "rigid", None),
                               getattr(binding.observables, "ours", None)]
-                binding._output_arrays = [(owner, name, value) for owner in containers if owner is not None
-                                          for name, value in vars(owner).items() if isinstance(value, wp.array)]
-                binding._output_arrays.extend((binding.observables, name, getattr(binding.observables, name))
-                                              for name in ("rigid", "ours") if hasattr(binding.observables, name))
-            binding._output_arrays.append((binding, "observables", binding.observables))
+                binding.register_outputs([(owner, name, value) for owner in containers if owner is not None
+                                          for name, value in vars(owner).items() if isinstance(value, wp.array)], replace=True)
+                binding.register_outputs((binding.observables, name, getattr(binding.observables, name))
+                                         for name in ("rigid", "ours") if hasattr(binding.observables, name))
+            binding.register_outputs([(binding, "observables", binding.observables)])
             if self.on_solver is not None:
                 self.on_solver(self.binding)
             self.prepare()
@@ -158,7 +157,7 @@ class ConstructionContext:
         self.check_coupling_config()
         binding = self.binding
         binding.check_valid()
-        binding._prepared = None
+        binding.invalidate_preparation()
         self.api.invalidate_graph(self)
         from i4h_physics.systems.rods.material import validate_material_systems
         binding.solver.check_binding()
@@ -166,7 +165,7 @@ class ConstructionContext:
         for system in binding.systems:
             system.prepare(binding.scene)
         binding.solver.configure(binding.dt, binding.substeps, binding.iterations, binding.debug)
-        binding._prepared = signature(binding, binding.systems)
+        binding.mark_prepared()
 
     def physics_step(self):
         """Device-resident work, called exactly once per physics step inside the host graph."""

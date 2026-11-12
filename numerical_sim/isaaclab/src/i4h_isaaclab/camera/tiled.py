@@ -369,7 +369,7 @@ class TiledCamera:
         The simulator's own graphs are captured first, so the step graph never captures after this one."""
         self.graph = None
         dev = self.scene.device
-        if self.sim._prepared is None:
+        if not self.sim.prepared:
             self.sim.prepare()
         self._render()
         with wp.ScopedDevice(dev):

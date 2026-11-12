@@ -231,7 +231,7 @@ class PhysicsWorker(threading.Thread):
         if not self.sim.reset_physics(env_ids):
             return False
         if self.procedure is not None:
-            self.procedure.reset(mask=self.sim._mask)
+            self.procedure.reset(mask=self.sim.env_mask)
         for d in self.drivers:
             d.reset(env_ids)
         self.t = 0.0

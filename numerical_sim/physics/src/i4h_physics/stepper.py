@@ -51,7 +51,7 @@ class Stepper:
         self._prepared = None
         E, dev = self.scene.envs, self.scene.device
         self.world_mask = wp.zeros(E + 1, dtype=wp.bool, device=dev)  # the reset graph's selection; [E] is world -1
-        self._mask = self.world_mask[:E]
+        self.env_mask = self.world_mask[:E]
         from i4h_physics.bindings import PhysicsBinding
 
         self.physics = PhysicsBinding(self)
@@ -117,6 +117,11 @@ class Stepper:
                     gc.enable()
         self._prepared = signature  # only after a successful capture, so a failed capture cannot fall back silently
 
+    @property
+    def prepared(self) -> bool:
+        """Whether the last ``prepare()`` completed; a structural change afterwards is reported by the next step."""
+        return self._prepared is not None
+
     def _check_prepared(self) -> None:
         if self._prepared is None:
             self.prepare()
@@ -148,7 +153,7 @@ class Stepper:
         (Isaac Lab's per-step ``reset_buf`` without its ``nonzero()`` sync). Replays the reset graph when captured.
         Torch inputs need no ordering by the caller (see ``select_envs``); Warp arrays are read on Warp's stream."""
         self._check_prepared()
-        if not select_envs(self._mask, env_ids, mask, debug=self.debug):
+        if not select_envs(self.env_mask, env_ids, mask, debug=self.debug):
             return False
         if self.reset_graph is not None:
             wp.capture_launch(self.reset_graph)

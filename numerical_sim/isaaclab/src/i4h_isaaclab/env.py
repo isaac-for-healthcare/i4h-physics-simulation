@@ -325,7 +325,7 @@ class I4hEnv(DirectRLEnv):
         self._save_terminal_task(mask=self.reset_buf)
         self.simulator.reset(mask=self.reset_buf)  # select_envs orders Warp after torch's writes of reset_buf
         if self.task is not None:
-            self.procedure.reset(mask=self.simulator._mask)
+            self.procedure.reset(mask=self.simulator.env_mask)
             self.task.clear_recorded(mask=self.reset_buf)
         self.episode_length_buf.masked_fill_(self.reset_buf, 0)
         return None
@@ -339,9 +339,9 @@ class I4hEnv(DirectRLEnv):
         super()._reset_idx(env_ids)
         self._torch_to_warp()  # Warp (the procedure, the next step, the camera) consumes the events' writes
         if reset:
-            self.simulator.scene.initialize_particle_history(self.simulator._mask)
+            self.simulator.scene.initialize_particle_history(self.simulator.env_mask)
         if reset and self.task is not None:
-            self.procedure.reset(mask=self.simulator._mask)
+            self.procedure.reset(mask=self.simulator.env_mask)
             self.task.clear_recorded(env_ids=env_ids)
 
     def _save_terminal_task(self, env_ids=None, mask=None):

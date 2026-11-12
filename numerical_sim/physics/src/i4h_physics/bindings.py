@@ -33,7 +33,7 @@ class PhysicsBinding:
         binding.procedure = binding.after_step = binding.observables = binding.contacts = None
         binding._output_arrays = []
         binding.world_mask = wp.zeros(core.scene.envs + 1, dtype=wp.bool, device=core.scene.device)
-        binding._mask = binding.world_mask[:core.scene.envs]
+        binding.env_mask = binding.world_mask[:core.scene.envs]
         return binding
 
     def check_valid(self):
@@ -47,7 +47,7 @@ class PhysicsBinding:
         self._output_arrays = []
         self._prepared = None
         if hasattr(self, "world_mask"):
-            self.world_mask = self._mask = None
+            self.world_mask = self.env_mask = None
 
     @property
     def physics(self):
@@ -62,6 +62,30 @@ class PhysicsBinding:
     def coupled(self):
         self.check_valid()
         return self._runtime if self._runtime is not self._core else None
+
+    @property
+    def runtime(self):
+        """The solver the host steps: the coupled wrapper when there is one, otherwise ``solver``."""
+        self.check_valid()
+        return self._runtime
+
+    @property
+    def prepared(self) -> bool:
+        """Whether a hosted preparation completed and has not been invalidated since."""
+        return self._prepared is not None
+
+    def invalidate_preparation(self):
+        self._prepared = None
+
+    def mark_prepared(self):
+        """Record the structural signature that ``check_prepared`` compares against."""
+        self._prepared = signature(self, self.systems)
+
+    def register_outputs(self, entries, replace=False):
+        """Add ``(owner, name, value)`` records whose replacement ``check_prepared`` rejects."""
+        if replace:
+            self._output_arrays = []
+        self._output_arrays.extend(entries)
 
     @property
     def scene(self):
@@ -147,7 +171,7 @@ class PhysicsBinding:
         during construction callbacks, before preparation or capture.
         """
         self.solver.check_binding()
-        selection = self._standalone._mask if self._standalone is not None else self._mask
+        selection = self._standalone.env_mask if self._standalone is not None else self.env_mask
         if not select_envs(selection, env_ids, mask, debug=self.debug):
             return False
         self.scene.initialize_particle_history(selection)
@@ -169,8 +193,8 @@ class PhysicsBinding:
         if env_ids is None and mask is None:
             getattr(runtime, call)(state, control, None)
             return True
-        selection, worlds = ((self._standalone._mask, self._standalone.world_mask) if self._standalone is not None
-                             else (self._mask, self.world_mask))
+        selection, worlds = ((self._standalone.env_mask, self._standalone.world_mask) if self._standalone is not None
+                             else (self.env_mask, self.world_mask))
         if not select_envs(selection, env_ids, mask, debug=self.debug):
             return False
         getattr(runtime, call)(state, control, worlds)
@@ -181,7 +205,7 @@ class PhysicsBinding:
         if self._standalone is not None:
             return self._standalone.reset_physics(env_ids, mask=mask)
         self.check_prepared()
-        if not select_envs(self._mask, env_ids, mask, debug=self.debug):
+        if not select_envs(self.env_mask, env_ids, mask, debug=self.debug):
             return False
         self._runtime.restore_episode(self.state, self.control, self.world_mask)
         return True

@@ -48,7 +48,7 @@ def test_capture_defers_collection_and_restores_state(reject, collecting):
         if reject:
             with pytest.raises(RuntimeError, match="extension rejected capture"):
                 sim.prepare()
-            assert sim._prepared is None
+            assert not sim.prepared
         else:
             sim.prepare()
             assert sim.graph is not None and sim.reset_graph is not None

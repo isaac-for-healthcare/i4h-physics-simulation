@@ -800,7 +800,7 @@ def test_empty_reset_preserves_assessment_after_partial_reset(make_env, tmp_path
     env.step(action)
     u._reset_idx(torch.tensor([0], device=u.device))
     u.sim.step(render=False)  # advance one physics sample without the host automatic-reset path
-    assert u.simulator._mask.numpy().tolist() == [True, False]
+    assert u.simulator.env_mask.numpy().tolist() == [True, False]
     u._warp_to_torch()
     before = u.task_rows.clone()
     positions = u.simulator.scene.q.numpy().copy()
@@ -1009,7 +1009,7 @@ def test_newton_missing_regional_provider_fails_before_capture():
     owner.binding = PhysicsBinding.hosted(core, core, owner.prepare)
     with pytest.raises(ValueError, match="must precede"):
         owner.prepare()
-    assert owner.binding._prepared is None
+    assert not owner.binding.prepared
     assert provider.body.rod_material is rod.body.rod_material
 
 
