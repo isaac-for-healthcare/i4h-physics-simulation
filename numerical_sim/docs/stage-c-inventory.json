@@ -4,14 +4,14 @@
   "source_sha256": {
     "physics/src/i4h_physics/__init__.py": "9220bcf520eee3bdbb0596c88f95e689c93723f7b8e75bbd31d3abdd9d25256a",
     "physics/src/i4h_physics/array_copy.py": "83a4b24358755f9fff4469fb185ee63f8dafb3b853d5becffc3398ef91d6653f",
-    "physics/src/i4h_physics/authoring.py": "f33e87ff8f2bd5c813f71cc3d17e9b682fde02ce832f7680fa803dc1c1f1dbaf",
-    "physics/src/i4h_physics/bindings.py": "6d7ae33a3ae6fb13bb9725e9cfbd4d0217f52536693e52ad53ca7e6ab8bc9221",
+    "physics/src/i4h_physics/authoring.py": "94ceb213699270522f92ffb4c99e0bd933fe18cecfa423cd84289d617bc2cf77",
+    "physics/src/i4h_physics/bindings.py": "86616880724902a7f1cc407eb75279359fdf188ae76e464c244f6c3b6bbc95bb",
     "physics/src/i4h_physics/checks.py": "f70d7c0a15acb92cfdea996d77d946a6b4b7c4242f981d6e4ef70b77877a8a59",
     "physics/src/i4h_physics/commands.py": "623e2e682486b5a8f9bb5e1d20d48699bb421d75b7a132638978e4f0f4c1b058",
     "physics/src/i4h_physics/config.py": "e338ca755028de52f2b61fb6c950742f7f3f55d86640a22d9bfe087047b27ed5",
     "physics/src/i4h_physics/containment_storage.py": "2a8d1ce8392051236cad075bc6029823ec749608e00de6bcc04a347c0305e4b3",
     "physics/src/i4h_physics/continuation.py": "d25e60335bc3e95a7062a959bb6860e96a4714ffd576f2809c2dc0a0350674d2",
-    "physics/src/i4h_physics/coupling.py": "63f046a88b42268d164b7db940509a6987c1eed0ede206dcfeb790eeeef0639c",
+    "physics/src/i4h_physics/coupling.py": "b4df1f645de0fb3346583fba2739127eca62179825e68cfb947e00d03603e8a2",
     "physics/src/i4h_physics/debug.py": "5e4df588252639710ad1d1976feae5007caffbe845a9304f46285aeb50401712",
     "physics/src/i4h_physics/fluid_storage.py": "97be683549465d03896eb5ced05391bfed9410190cbe84bccac067580142513d",
     "physics/src/i4h_physics/history_storage.py": "268d489475b84db243e8fdaf6dbddc96e212c412c6f5ef32be052203cfb42dcf",
@@ -25,16 +25,16 @@
     "physics/src/i4h_physics/mesh_utils.py": "b2dc5e4aff5cf97ed030033e092334551fb248930868ead127ca8dd603eed008",
     "physics/src/i4h_physics/mount_storage.py": "91268ad61c7365f9d5263c715c83c806b4c4741293dcf70eee84072898e59e5d",
     "physics/src/i4h_physics/newton_compat.py": "0798550a5c5c659ebc8f02fe3a2f7c8dc1ecc1cd591b54fe16109b6b8a2d93d4",
-    "physics/src/i4h_physics/newton_model.py": "4ac90c7d1072ba058ed5e75c48f046d48df8d782ec0aeb0eb5c4aaadbf6fa7b1",
-    "physics/src/i4h_physics/observables.py": "9b2ebdac75db77e7112478738233481b22e1c2aa44cc4f567fe27ccda45f2121",
+    "physics/src/i4h_physics/newton_model.py": "667f6bfb4eab1eeae0f9b332a2b85ed4ef2eb02e86054ee7e9630928cfb2f834",
+    "physics/src/i4h_physics/observables.py": "bb59d0109875077a5bf269c3ad75d82053a0d407599ef7f8121b08bb88990e96",
     "physics/src/i4h_physics/particle_storage.py": "e5b8f7616631bd021b607ff4e1548f16341623267655a1e0c9655efd4c6995ea",
     "physics/src/i4h_physics/quat.py": "5781810f6b1fb9063834a10f0fe69a40719f9c8fb4ede168907c251437e5be4c",
     "physics/src/i4h_physics/regions.py": "d7deebce204644c170ba68aa6308235aecfefa8b015547769539ee3337269bd7",
-    "physics/src/i4h_physics/rod_storage.py": "485a2a5fd5600b5dc00eca0b9db0fd0fb628b8dc62bfe7524ace4e16c5270025",
-    "physics/src/i4h_physics/scene.py": "bd22cf7d9d3f5097f379c21217bbc67c991e3f71c823b77300f13df86d32a841",
+    "physics/src/i4h_physics/rod_storage.py": "3b223e49b3feb081b3471496fc9d27a0b63f9bd35c185a97ba015bb6ad01d01a",
+    "physics/src/i4h_physics/scene.py": "c9d55bee71f470cd9d761cf385187351fddf781754e3ffd16696e3a1c389220d",
     "physics/src/i4h_physics/scene_storage.py": "8c89ad7b319678c766670765faef2512d6bc31d393289128711818d57a125730",
-    "physics/src/i4h_physics/sim.py": "a8b40108ad47c1b87198c5b441fe8a3bf683d8a28af69f3965d37129c965d4c9",
-    "physics/src/i4h_physics/stepper.py": "b0c4c267357bd7e190ee2943ba3ab49cd2af598e8983345fd1d69153ddf76a83",
+    "physics/src/i4h_physics/sim.py": "9eba12fc51d99624620635588e2eb6d06d63205ea43e4a79d96654c6677903ce",
+    "physics/src/i4h_physics/stepper.py": "d5d2d5d24dc0d1668ec2bae858a90bc49982c2bf4cb95607ccfaced1bbc38d6f",
     "physics/src/i4h_physics/storage.py": "8dae16fd73843cf4aa1e4d4086ae60bf151ca1bbc9362a9cac76dd22855277e8",
     "physics/src/i4h_physics/surface_storage.py": "8d57e764e3e5f8c740d0a8f230954c9abb937b2044ca0b4a204f8fe9ad6b4d47",
     "physics/src/i4h_physics/systems/__init__.py": "6c210e1d46456b19dc950af65e0643828acf5f348fd1d85bb8dd29ddf3d771f4",
@@ -61,15 +61,15 @@
     "physics/src/i4h_physics/systems/mechanics/surface.py": "aed3ae86716152c15b0c9be67d31387799f1d041b7345e0098c26c14a9afdb0f",
     "physics/src/i4h_physics/systems/mechanics/tet.py": "dc40be212caf008c3f4a9e177aeb6d83ef4013b71ea4ccae34242888e29a2e1a",
     "physics/src/i4h_physics/systems/rods/__init__.py": "39b67a3543de12fbe919327958818a53222b223688ef8ece33a12bc1e46d1f14",
-    "physics/src/i4h_physics/systems/rods/material.py": "8cf79b0a46dc8e6faad84644d4862df99d0e7913f037e10bdda2f628a1e56895",
+    "physics/src/i4h_physics/systems/rods/material.py": "ffd14c1f7436e912665d406d360a0bccf1078f69be6a441610bb76f2e427f3f1",
     "physics/src/i4h_physics/systems/rods/region_kernels.py": "a1e6aaa404a813478ec4ad83e35575f5336469fff7719d3f7ee8dd894f4448f8",
     "physics/src/i4h_physics/systems/rods/rod_direct.py": "0159051577858d267cd716255fa61c85c649c2d23978dfe5ff740f0bd22cf52b",
     "physics/src/i4h_physics/systems/rods/rod_direct_kernels.py": "385acae1b0b599a5d7b39bbad3a4318e1fa6c992aef173cadb93d8dbbae80be2",
-    "physics/src/i4h_physics/systems/rods/rod_pbd.py": "5ce21e9b658bfecc5f0a692fe3baf553281256ffb9dde70901c6d8811d34306a",
+    "physics/src/i4h_physics/systems/rods/rod_pbd.py": "a9f814b41fd395de7957716fb343a004bc0051257ec07c42cd2f26819e77363f",
     "physics/src/i4h_physics/tet_storage.py": "a599960ebb888dd985de60e2e3d4177688bedfd3f3e1602f25b4296eb6ae1ad0",
     "physics/src/i4h_physics/usd.py": "6fa36a7beed0a289aa5abce379c55b2e0baf2a7d9c08c27b494c94e9b191c360",
     "surgical/src/i4h_surgical/__init__.py": "7f08898a312416edefd03cb263ace373f2e3334df5cfda81e6eefb8d1eddc2f4",
-    "surgical/src/i4h_surgical/assessment.py": "c7f4816197a52e2de4b7b269ad219902291615c5ed4f35f4d4c08ce6e445fb66",
+    "surgical/src/i4h_surgical/assessment.py": "41828b1c934fd44227c3976ce2e94ea8531e3f796d22aa078d1b3937abc8aacc",
     "surgical/src/i4h_surgical/config.py": "b08f2deccc3e87e25b1dc2c2dd80550cb8b9252b858d68ce6cea79857d726dcf",
     "surgical/src/i4h_surgical/instrument_storage.py": "a904e649930ce4b4b4af39ab3283cbc38d582636fe9cf72a21dd33522b39aaa6",
     "surgical/src/i4h_surgical/interaction_storage.py": "70903e2c39e9f35230ff9f79acdcc351cf8d173615289d7da054f968b1d83ff9",
@@ -104,11 +104,11 @@
     "surgical/src/i4h_surgical/systems/mechanics/tool_delta.py": "4e92802198d84a6d94a8a51c72d2e67a55d7b703e2711ddbebcfe0ff2aaab428",
     "surgical/src/i4h_surgical/tet_storage.py": "56f2c7a9812f72b62dbdbaabb0693d2872f70b4c31d7d285d4dbe84dc3379f13",
     "endoluminal/src/i4h_endoluminal/__init__.py": "5abbe22980a4c50ccd65e61245f6f2b3bcf641198de319645c4681020ac93144",
-    "endoluminal/src/i4h_endoluminal/assessment.py": "2bfb241fdbf59ecc75587f5cf8a5cffd013288444fefbc88b4d2a932c2e105a4",
-    "endoluminal/src/i4h_endoluminal/bindings.py": "945b8b4755024fa9cdcbc8231df48da91e7a987494135a87ba422e530889ad02",
+    "endoluminal/src/i4h_endoluminal/assessment.py": "b7b65c39f04f78ff0d0a126b06eea83a6775d27f148eae746dd1295e88a2d795",
+    "endoluminal/src/i4h_endoluminal/bindings.py": "14214ee6f36a53ff7f5e17947f1d4aabb651eca35e05a64d90f441de3e2b23b9",
     "endoluminal/src/i4h_endoluminal/config.py": "4a243d07193d9498d6e3f57130c07fe21a3823c3eeea13cb2e65fe0a8146f735",
     "endoluminal/src/i4h_endoluminal/loaders/__init__.py": "27bcc029a212ea49eb3501d8d0a4f5c8011c21929f5e78c566f400ece7ca4d9a",
-    "endoluminal/src/i4h_endoluminal/loaders/centreline.py": "2239b3b37dcea662f81c0baf3ff7d122ed8fa1651faed660625dc78005af6e2a",
+    "endoluminal/src/i4h_endoluminal/loaders/centreline.py": "7d36aa4b2e1a2bbe348e85d4e188b79a1b5e8fa1a5de337c75303a45ec51ffc6",
     "endoluminal/src/i4h_endoluminal/loaders/presentation.py": "53342411e56b9073c4e60ed41f90c2052ec55beb41bee70c9116566ceb194c5a",
     "endoluminal/src/i4h_endoluminal/loaders/rod.py": "b1877d0f590c0e49b510152c42da65cc7672a9a8fa49e69f160daa1c70b83b2a",
     "endoluminal/src/i4h_endoluminal/loaders/vessel_mesh.py": "2378c1370a58f76ae2316efbed9f876890af41f52e6297aa50d07391172d5b0c",
@@ -127,17 +127,17 @@
     "isaaclab/src/i4h_isaaclab/camera/__init__.py": "7416cae8d4ab8a43c70a72e4d6eb9587a2df79cc1e607184df771afe61976c28",
     "isaaclab/src/i4h_isaaclab/camera/camera.py": "e0f85c5e031b6865c67c07b72dee8d8466bc2dbedc0ee169311affd613311d57",
     "isaaclab/src/i4h_isaaclab/camera/rig.py": "743d65d1a1e017959f3bf4e7f6e12235aa6d61ef636c1b20db10ee2590c5fcfd",
-    "isaaclab/src/i4h_isaaclab/camera/tiled.py": "ad6d5d5a25ed62aa72b3c82297a446ebe475c33aeb31c4927bd13f74164f9b1b",
-    "isaaclab/src/i4h_isaaclab/component.py": "d3a8d185c6d49ba21a12a8c1e025a25cdb316f9dbdd895a5856965943da88684",
+    "isaaclab/src/i4h_isaaclab/camera/tiled.py": "fc9e5352af34bd07ec84be5a98572d8adb931555c452ad86502b14c4240def60",
+    "isaaclab/src/i4h_isaaclab/component.py": "48aa0698d474c50fdee6369fb5600fafa41633489877c2edc4a2eb53091d2c28",
     "isaaclab/src/i4h_isaaclab/composition.py": "1aab51ba0002746ff1413b6ad1aa393416e3b8250bd0d0e954cbc03f6f2cea61",
     "isaaclab/src/i4h_isaaclab/coupling.py": "d488e14bd0b17c127d6a5779268ac0b1b3ae755f7ea60ccb341cbf035ff8241b",
-    "isaaclab/src/i4h_isaaclab/env.py": "e08fe26915252e05150803f673093bc1a1599420978138a8092fd1f536bfdc5e",
+    "isaaclab/src/i4h_isaaclab/env.py": "6355cf85994bdfcbefc53198fdeb57cccd7b57aead7a7b4207bb9ce32a5e7ef9",
     "isaaclab/src/i4h_isaaclab/lab.py": "35da49a1faad65b417ee9bda37a21c53ff34cb2fcf5472f92d6e9f755bc33ebf",
     "isaaclab/src/i4h_isaaclab/lab30.py": "79407d0534fe40dad4cb714709dc8ddc6ac3d2d15651b4865fefa7fc154253f4",
-    "isaaclab/src/i4h_isaaclab/manager.py": "60302897161a4fa75bd7145fd4a6d280e2b8dee219a5803f8faf46e36f33e444",
-    "isaaclab/src/i4h_isaaclab/newton_manager.py": "0c579cbff9ce6adfc269cb73e64a656a26c43ed614a131433fb445f475493ae4",
-    "isaaclab/src/i4h_isaaclab/newton_solver.py": "14e23cf2e33bbee20d6968daef711c966ae0549da03d052e0c49e067d608af17",
-    "isaaclab/src/i4h_isaaclab/recording.py": "a06e5ea4dc72b1fbb1949a4688adeaa07d997182720a6698243886dbf4a42a7c",
+    "isaaclab/src/i4h_isaaclab/manager.py": "0df72c9f0cd97808d1078fbc9f266745d9b4a30835b9dda81c8b4cf553fe978c",
+    "isaaclab/src/i4h_isaaclab/newton_manager.py": "f33cb6320867cdd12b07006d04b2d973cec01e04721aec462b54278ec7316c6a",
+    "isaaclab/src/i4h_isaaclab/newton_solver.py": "2d96ce9575982a2e3c0f83ae699d8718d1fff76aa88ae28c6d0b654346f77b05",
+    "isaaclab/src/i4h_isaaclab/recording.py": "a2df2fc2a46bf78c758673352450773f4915d701371d35274e432fcdb6653f90",
     "isaaclab/src/i4h_isaaclab/tasks.py": "ef53d715dec6faa8d8cf33719d6c47bba7b5d2a3bb1e09ce8950bb4d173f205d",
     "isaaclab/src/i4h_isaaclab/terminal.py": "33b3d888b04974294c4dcd7e18947ca3ba17a7c9a7ff43334450d9f4bb5640f2",
     "isaaclab/src/i4h_isaaclab/views.py": "e50e6f633b1a4431ec67a92dfa0dbef01bf87e1d8411449c8fd89999148fc045",
@@ -154,10 +154,10 @@
     "standalone/src/i4h_standalone/app/panel_adapters.py": "5b1efe69a1335a3e0f31bc612e8dddf6fa76fd20929d669e27fd21244b0ec508",
     "standalone/src/i4h_standalone/app/pickup.py": "e7f3bb8d393cafa6125eef2f4cf484b48d3f5c64f16d0fa5f3dd58ed52359aaf",
     "standalone/src/i4h_standalone/app/ui.py": "2e09d63356d3a70fb4eebc4f7d535a11a0961826d1a07f46454451248e168390",
-    "standalone/src/i4h_standalone/app/worker.py": "52f96a78340ca184d0b58e687bb64aa8c8948802f05e33a2b809c8e37992edb4",
+    "standalone/src/i4h_standalone/app/worker.py": "186ddd331616fc5a2e954d828d5b3e833faad96149a518bc8f0de7733a1ca351",
     "standalone/src/i4h_standalone/app/workspace.py": "9988cc2c927edfd45a8b9b847153b60cc8cd51bccbc84c5ca5a0e8db1d6c350b",
     "standalone/src/i4h_standalone/config.py": "227cc2dfdc7e369fc92986a11a3208843918d6629ace91992a9d515ed1935d08",
-    "standalone/src/i4h_standalone/devices.py": "f05547d2858b10d8d3c12d2c0202f91f1281bcdf5a6a96ab5e86aee129c60a79",
+    "standalone/src/i4h_standalone/devices.py": "184de718fd696e1e6e4c32859c2dbaaae1f2c6dfdedc4c354928d20b5a00b96a",
     "standalone/src/i4h_standalone/input/__init__.py": "e70fb5d76e054dc5bfd588c0163537509fddd70b58c0c0c7042b599d86fc45fb",
     "standalone/src/i4h_standalone/input/avatar.py": "37371148dec19c01663b9c6a3284d448e26cb55fd987a662b7fc6b413055cff7",
     "standalone/src/i4h_standalone/input/config.py": "1846f4c10242feacd68e312342b1b7bf60ebc0d32f794a217bd17273f2028375",
@@ -193,7 +193,7 @@
     "standalone/src/i4h_standalone/xr/session.py": "2e749fcd3a1d98b765aeb74e70152f3e5cb38c85613ab1f4c820bb4ccc806fd2",
     "assessment/src/i4h_assessment/__init__.py": "4649b9b20e36d6c48ed6ca54845968fdf5ff7487abe83899c5685ccdaf266263",
     "assessment/src/i4h_assessment/config.py": "d28166f8e03c986346f01b0e5b7eb36e8ae74b9a6111a95a8a76455b3091983d",
-    "assessment/src/i4h_assessment/executor.py": "aa49a4af1b0085e1425e99a11329d4ac02cd3b3f84728a8a909ef8e8bd0a6f69"
+    "assessment/src/i4h_assessment/executor.py": "7d68f45e5fef03d3726e5160ce17e3732900e5cf435f5c4adeb444b064c09b88"
   },
   "contracts": {
     "702c9ca2340c": {
@@ -2580,7 +2580,7 @@
     {
       "path": "physics/src/i4h_physics/scene.py",
       "scope": "Scene.static_wp_mesh",
-      "line": 557,
+      "line": 561,
       "expression": "wp.Mesh(points, indices)",
       "target": "cached, self._fields['static_mesh', name, None]",
       "kind": "acceleration_structure",
@@ -2646,7 +2646,7 @@
     {
       "path": "physics/src/i4h_physics/stepper.py",
       "scope": "select_envs",
-      "line": 183,
+      "line": 188,
       "expression": "wp.from_torch(mask, dtype=wp.bool)",
       "target": "mask",
       "kind": "interop_view",
@@ -2661,7 +2661,7 @@
     {
       "path": "physics/src/i4h_physics/stepper.py",
       "scope": "_int32_ids",
-      "line": 213,
+      "line": 218,
       "expression": "wp.empty(0, dtype=wp.int32, device=device)",
       "target": null,
       "kind": "allocation",
@@ -2676,7 +2676,7 @@
     {
       "path": "physics/src/i4h_physics/stepper.py",
       "scope": "_int32_ids",
-      "line": 218,
+      "line": 223,
       "expression": "env_ids.to(device=wp.device_to_torch(device), dtype=torch.int32)",
       "target": "t",
       "kind": "method_conversion_or_copy",
@@ -2691,7 +2691,7 @@
     {
       "path": "physics/src/i4h_physics/stepper.py",
       "scope": "_int32_ids",
-      "line": 220,
+      "line": 225,
       "expression": "wp.from_torch(t, dtype=wp.int32)",
       "target": null,
       "kind": "interop_view",
@@ -2706,7 +2706,7 @@
     {
       "path": "physics/src/i4h_physics/stepper.py",
       "scope": "_int32_ids",
-      "line": 225,
+      "line": 230,
       "expression": "wp.array(ids.astype(np.int32), dtype=wp.int32, device=device)",
       "target": null,
       "kind": "allocation",
@@ -8077,13 +8077,22 @@
     },
     {
       "path": "standalone/src/i4h_standalone/devices.py",
-      "scope": "I4hTeleopDevice.attach",
       "line": 168,
-      "expression": "u._mid[columns].to(self.cfg.sim_device)",
-      "target": "(self._mid, self._half)",
+      "scope": "I4hTeleopDevice.attach",
       "kind": "method_conversion_or_copy",
+      "target": "(self._mid, self._half)",
+      "expression": "u.action_mid[columns].to(self.cfg.sim_device)",
       "dtype_expression": null,
       "shape_or_source_expression": "self.cfg.sim_device",
+      "review": {
+        "status": "pending",
+        "owner": null,
+        "indexing": null,
+        "authored_value": null,
+        "reset": null,
+        "aliases": null,
+        "first_subsequent_reader_writer": null
+      },
       "contracts": [
         "5cc168cf95c5",
         "21df725a35ce"
@@ -8093,13 +8102,22 @@
     },
     {
       "path": "standalone/src/i4h_standalone/devices.py",
-      "scope": "I4hTeleopDevice.attach",
       "line": 168,
-      "expression": "u._half[columns].to(self.cfg.sim_device)",
-      "target": "(self._mid, self._half)",
+      "scope": "I4hTeleopDevice.attach",
       "kind": "method_conversion_or_copy",
+      "target": "(self._mid, self._half)",
+      "expression": "u.action_half[columns].to(self.cfg.sim_device)",
       "dtype_expression": null,
       "shape_or_source_expression": "self.cfg.sim_device",
+      "review": {
+        "status": "pending",
+        "owner": null,
+        "indexing": null,
+        "authored_value": null,
+        "reset": null,
+        "aliases": null,
+        "first_subsequent_reader_writer": null
+      },
       "contracts": [
         "5cc168cf95c5",
         "21df725a35ce"
@@ -13505,5 +13523,36 @@
     ],
     "line_moves": 4,
     "ownership": "no ownership change; additions are binding-time row maps, masks and views of the continuation call"
+  },
+  "c44_cleanup": {
+    "slice": "C4.4",
+    "renamed_sites": [
+      {
+        "path": "standalone/src/i4h_standalone/devices.py",
+        "scope": "I4hTeleopDevice.attach",
+        "before": {
+          "target": "(self._mid, self._half)",
+          "expression": "u._mid[columns].to(self.cfg.sim_device)"
+        },
+        "after": {
+          "target": "(self._mid, self._half)",
+          "expression": "u.action_mid[columns].to(self.cfg.sim_device)"
+        }
+      },
+      {
+        "path": "standalone/src/i4h_standalone/devices.py",
+        "scope": "I4hTeleopDevice.attach",
+        "before": {
+          "target": "(self._mid, self._half)",
+          "expression": "u._half[columns].to(self.cfg.sim_device)"
+        },
+        "after": {
+          "target": "(self._mid, self._half)",
+          "expression": "u.action_half[columns].to(self.cfg.sim_device)"
+        }
+      }
+    ],
+    "line_moves": 6,
+    "ownership": "no ownership or classification change; private names used across modules were given public names"
   }
 }
