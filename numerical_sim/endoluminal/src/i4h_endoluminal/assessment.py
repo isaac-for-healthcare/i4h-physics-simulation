@@ -35,4 +35,4 @@ def single_target_assessor(physics, *, target, radius, hold, timeout, horizon_s=
     from i4h_assessment.executor import Procedure
     physics.owner.check_valid()
     spec = dict(type="reach_target", tool=physics.body.name, target={"position": target}, radius=radius, hold=hold, timeout=timeout)
-    return Procedure(spec, physics._sim, measurements={"reach_target": ReachTarget}, physics_binding=physics, horizon_s=horizon_s)
+    return Procedure(spec, physics.sim, measurements={"reach_target": ReachTarget}, physics_binding=physics, horizon_s=horizon_s)

@@ -375,7 +375,7 @@ def declare_rod_pbd_material(scene, body, *, system_id="rod_pbd_material", radiu
 
 
 def publish_material(scene, declarations, system_id, *, body, backend, settings, solver_specs=None):
-    from i4h_physics.systems.rods.material import _membership
+    from i4h_physics.systems.rods.material import region_membership
 
     body = scene.body(body)
     if solver_specs is None:
@@ -390,7 +390,7 @@ def publish_material(scene, declarations, system_id, *, body, backend, settings,
     shared = shared_rod(scene, declarations, body, backend)
     if shared.provider is not None or shared.solver is not None:
         raise ValueError("duplicate provider or material must precede solver")
-    membership = _membership(body, shared.S)
+    membership = region_membership(body, shared.S)
     r = Record(scene, declarations, system_id, body)
     r.backend, r.shared = backend, shared
     r.signature = body_signature(body, backend)

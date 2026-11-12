@@ -52,9 +52,9 @@ ACTIVE_INT = 1  # same bit as newton.ParticleFlags.ACTIVE, so ported omnisurg ke
 ACTIVE = wp.constant(wp.int32(ACTIVE_INT))
 INACTIVE = wp.constant(wp.int32(~ACTIVE_INT))  # ``flags & INACTIVE`` clears the bit
 
-_VEC3 = 12
-_F32 = 4
-_I32 = 4
+VEC3_BYTES = 12
+F32_BYTES = 4
+I32_BYTES = 4
 
 
 @dataclass(eq=False)
@@ -367,6 +367,10 @@ class Scene:
 
             model.i4h.scene_gravity.assign(component_gravity(model, self))
 
+    def adopt_gravity(self, gravity) -> None:
+        """Take the host's gravity as the case gravity (a case that declares none)."""
+        self._gravity = tuple(float(g) for g in gravity)
+
     @property
     def gravity_vector(self) -> tuple:
         """The case gravity (the live per-env values are ``scene.gravity``, the model's per-world array)."""
@@ -415,8 +419,8 @@ class Scene:
         what ``allocate`` checks against free memory."""
         from i4h_physics.newton_model import estimate_bytes as newton_bytes
 
-        sizes = {"q": _VEC3, "qd": _VEC3, "q_prev": _VEC3, "q0": _VEC3, "inv_mass": _F32, "radius": _F32, "flags": _I32,
-                 "flags0": _I32}
+        sizes = {"q": VEC3_BYTES, "qd": VEC3_BYTES, "q_prev": VEC3_BYTES, "q0": VEC3_BYTES, "inv_mass": F32_BYTES, "radius": F32_BYTES, "flags": I32_BYTES,
+                 "flags0": I32_BYTES}
         n, m = self.particle_count, self.pool_count
         out = newton_bytes(n, construction)
         out.update({f"pool_{field}": max(1, m) * size for field, size in sizes.items()})

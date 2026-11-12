@@ -15,7 +15,7 @@ history/flags on State, avoiding reciprocal round trips through native masses.
 from __future__ import annotations
 
 import numpy as np
-from i4h_physics.scene import _F32, _I32, _VEC3
+from i4h_physics.scene import F32_BYTES, I32_BYTES, VEC3_BYTES
 from i4h_physics.storage import scene_record
 
 HASH_GRID_BYTES = 2 * 128**3 * 4  # Newton's model.particle_grid (a 128^3 wp.HashGrid) whenever there are particles
@@ -51,16 +51,16 @@ def estimate_bytes(particles: int, construction: bool = False) -> dict[str, int]
     # Empty custom native fields retain one inaccessible backing element.
     declared = max(1, particles)
     out = {
-        "newton_particle_defaults": declared * (_F32 + _I32),
-        "newton_particle_history": declared * (_VEC3 + _I32),
-        "newton_particle_templates": declared * (_VEC3 + _I32),
+        "newton_particle_defaults": declared * (F32_BYTES + I32_BYTES),
+        "newton_particle_history": declared * (VEC3_BYTES + I32_BYTES),
+        "newton_particle_templates": declared * (VEC3_BYTES + I32_BYTES),
     }
     if particles == 0:
         return out
     n = particles
     out.update({
-        "newton_model": n * (2 * _VEC3 + 3 * _F32 + 2 * _I32),
-        "newton_state": n * 3 * _VEC3,
+        "newton_model": n * (2 * VEC3_BYTES + 3 * F32_BYTES + 2 * I32_BYTES),
+        "newton_state": n * 3 * VEC3_BYTES,
         "newton_bvh": n * BVH_BYTES_PER_PARTICLE,
     })
     if construction:  # finalize allocates the hash grid too; build_model drops it right away
@@ -185,7 +185,7 @@ def check_host_gravity(model, scene) -> None:
     rotated component then sees ``R_e^T g`` (``component_gravity``). Without one the scene adopts world 0's in the
     component frame, so ``scene.down`` follows the host."""
     if not scene.gravity_declared:
-        scene._gravity = tuple(float(g) for g in component_gravity(model, scene).astype(np.float64)[0])
+        scene.adopt_gravity(host[0])
         return
     world = model.gravity.numpy()[: scene.envs].astype(np.float64)
     case = np.asarray(scene.gravity_vector, np.float64)

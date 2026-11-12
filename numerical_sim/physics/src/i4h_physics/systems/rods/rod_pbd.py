@@ -40,7 +40,7 @@ E3 = wp.constant(wp.vec3(0.0, 0.0, 1.0))
 
 
 # pbd_cosserat.py:479-485 numpy quaternion helpers. Edits: none.
-def _qmul_np(a, b):
+def qmul_np(a, b):
     av, aw = a[:3], a[3]
     bv, bw = b[:3], b[3]
     v = aw * bv + bw * av + np.cross(av, bv)
@@ -56,7 +56,7 @@ def rest_darboux_quats(frames: np.ndarray, pairs: np.ndarray) -> np.ndarray:
     segment pairs ``pairs (K, 2)`` of one variant's ``(S, 4)`` segment frames."""
     rd = np.zeros((len(pairs), 4), dtype=np.float64)
     for k, (a, b) in enumerate(pairs):
-        rel = _qmul_np(_qconj_np(frames[a]), frames[b])
+        rel = qmul_np(_qconj_np(frames[a]), frames[b])
         if rel[3] < 0.0:
             rel = -rel
         rd[k] = rel

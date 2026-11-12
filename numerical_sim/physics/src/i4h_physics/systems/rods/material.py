@@ -11,7 +11,7 @@ from i4h_physics.systems.base import System
 from i4h_physics.systems.rods.region_kernels import direct_regions, pbd_regions
 
 
-def _membership(body, edges):
+def region_membership(body, edges):
     membership = body.regions
     if membership is None:
         edge = np.zeros(edges, np.int32)

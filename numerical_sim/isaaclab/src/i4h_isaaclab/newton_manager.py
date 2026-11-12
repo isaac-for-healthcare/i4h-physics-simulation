@@ -150,7 +150,7 @@ class ConstructionContext:
     def check_coupling_config(self):
         from i4h_physics.mount_storage import configuration
         config = configuration(self.cfg.mounts, self.cfg.coupling_mode == "two_way"), self.cfg.coupling_mode
-        if config != self.authoring._mount_config:
+        if config != self.authoring.mount_config:
             raise RuntimeError("mount configuration changed; reconstruct the model")
 
     def prepare(self):

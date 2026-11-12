@@ -516,7 +516,7 @@ def test_tree_case_wall_returns_to_rest_after_retraction():
 # --- skinning ------------------------------------------------------------------------------------------------------
 
 from i4h_endoluminal.loaders.centreline import bind_skin  # noqa: E402
-from i4h_physics.systems.rods.rod_pbd import _qmul_np  # noqa: E402
+from i4h_physics.systems.rods.rod_pbd import qmul_np  # noqa: E402
 from i4h_standalone.render.skin import Skinner  # noqa: E402
 from i4h_standalone.render.snapshots import Snapshot  # noqa: E402
 
@@ -566,7 +566,7 @@ def test_skin_rigid_motion():
     q[1] = pos @ R.T
     scene.view(scene.q, body).assign(q)
     frames = rod.frame.numpy().reshape(2, -1, 4)
-    frames[1] = np.asarray([_qmul_np(r, f) for f in body.tree.frames[0]], np.float32)
+    frames[1] = np.asarray([qmul_np(r, f) for f in body.tree.frames[0]], np.float32)
     rod.frame.assign(frames.reshape(-1, 4))
     sk.place(snap, 1, out, "cuda:0")
     np.testing.assert_allclose(out.numpy(), pts @ R.T, atol=1e-4)

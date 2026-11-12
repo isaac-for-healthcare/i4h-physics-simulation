@@ -53,13 +53,8 @@ ALLOWED = {
         "standalone/src/i4h_standalone/render/xr.py": {"_ensure_targets", "_frame_uniforms"},
     },
     "to be removed in C4.4": {
-        "physics/src/i4h_physics/newton_model.py": {"_F32", "_I32", "_VEC3", "_gravity"},
-        "physics/src/i4h_physics/rod_storage.py": {"_membership"},
-        "endoluminal/src/i4h_endoluminal/assessment.py": {"_sim"},
-        "endoluminal/src/i4h_endoluminal/loaders/centreline.py": {"_qmul_np"},
         "assessment/src/i4h_assessment/executor.py": {"_measure", "_qualify"},
         "isaaclab/src/i4h_isaaclab/manager.py": {"_order"},
-        "isaaclab/src/i4h_isaaclab/newton_manager.py": {"_mount_config"},
         "isaaclab/src/i4h_isaaclab/newton_solver.py": {"_bind_main"},
         "isaaclab/src/i4h_isaaclab/recording.py": {"_case", "_half", "_mid"},
         "standalone/src/i4h_standalone/devices.py": {"_half", "_mid"},

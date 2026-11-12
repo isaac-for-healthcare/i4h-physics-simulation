@@ -40,7 +40,7 @@ class CaseAuthoring:
         self.mounts, self.coupling_mode = deepcopy(mounts), coupling_mode
         if mounts is not None:
             declare_mounts(self.scene, mounts, two_way=coupling_mode == "two_way")
-        self._mount_config = self._coupling_config()
+        self.mount_config = self._coupling_config()
         self.token = uuid4().hex
         self.builder = None
         self.worlds = {}
@@ -128,7 +128,7 @@ class CaseAuthoring:
 
     def _layout(self):
         from i4h_physics.scene_storage import layout
-        if self._coupling_config() != self._mount_config:
+        if self._coupling_config() != self.mount_config:
             raise RuntimeError("mount configuration changed; reconstruct the model")
         return layout(self.scene)
 

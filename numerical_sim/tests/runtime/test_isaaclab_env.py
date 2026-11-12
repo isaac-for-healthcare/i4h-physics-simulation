@@ -1004,7 +1004,7 @@ def test_newton_missing_regional_provider_fails_before_capture():
     core.configure(1 / 60, 1, 1)
     owner = ConstructionContext.__new__(ConstructionContext)
     owner.cfg = SimpleNamespace(mounts=None, coupling_mode="one_way")
-    owner.authoring = SimpleNamespace(_mount_config=(((), False), "one_way"))
+    owner.authoring = SimpleNamespace(mount_config=(((), False), "one_way"))
     owner.api = SimpleNamespace(invalidate_graph=lambda _: None)
     owner.binding = PhysicsBinding.hosted(core, core, owner.prepare)
     with pytest.raises(ValueError, match="must precede"):
