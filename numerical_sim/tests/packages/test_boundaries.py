@@ -215,3 +215,14 @@ else:
     raise AssertionError("a procedure case read without i4h-assessment")
 """
     subprocess.run([sys.executable, "-c", script], cwd="/tmp", check=True)
+
+
+def test_private_names_of_other_objects_are_listed():
+    """Every use of another object's underscore-prefixed name is listed with its reason, and the list has no stale entry."""
+    import runpy
+
+    checker = runpy.run_path(str(WORKSPACE / "scripts/check_private_reaches.py"))
+    errors, count = checker["verify"](WORKSPACE)
+    assert not errors, "\n".join(errors)
+    assert count
+    assert checker["reaches"](ast.parse("a._b; self._c; getattr(d, '_e'); getattr(self, '_f')\nfrom g import _h")) == {"_b", "_e", "_h"}
