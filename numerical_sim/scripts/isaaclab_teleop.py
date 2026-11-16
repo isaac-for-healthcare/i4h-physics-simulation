@@ -16,9 +16,10 @@ The GL window takes the case's pickup keys (``inputs.pickup.keys``); keyboard po
 
 ``--record FILE`` writes env 0's episodes in Isaac Lab's HDF5 format (``isaaclab/recording.py``). Recording starts at
 once; in the GL window K saves the take as successful and starts the next, X discards it and starts over, R stops
-(the take is saved, unsuccessful) and resumes. A take still open at exit, or cut by env 0's time-out, is saved
-unsuccessful (``--success-on-timeout``: successful). ``--replay FILE.hdf5[:demo_N]`` shows a demo in the GL view with
-its drift; ``isaaclab_run.py --policy replay_hdf5:FILE[:demo_N] --check-replay`` checks one headless.
+recording (the take is saved, unsuccessful) and a second R starts it again (a new take, from a reset). A take still
+open at exit, or cut by env 0's time-out, is saved unsuccessful (``--success-on-timeout``: successful).
+``--replay FILE.hdf5[:demo_N]`` shows a demo in the GL view with its drift;
+``isaaclab_run.py --policy replay_hdf5:FILE[:demo_N] --check-replay`` checks one headless.
 """
 
 from __future__ import annotations
