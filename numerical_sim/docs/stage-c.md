@@ -1,3 +1,21 @@
+**Stage C disposition — 2026-11-16: closed by the user, with two review defects deferred.**
+The user authorized closure of the refactor and publication of the current branch.
+The C4.4 frozen campaign meets the 2026-11-10 closure rule: **35/36 groups**,
+**46/48 replays**, **17/18 chole trials**, and core **1,261**, Lab main **123**,
+Lab 3.0 **122** tests passed with zero failures. The failed group remains
+`aorta_shell` catheter impulse on Lab 3.0 eager.
+The hosted restore order stays the documented contract: write host state, call
+`forward()`, and restore i4h rows last. The user explicitly deferred the two P2
+review findings: standalone binding settings bypass capture invalidation, and
+observable publishing retains removed systems. Their reproductions and workarounds,
+along with all retained failures, exclusions and unverified items, are recorded in
+[stage-c-closure.md](stage-c-closure.md). Neither defect is claimed fixed.
+The independent review suites passed on `ade243f`; this closure changes only
+documentation and does not rerun a reference or timing campaign. Branch push is
+authorized; merge to main is separate work. Earlier entries below are historical.
+
+---
+
 **C4.4 status — 2026-11-12: implemented; the final campaign meets the closure rule.**
 The simulator and its hosts no longer use each other's private names (a checker lists the 50
 remaining uses, all third-party, renderer or stored attributes); kernels are unchanged and six hooks

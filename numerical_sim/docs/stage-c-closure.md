@@ -1,6 +1,6 @@
 # Stage C closure summary
 
-**Stage C is ready for the user's closing decision.** Newton owns the simulation data, an episode can be saved and resumed, and the final frozen campaign on `95c8f4c` meets the closure rule. This document states what is owned where, what the reset-like operations guarantee, what is excluded, and every failure and gap that is retained. Detailed evidence is in the checkpoint reports `stage-c30.md` to `stage-c44.md`.
+**Stage C is closed (user, 2026-11-16), with the two review defects below deferred.** Newton owns the simulation data, an episode can be saved and resumed, and the final frozen campaign on `95c8f4c` meets the closure rule. This document states what is owned where, what the reset-like operations guarantee, what is excluded, and every failure and gap that is retained. Detailed evidence is in the checkpoint reports `stage-c30.md` to `stage-c44.md`.
 
 ## Final qualification
 
@@ -91,6 +91,8 @@ Certificates and approved references are in the git-ignored `.tmp_tests`. The re
 
 ## Deferred beyond Stage C
 
+- **P2: standalone binding settings bypass capture invalidation** (`physics/src/i4h_physics/bindings.py`). Setting `sim.physics.substeps`, `iterations` or `debug` writes the solver's value rather than the Stepper's. After preparing four substeps, setting `sim.physics.substeps = 5` permits stepping without recapture: a gravity-only probe produced `z=-0.006` eagerly and `z=-0.00625` captured, although both reported five substeps. Calling `prepare()` reverts the setting. Until fixed, change settings on the standalone Stepper (`sim.substeps`, `sim.iterations`, `sim.debug`) and call `sim.prepare()`.
+- **P2: observable publishing retains removed systems** (`physics/src/i4h_physics/observables.py`). The publisher caches source instances when allocated. Removing an instrument-contact system and its force consumer, then calling `prepare()` and `step()`, still exported the removed source's stale force (approximately `-14,400` in the review probe). Until fixed, reconstruct the runtime when changing system membership. The fix should reject membership changes after binding or rebuild and validate the publisher's sources.
 - External `particle_f` consumption.
 - Contact geometry export and `soft_contact_capacity`.
 - Physical rod units.
@@ -98,7 +100,13 @@ Certificates and approved references are in the git-ignored `.tmp_tests`. The re
 - A bulk-authoring request to Newton for the 64-world construction time.
 - An archive location for the references and certificates.
 
-## Decisions asked of the user
+## Decisions
 
-1. Accept the hosted call order as the contract for restoring inside Isaac Lab.
-2. Close Stage C.
+On 2026-11-16 the user authorized closure of the refactor and a push to the current remote branch:
+
+1. Stage C is closed under the 2026-11-10 closure rule, with all retained failures, exclusions and unverified items above preserved.
+2. The hosted restore order remains the documented contract: write host state, call `forward()`, then restore i4h rows last.
+3. The two P2 review defects above are explicitly deferred beyond Stage C; closure does not claim they are fixed.
+4. Publish the current branch; merging to main is separate work.
+
+The independent review on `ade243f` passed core **1,261** tests (**49** skipped), Lab main **123** (**7** skipped), and Lab 3.0 **122** (**8** skipped), with zero failures. The allocation inventory and stored C4.4 certificate/reference hashes also passed verification. These are review checks, not a new frozen reference or timing campaign. Closure changes documentation only.
