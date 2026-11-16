@@ -63,6 +63,26 @@ def test_camera_rejects_bad_clip():
         Camera(near=1.0, far=0.5)
 
 
+def test_gl_view_looks_where_the_case_camera_does():
+    """``--render gl`` gives ViewerGL the pitch and yaw that look along the case camera's forward (NVBug 7048533).
+    ViewerGL's Z-up camera looks along (cos yaw cos pitch, sin yaw cos pitch, sin pitch) (Newton 1.6.1
+    ``Camera.get_front``); the case camera's yaw 0 looks along +y when up is +z."""
+    from i4h_standalone.render.gl import _viewer_pitch_yaw
+
+    def viewer_forward(pitch, yaw):
+        p, y = math.radians(pitch), math.radians(yaw)
+        return np.array([math.cos(y) * math.cos(p), math.sin(y) * math.cos(p), math.sin(p)])
+
+    aorta = read_case("aorta_static")["render"]["camera"]
+    assert np.allclose(_viewer_pitch_yaw(aorta), (-14.8, 90.0), atol=1e-4)  # along +y, at the aorta
+    cameras = [read_case(name)["render"]["camera"] for name in ("aorta_static", "two_worlds", "liver", "tissue_contact")]
+    cameras += [{"position": (1.0, 2.0, 3.0), "pitch": float(p), "yaw": float(y), "up": (0.0, 0.0, 1.0)}
+                for p in (-85, -60, -30, 0, 30, 60, 85) for y in range(-180, 180, 15)]
+    for cam in cameras:
+        _, _, _, forward = Camera(**cam).basis()
+        assert np.allclose(viewer_forward(*_viewer_pitch_yaw(cam)), forward, atol=1e-5), cam
+
+
 @needs_chole
 def test_read_case_render():
     cfg = read_case("chole_tet_med")

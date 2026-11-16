@@ -18,6 +18,7 @@ from __future__ import annotations
 import numpy as np
 import warp as wp
 from i4h_isaaclab.appearance import appearance
+from i4h_isaaclab.camera.camera import Camera
 from i4h_physics.config import require_asset
 from i4h_physics.scene import ACTIVE
 from i4h_physics.systems.mechanics.surface import Surface
@@ -41,6 +42,19 @@ from i4h_surgical.systems.fluids.smoke import Smoke
 from i4h_surgical.systems.instruments.clipping import Clipping
 
 
+def _viewer_pitch_yaw(camera: dict) -> tuple[float, float]:
+    """ViewerGL's ``(pitch, yaw)`` [deg] that look where the case ``camera`` (``render.camera``) looks.
+
+    The case camera is i4h's ``Camera``, as the Slang renderer builds it: ``forward_from`` measures yaw from +y when
+    ``up`` is +z and from -z when it is +y. ViewerGL's camera is Z-up and looks along (cos yaw cos pitch,
+    sin yaw cos pitch, sin pitch), yaw measured from +x. So the angles go through the forward direction: for a Z-up case
+    that is the same pitch and 90 - yaw. A Y-up case looks the same way but stays rolled (see the module docstring)."""
+    up = camera.get("up", (0.0, 1.0, 0.0))  # i4h Camera's default
+    forward = Camera(up=up).forward_from(float(camera.get("pitch", 0.0)), float(camera.get("yaw", 0.0)))
+    pitch = np.degrees(np.arcsin(np.clip(forward[2], -1.0, 1.0)))
+    return float(pitch), float(np.degrees(np.arctan2(forward[1], forward[0])))
+
+
 class GlRenderer:
     def __init__(self, sim, *, size=(1280, 720), env=0, camera=None, procedure=None):
         from newton.viewer import ViewerGL
@@ -55,8 +69,7 @@ class GlRenderer:
         self.viewer = ViewerGL(width=int(size[0]), height=int(size[1]))
         camera = dict(camera or {})
         if "position" in camera:
-            self.viewer.set_camera(wp.vec3(*[float(v) for v in camera["position"]]),
-                                   float(camera.get("pitch", 0.0)), float(camera.get("yaw", 0.0)))
+            self.viewer.set_camera(wp.vec3(*[float(v) for v in camera["position"]]), *_viewer_pitch_yaw(camera))
         self.time = 0.0
         dev = scene.device
         for m in scene.static_meshes:
