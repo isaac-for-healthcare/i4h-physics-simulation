@@ -3,8 +3,8 @@
 
 """Catheter parity (F5): the workflow's catheter rod against i4h_endoluminal's, same physical rod, same commands.
 
-Reference: ``catheter_vasculature_solver.CathRodSolver`` at physics repo ``e4bed31`` (what the workflows branch
-``feat/catheter-navigation-reward`` @ 95d0335 installs), run as the workflow's ``CatheterRodSpec`` configures it
+Reference: ``catheter_vasculature_solver.CathRodSolver`` at physics repo tag ``v0.9.0`` (the solver the workflows
+branch ``feat/catheter-navigation-reward`` @ 95d0335 installs), run as the workflow's ``CatheterRodSpec`` configures it
 (physical rotational inertia, 128 distance sweeps, one block-Thomas solve per substep, no vessel). It needs only warp,
 torch and numpy; ``setup_reference.sh`` builds its venv on the old stack (warp 1.13). Ours: ``rod_direct`` +
 ``catheter_control`` on the current stack, through ``i4h_isaaclab.composition``.
