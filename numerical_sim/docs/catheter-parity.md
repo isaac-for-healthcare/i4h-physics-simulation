@@ -40,6 +40,7 @@ The bounds are docs/component-contracts.md section 4. Numerical qualification is
 
 ```bash
 scripts/parity/setup_reference.sh                       # .parity/reference: warp 1.13 + the v0.9.0 solver
+mkdir -p parity                                         # run outputs (gitignored; np.savez does not create it)
 .parity/reference/venv/bin/python scripts/parity/catheter.py run --engine reference --out parity/reference.npz
 $PY scripts/parity/catheter.py run --engine ours --out parity/ours.npz          # current stack
 $PY scripts/parity/catheter.py compare parity/reference.npz parity/ours.npz --report parity/report.json
