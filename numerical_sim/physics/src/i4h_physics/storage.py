@@ -482,7 +482,11 @@ class Views:
             scalar = array.view(field.dtype).flatten()
             placement = placements.get(field.domain)
             if placement is None:
-                if field.domain.count and size != field.domain.count:
+                # Newer Newton includes a trailing global row in WORLD storage.
+                # This declaration owns only the local worlds; leave that row outside its view.
+                global_world_row = (field.domain.frequency == newton.Model.AttributeFrequency.WORLD
+                                    and field.domain.count == model.world_count and size == model.world_count + 1)
+                if field.domain.count and size != field.domain.count and not global_world_row:
                     raise ValueError("native domain with foreign rows requires an explicit placement")
                 rows = scalar if size == 0 else scalar[:prod(field.shape)]
                 self._views[key] = rows.reshape(field.shape)

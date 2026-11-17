@@ -74,7 +74,9 @@ class Continuation:
             elif domain.frequency == newton.Model.AttributeFrequency.PARTICLE:
                 return particle_map()
             elif domain.frequency == newton.Model.AttributeFrequency.WORLD:
-                host, device = np.arange(E, dtype=np.int32), None
+                # The optional trailing global row belongs to the host, not this scene.
+                host, device = np.full(rows, FOREIGN, dtype=np.int32), None
+                host[:E] = np.arange(E, dtype=np.int32)
             else:
                 raise NotImplementedError(f"no world layout for native frequency {domain.frequency}")
             if host.shape[0] != rows:

@@ -14,6 +14,9 @@ PACKAGES = ("physics", "surgical", "endoluminal", "assessment", "isaaclab", "sta
 
 # reason -> {source file relative to the workspace: names reached there}
 ALLOWED = {
+    "Newton WORLD row count on the pinned and current-stack assessment revisions": {
+        "physics/src/i4h_physics/scene_storage.py": {"_attribute_frequency_count"},
+    },
     "Newton internals at the pinned revision": {
         "physics/src/i4h_physics/newton_compat.py": {"_add_custom_attribute_model_finalizer"},
         "physics/src/i4h_physics/observables.py": {"_observable_fields"},

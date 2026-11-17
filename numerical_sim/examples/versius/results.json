@@ -1,0 +1,157 @@
+{
+  "status": "Original profiles software qualified; chole-1x geometry/contact/reset verified, poke gate failed",
+  "units": "simulation coordinate units",
+  "checks": {
+    "example_tests": {
+      "passed": 31
+    },
+    "current_repository_example_selection": {
+      "passed": 198,
+      "skipped": 2
+    },
+    "block_eager_success": [
+      10,
+      10
+    ],
+    "block_graph4_success": [
+      12,
+      12
+    ],
+    "block_graph8_success": [
+      16,
+      16
+    ],
+    "chole_eager_success": [
+      10,
+      10
+    ],
+    "chole_graph2_success": [
+      10,
+      10
+    ],
+    "ppo": {
+      "block_envs": 8,
+      "chole_envs": 2,
+      "updates": 5,
+      "playback_steps": 200,
+      "parameters_updated": true,
+      "finite": true
+    },
+    "inventory": {
+      "sites": 454,
+      "files": 192
+    },
+    "private_reaches": 51,
+    "teleop_replay": {
+      "steps": 190,
+      "episode_steps": 190,
+      "tcp_displacement": 0.013789371587336063,
+      "unintended_timeout_reset": false
+    },
+    "actual_graph_execution_observed": true,
+    "physical_devices_verified": false,
+    "follou_uv_overlay_import": true,
+    "status_ui": {
+      "rendered": true,
+      "read_only_measurements": true,
+      "single_fault_message": true,
+      "block_and_chole_graph_scripted_pass": true
+    },
+    "life_size": {
+      "reference_revision": "298f6e0b632541519d807b624b51b433a9df3769",
+      "geometry_scale": 0.14285714285714285,
+      "focused_regression_passed": 143,
+      "selected_reset_and_rebuild": true,
+      "finite_contact_and_withdrawal": true,
+      "eager_scripted_success": [
+        0,
+        10
+      ],
+      "graph_scripted_success": [
+        0,
+        10
+      ],
+      "ppo_qualified": false,
+      "liver_rest_extents": [
+        0.2609010934829712,
+        0.15969544649124146,
+        0.17727652192115784
+      ],
+      "gallbladder_rest_extents": [
+        0.02725694328546524,
+        0.07099270820617676,
+        0.07898646593093872
+      ]
+    }
+  },
+  "comparisons": {
+    "block": {
+      "max_reaction_tcp_response": 0.0008169698822823696,
+      "max_repeat_tcp_noise": 7.66123386504725e-07,
+      "max_mode_tcp_drift": 1.0546824422484905e-06,
+      "max_mode_depth_drift": 5.662441253662109e-07,
+      "median_opposing_hold_force_world_z": 2.439940571784973,
+      "independent_rollout_peer_q_difference": 4.470348358154297e-08,
+      "independent_rollout_peer_patch_difference": 4.76837158203125e-07,
+      "peer_contact_force_and_count_zero": true
+    },
+    "chole": {
+      "max_reaction_tcp_response": 0.00917612017802933,
+      "max_repeat_tcp_noise": 5.777633515207761e-05,
+      "max_mode_tcp_drift": 6.32483227348362e-05,
+      "max_mode_depth_drift": 0.0001430809497833252,
+      "median_opposing_hold_force_world_z": 25.012182235717773,
+      "independent_rollout_peer_q_difference": 0.003856182098388672,
+      "independent_rollout_peer_patch_difference": 0.00017210841178894043,
+      "peer_contact_force_and_count_zero": true
+    }
+  },
+  "source_sha256": {
+    "NOTICE": "213cbece3f2a4e44d5573b06fff71813e56b87e4e4a050afad2676e8b4ad3e5c",
+    "reuse.json": "7fd271a03ec4dca4e81fdd0375c0e49d74dd57fa0b1727887e6746583b32a1b0",
+    "RESULTS.md": "9a9b4df1dfab16cd38012d9c32c1690443b330950fa24b76c56a62e75aef576b",
+    "pyproject.toml": "666c8017770c9c572092212b062d29f7b7b44d8ec520f2089e09d8f5c291345b",
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "compare.py": "0984c72c174d41b7f8c8e173cc8d9ae5de840756b78fd59ff6ce3afa51a3fec8",
+    "life_size_reference.json": "fc1a5757f5b986ad609a9c086607d3ab14fcb8ac0b37b9b6c4aca2ab1ec1372a",
+    "bootstrap.py": "0fec94d8afea4540db5b67c77a8ac10e0b1ff0a057f52a62e885a8f1f7068e20",
+    "README.md": "900f7e4b93b023133d6214e495458a12fba555ab33631d0e8f9d27ac1aa6f81f",
+    "replay.json": "713cbdd678474c4f8be3e5c4ecb35fe67b9e032a9d63e63c9d3062fd72946924",
+    "run.py": "a4d4416252d4e0fdd09f4fb7ee3257c43a4bab11eefa65b2ae9fb2e162acb38b",
+    "stack.json": "94e89f025ed073e876efd7b1e896aff4e1180e15b2953c9230126a4bba33d214",
+    "requirements.lock": "43e87addf80e4aa39a54d92bda72f5a1aefb7183d57f4044fce0c3e0fb8396da",
+    "MANIFEST.in": "21197aede3494fdc4e2e96a5fc71b9a7eff42b3d53a56c8783f78e876f305e64",
+    "tests/test_status.py": "405a20299dc788ce98f44b5356917c9c0b36d7571e158925694b71cbe7a194b8",
+    "tests/test_terms.py": "e36903ed4f52e2cd35b3d4be86c7eff3dd48e0e99dd6a5e002706600d2ae8fd2",
+    "tests/test_teleop_input.py": "901c43ee9d37bb50e033553b7711f988293140f4d199d890eb6ac24dabb9ed18",
+    "tests/test_input_flow.py": "f729f8f1d0a0cb043610bd00221066297f00411c53f5730691870f38857062bd",
+    "tests/test_profiles.py": "8996cd4b7e2086cc244681f3508af73f49cc6391634033d3246680fe65c3db4c",
+    "tests/test_manager_ppo.py": "b1fc8d50d2f94a3416b6b23dc1a1b3f8f49f02b95e6f79958fa0c53d77f4b380",
+    "src/i4h_versius/status.py": "c137ba1be30ba57b86d65750cba109920843159f0d7132bf3581b41e8c3055b7",
+    "src/i4h_versius/terms.py": "27ac1712bbab659281f5da5f9a8c221bc7e5c355ae49499b0771f4ffd161a2a3",
+    "src/i4h_versius/__init__.py": "654386926ef8a58a5c43237e7419e5f45bc5437b5ad96f6b900a136c884b1026",
+    "src/i4h_versius/workflows.py": "980e79747c418cd1fbec60dbb1bfec99e8df0c34be6c5897d4a90328f0dace47",
+    "src/i4h_versius/launch.py": "5f3685922066172b1c38a8dde239be9db731aff309e0e2cfb9ecc26d9eade88b",
+    "src/i4h_versius/manager_ppo.py": "f3cb2fe6c2bbdf916e110ccea1a9087abc2ce4338335b97c1703b438d57a088f",
+    "src/i4h_versius/task.py": "1d31a6419b475e9acc0b0659cd5c5ebeeb91aa813c7216f5cde6beea78e2e1b0",
+    "src/i4h_versius/follou_input.py": "f5d7d5e9c4f6f604c3b39a6c26189a5ef86ce6a81ba5c03b0e78f16bf5052176",
+    "src/i4h_versius/agents.py": "c6c5e0a9a544d9cb3311db6e4f1ce9364f6c9fd1a51504774f0ec60d7e8666e5",
+    "src/i4h_versius/profiles.py": "6e82f478ca4d2d6fa7955f270e4a1c95e5de62fd0df7153bbd1614fded2765a5",
+    "src/i4h_versius/provenance.py": "3585d93a0ad27869b9288ff14e376fde5cc78b7341b6de2b05ec73adb8b973f9",
+    "src/i4h_versius/teleop_input.py": "b0ceb25da08862ec7b9a656b6d975c89ea1d79077796d409d6fde91ddb2a6c6a",
+    "src/i4h_versius/cases/chole_tet_med_1x.yaml": "4229439b1e18bf4797d5858e76f05ea7a3bde194ec3e78e56c0bce4c68cf4c6b"
+  },
+  "artifacts": {
+    "block-gl-v4.mp4": "5124d52ffc9f4db1b5ccb0b25ce2a7c13738716150c82161166dde88074dcb47",
+    "final-block/i4h_solver_versius_block_24obs.pt": "163b41b10829bb5b0a11d03885a617758b325f7e364b29570068e8b23b75b8a6",
+    "final-chole/i4h_solver_versius_chole_24obs.pt": "a0d74123744cc8170fb35fd2c787c37b73c5257c9d0e7164668056e2b5e7ae3e",
+    "status-followup/fault-ui.png": "c6f56517425e06b4f818227de077d3f32e76c22ec965ab2814c6626ed7189991",
+    "status-followup/fault-ui.mp4": "9efe33cc4c137f5113d65f0465f3c7414f85ef1a6602a1b3a95735e6e578e8db",
+    "status-ui-v3.mp4": "7bc228cca8dccac032565ac97b5d7b8e53186306587bef600acb41ffa658f52c"
+  },
+  "core_followup_sha256": {
+    "numerical_sim/physics/src/i4h_physics/loaders/tet_bundle.py": "baa02586041f36956732b6a30e9f1d55ce69b32e215f8ef0d8f50b593cd3978d",
+    "numerical_sim/surgical/src/i4h_surgical/loaders/tet_bundle.py": "0b48fe1a8c29fce8018fd3aea344c3df2ecbdeb04ae25532955a0040269b7383",
+    "numerical_sim/physics/src/i4h_physics/systems/mechanics/tet.py": "b6d2210ac13d5f3c1d4fa31884db1e9a242c9873d3f73fcca19598d106eaaf9e"
+  }
+}

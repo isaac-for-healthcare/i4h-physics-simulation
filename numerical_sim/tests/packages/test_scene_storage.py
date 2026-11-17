@@ -163,7 +163,8 @@ def test_direct_completion_retained_builder_gravity_and_reconstruction():
     m = b.finalize(device="cpu")
     rebuilt = b.finalize(device="cpu")
     np.testing.assert_array_equal(m.i4h.scene_gravity.numpy(), rebuilt.i4h.scene_gravity.numpy())
-    initial = m.i4h.scene_gravity.numpy().copy()
+    initial = m.i4h.scene_gravity.numpy()[:scene.envs].copy()
+    global_gravity = m.i4h.scene_gravity.numpy()[scene.envs:].copy()
     m.set_gravity((1, 2, 3))
     # Binding preserves a derived buffer even when host edits require refresh.
     scene.allocate(m, m.state())
@@ -172,6 +173,7 @@ def test_direct_completion_retained_builder_gravity_and_reconstruction():
     scene.refresh_gravity()
     assert scene.gravity.ptr == ptr
     np.testing.assert_allclose(scene.gravity.numpy(), [[1, 2, 3], [1, 3, -2]], atol=1e-6)
+    np.testing.assert_array_equal(m.i4h.scene_gravity.numpy()[scene.envs:], global_gravity)
     scene.refresh_gravity(rebuilt)  # Explicit pre-bind refresh on another finalized Model.
     scene.env_xforms[0][0][0] = 1
     with pytest.raises(RuntimeError, match="transforms changed"):

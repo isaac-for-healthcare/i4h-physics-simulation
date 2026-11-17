@@ -17,6 +17,7 @@ iterations once converged; the damping factors are not used.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import warp as wp
@@ -30,7 +31,9 @@ class Tet(System):
     iterations: int = 1  # repeated existing solve/apply sweeps per runner iteration
     model: str = "pbd"  # structural: pbd (stiffness factors per iteration, omnisurg) or xpbd (compliance, see above)
 
-    structural = System.structural + ("iterations", "model")
+    volume_epsilon: float = 1.0e-8  # cutoff for sum(w |grad V|^2), scales as length^4
+
+    structural = System.structural + ("iterations", "model", "volume_epsilon")
 
     @classmethod
     def declare_storage(cls, authoring, declarations, spec, records):
@@ -47,6 +50,10 @@ class Tet(System):
             raise ValueError("tet.iterations must be a positive integer")
         if self.model not in ("pbd", "xpbd"):
             raise ValueError(f"tet.model must be 'pbd' or 'xpbd', got {self.model!r}")
+
+        eps = self.volume_epsilon
+        if isinstance(eps, bool) or not isinstance(eps, (int, float)) or not math.isfinite(eps) or eps <= 0.0:
+            raise ValueError(f"tet.volume_epsilon must be a positive number, got {eps!r}")
 
     def __post_init__(self):
         scene = self.scene
@@ -92,7 +99,7 @@ class Tet(System):
                     inputs=[scene.field("q", b), scene.field("inv_mass", b), self.variant, self.edges, self.edge_active,
                             self.edge_rest, self.edge_part, self.spring, self.spring_damping, self.tets, self.active,
                             self.rest_volume, self.tet_part, self.volume, self.volume_damping, S, b.count, dt,
-                            int(self.model == "xpbd")],
+                            int(self.model == "xpbd"), float(self.volume_epsilon)],
                     outputs=[self.delta, self.delta_count, self.edge_lambda, self.tet_lambda],
                     device=dev,
                 )
@@ -195,6 +202,7 @@ def volume_constraint(
     count: wp.int32,
     dt: wp.float32,
     xpbd: wp.int32,
+    volume_epsilon: wp.float32,
     delta: wp.array(dtype=wp.vec3),
     delta_count: wp.array(dtype=wp.int32),
     lambdas: wp.array2d(dtype=wp.float32),
@@ -232,7 +240,7 @@ def volume_constraint(
 
     denom = (w0 * wp.length_sq(grad0) + w1 * wp.length_sq(grad1)
              + w2 * wp.length_sq(grad2) + w3 * wp.length_sq(grad3))
-    if denom <= 1.0e-8:
+    if denom <= volume_epsilon:
         return
 
     scale = float(0.0)
@@ -279,6 +287,7 @@ def solve_tet(
     count: wp.int32,
     dt: wp.float32,
     xpbd: wp.int32,
+    volume_epsilon: wp.float32,
     delta: wp.array(dtype=wp.vec3),
     delta_count: wp.array(dtype=wp.int32),
     edge_lambda: wp.array2d(dtype=wp.float32),
@@ -290,7 +299,7 @@ def solve_tet(
                             count, dt, xpbd, delta, delta_count, edge_lambda)
     else:
         volume_constraint(env, i - S, q, inv_mass, variant, tets, active, rest_volume, tet_part, volume, volume_damping,
-                          count, dt, xpbd, delta, delta_count, tet_lambda)
+                          count, dt, xpbd, volume_epsilon, delta, delta_count, tet_lambda)
 
 
 # Ported from omnisurg/tet/kernels/tet.py:1729-1741 (apply_average_deltas_range).

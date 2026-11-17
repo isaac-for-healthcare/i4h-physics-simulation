@@ -40,7 +40,13 @@ def row_worlds(scene):
         if field.domain.custom:
             worlds = np.asarray(d.rows(field.domain)[0]) if field.domain.count else np.full(1, -2)
         else:
-            worlds = particles if field.domain.frequency == newton.Model.AttributeFrequency.PARTICLE else np.arange(E)
+            if field.domain.frequency == newton.Model.AttributeFrequency.PARTICLE:
+                worlds = particles
+            else:
+                container = scene.state if field.owner is Owner.STATE else scene.control
+                rows = getattr(container.i4h, d.name(key)).shape[0]
+                worlds = np.full(rows, -2)
+                worlds[:E] = np.arange(E)
         table["i4h:" + d.name(key)] = (int(field.owner is Owner.CONTROL), worlds)
     if m.particle_count:
         table.update({name: (0, particles) for name in NATIVE})
@@ -200,6 +206,28 @@ def test_rejections_write_nothing():
     setattr(state.i4h, name, wp.clone(getattr(state.i4h, name)))
     with pytest.raises(RuntimeError, match="replaced"):
         sim.physics.restore(*saved)
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_continuation_preserves_native_world_global_rows(device):
+    """The host's trailing WORLD row is foreign even when the shared-row mask slot is selected."""
+    cfg, a, m = aorta(device)
+    if m._attribute_frequency_count(newton.Model.AttributeFrequency.WORLD) == m.world_count:
+        pytest.skip("this Newton revision has no global WORLD row")
+    state, control = m.state(), m.control()
+    sim = runtime(cfg, a, m, state=state, control=control)
+    saved = m.state(), m.control()
+    poison(21, state, control)
+    poison(22, *saved)
+    live, other = snapshot(state, control), snapshot(*saved)
+    worlds = row_worlds(sim.scene)
+    assert any(key.startswith("i4h:") and rows[-1] == -2 for key, (_, rows) in worlds.items())
+    sim.physics.save(*saved)
+    assert snapshot(*saved) == expected(other, live, sim.scene)
+    poison(23, state, control)
+    before, checkpoint = snapshot(state, control), snapshot(*saved)
+    sim.solver.restore_i4h(*saved, wp.ones(m.world_count + 1, dtype=wp.bool, device=device))
+    assert snapshot(state, control) == expected(before, checkpoint, sim.scene)
 
 
 def test_repeated_calls_allocate_nothing():

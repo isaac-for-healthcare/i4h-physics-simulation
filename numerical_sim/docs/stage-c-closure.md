@@ -4,6 +4,8 @@
 
 ## Final qualification
 
+Subsequent work: the [2026-11-16 current-source assessment](current-stack-assessment-20261116.md) checks newer local Lab/Newton sources and records a focused compatibility patch. It is separate from the frozen qualification below; its results and limitations do not replace that evidence.
+
 | Item | Result | Evidence |
 | --- | --- | --- |
 | Reference groups | 35 of 36; the failure is `aorta_shell` catheter impulse on Lab 3.0 eager | [stage-c44.md](stage-c44.md) |

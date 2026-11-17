@@ -316,7 +316,8 @@ def test_builtin_world_and_empty_native_domain():
     np.testing.assert_array_equal(v.attr(world, "rate").numpy(), [2., 5.])
     assert v.attr(particle, "q_prev").shape == (2, 0)
     assert m.particle_count == 0 and m.i4h.particle_q_prev.shape == (1,)
-    assert v.allocated_bytes() == dict(model=8, templates=12, state=12, control=0, control_shared_with_template=0)
+    world_bytes = 4 * m._attribute_frequency_count(newton.Model.AttributeFrequency.WORLD)
+    assert v.allocated_bytes() == dict(model=world_bytes, templates=12, state=12, control=0, control_shared_with_template=0)
 
 
 def test_per_row_scalar_columns_keep_original_layout_and_lifetime():
@@ -538,6 +539,10 @@ def test_uniform_defaults_on_world_rows_wide_rows_flat_vectors_and_empty_domains
     colour.fill_(wp.vec4f(1.0, 2.0, 3.0, 4.0))
     candidates.fill_(7)
     v.attr(world, "rebuild").zero_()
+    # A newer Newton WORLD backing has a global row; local views must not clear it.
+    np.testing.assert_array_equal(s.i4h.first_rebuild.numpy()[:2], [0, 0])
+    if s.i4h.first_rebuild.shape[0] == 3:
+        assert s.i4h.first_rebuild.numpy()[2] == 1
     for container in (m, other):
         assert not container.i4h.first_colour.numpy().any() and (container.i4h.first_candidates.numpy() == -1).all()
         assert (container.i4h.first_rebuild.numpy() == 1).all()

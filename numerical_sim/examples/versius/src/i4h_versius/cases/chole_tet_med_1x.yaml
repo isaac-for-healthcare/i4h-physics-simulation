@@ -1,0 +1,320 @@
+# chole_tet_med at life size: the same tissue, cavity, instruments, fluids and systems with every length divided by
+# 7 (chole_tet_med is ~7x life size: its liver fragment spans 1.83 units, its gallbladder 0.55). Meshes are scaled at
+# load (tissue and cavity `scale`, instrument `scale`); positions, radii, margins, reaches, bounds, the camera and the
+# device motion scale are the chole_tet_med values / 7. Not scaled, on purpose: the biomechanical and time settings
+# (part spring/volume, connector and attachment stiffness, masses, damping, gravity, dt, substeps, iterations,
+# thresholds) and the emitter and smoke speeds. The particles' and instruments' max_velocity are set for life size
+# (0.5 and 0.3 m/s). The tissue is the PBD model tuned at 7x, so its response at this size is not calibrated: this case
+# is for checking the life-size scene, not for physics claims.
+sim:
+  device: cuda:0
+  dt: 0.016666667
+  substeps: 8
+  iterations: 8
+  envs: 1
+  gravity: [0.0, -9.81, 0.0]
+
+assets:
+  tissue:
+    type: tet_bundle
+    path: "${DATA}/choly-mid"
+    scale: 0.142857143          # the authored vertices (and connector rest distances) / 7
+    translation: [0.0, -0.428571, 0.0]
+    radius: 0.00142857          # particle radius (chole_tet_med: the 0.01 default)
+    parts:                      # order is the memory layout; connector files index into it
+      liver:
+        spring: 1.0
+        volume: 1.0
+        visual: {set: "${DATA}/textures/liver"}   # base, damage, coag and blood texture sets
+      fat:
+        spring: 0.1
+        volume: 0.1
+        heat: true                # conducts and burns under the hook's cautery
+        deletable: true           # burnt or cut tets are removed; cut_faces slots default to the authored count
+        visual: {set: "${DATA}/textures/fat"}   # base, damage, coag and blood texture sets
+      gallbladder:
+        spring: 0.8
+        volume: 0.1
+        deletable: true           # the cystic artery and duct run through it: cutting them severs their centrelines
+        visual: {set: "${DATA}/textures/gallbladder"}   # base, damage, coag and blood texture sets
+    connectors:
+      - {path: fat-liver.connector,       particle_part: fat,         triangle_part: liver, stiffness: 0.05, weight_ratio: 0.99}
+      - {path: gallbladder-fat.connector, particle_part: gallbladder, triangle_part: fat,   stiffness: 0.05, weight_ratio: 0.8}
+    pin:
+      center: [0.0714286, 0.214286, -0.714286]
+      radius: 0.142857
+    centrelines:                # vessel centrelines (.cntr rows: the gallbladder particles of each cross-section)
+      - {name: cystic_artery, path: centrelines/cystic_artery.cntr, part: gallbladder}
+      - {name: cystic_duct,   path: centrelines/cystic_duct.cntr,   part: gallbladder}
+  cavity:                       # drawn by the renderer; contact geometry for the static_contact systems below
+    type: static_mesh
+    path: "${DATA}/choly/cavity"
+    scale: 0.142857143
+    translation: [0.114286, -0.471429, -0.0571429]
+    visual: {diffuse: "${DATA}/choly/cavity/cavity_diffuse.tga", normal: "${DATA}/choly/cavity/cavity_normals.tga", specular: "${DATA}/choly/cavity/cavity_spec.png"}
+  blood:                        # fluid pools: chole_tet_med's values with the lengths / 7 (mass and counts unchanged)
+    type: fluid
+    count: 4096
+    mass: 0.02
+    radius: 0.000714286         # collision radius
+    interaction_radius: 0.00428571
+    rest_distance: 0.00142857
+    iterations: 4
+    max_neighbors: 128
+    relaxation: 0.1
+    viscosity: 0.001
+    cohesion: 0.001
+    visual: {color: [0.32, 0.015, 0.02], render_radius: 0.00142857}
+  irrigation:
+    type: fluid
+    count: 8192
+    mass: 0.02
+    radius: 0.000714286
+    interaction_radius: 0.00142857
+    rest_distance: 0.000571429
+    iterations: 8
+    max_neighbors: 128
+    relaxation: 0.1
+    viscosity: 0.001
+    visual: {color: [0.35, 0.35, 0.65], render_radius: 0.00142857}
+
+instruments:                    # laparoscopic tools through trocars; actions[env, k] = [position, quaternion, grip]
+  # Every mesh-based tool also states the loader's length defaults / 7: shaft_spheres (radius 0.04, distance 0.02),
+  # jaw sphere radius 0.015 and, for the scissors, the cutting chains (radius 0.01, distance 0.01, offset -0.005).
+  grasper:
+    kind: grasper
+    mesh: "${DATA}/instruments/pgrasp.usdc"
+    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
+    scale: 0.00107143
+    trocar: [-0.142857, 0.714286, 0.428571]
+    initial: {position: [0.0428571, 0.171429, -0.428571]}
+    input: primary
+    jaw_spheres: {radius: 0.00214286, distance: 0.00214286, offset: [0.0, -0.00214286, 0.0]}
+    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
+  hook:
+    kind: hook
+    mesh: "${DATA}/instruments/hook.usdc"
+    prims: {shaft: /root/shaft_color_001/shaft_color_001, body: /root/logobody_color_002/logobody_color_002, hook: /root/hook/Mesh_001}
+    scale: 0.00107143
+    trocar: [0.785714, 0.714286, 0.714286]
+    initial: {position: [0.1, 0.171429, -0.428571]}
+    input: secondary
+    jaw_spheres:
+      count: 5
+      radius: 0.00214286
+      distance: 0.00142857
+      chains: {jaw_left: {offset: [0.0, 0.0, 0.0142857], euler: [-20.0, 0.0, 0.0]}, jaw_right: {offset: [0.0, 0.00285714, 0.0214286], euler: [80.0, 0.0, 0.0]}}
+    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
+    wrist_end: [0.0, 0.0, 0.00857143]
+  clip_applier:                 # the grasper mesh in its own colours: never grasps, F (fire) clips the duct or artery node in reach
+    kind: clip_applier
+    mesh: "${DATA}/instruments/pgrasp.usdc"
+    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
+    scale: 0.00107143
+    trocar: [0.428571, 0.714286, 0.428571]
+    initial: {position: [0.157143, 0.171429, -0.428571]}
+    jaw_spheres: {radius: 0.00214286, distance: 0.00214286, offset: [0.0, -0.00214286, 0.0]}
+    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
+  scissors:                     # 5 collision spheres per jaw and 8 finer cutting spheres per jaw; closing the jaw cuts fat
+    kind: scissors
+    mesh: "${DATA}/instruments/rts.usdc"
+    prims: {shaft: /root/shaft_color_001/shaft_color_003, body: /root/logobody_color_001/logobody_color_004, jaw_left: /root/jawLeft_color_001/jawLeft_color_003, jaw_right: /root/jawRight_color_001/jawRight_color_003}
+    scale: 0.00107143
+    trocar: [0.0, 0.242857, -0.285714]
+    initial: {position: [0.0428571, 0.171429, -0.428571]}   # as chole_tet_med: the grasper's rest pose too
+    jaw_spheres: {count: 5, radius: 0.00214286, distance: 0.00214286, offset: [0.0, -0.00214286, 0.0]}
+    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
+    cutting: {count: 8, radius: 0.00142857, distance: 0.00142857, offset: [0.0, -0.000714286, 0.0]}
+  suction:                      # irrigation and suction tube: grip irrigates, energy sucks
+    kind: suction
+    mesh: "${DATA}/instruments/suction_irrigation.usdc"
+    prims: {tool: /root/root/tool/tool}
+    scale: 0.00107143
+    trocar: [0.5, 0.714286, 0.714286]
+    initial: {position: [-0.0714286, 0.171429, -0.428571]}
+    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
+
+
+inputs:                         # devices for --input devices (MiniMou); keyboard and scripted need no devices
+  pickup: {distance: 0.0214286, proxy_radius: 0.00714286, keys: {primary: "1", secondary: "2"}}
+  # As chole_tet_med, with the device motion scale and offsets / 7 (the same hand motion moves the tool 1/7 as far, the
+  # same fraction of the tissue). The 4-DOF Avatar would be
+  # {backend: avatar, settings: {device_index: 0, position_offset: [0.428571, 0.714286, 0.428571], handle: {box: box, channel: 1}}}
+  box:       {backend: ibcontroller, settings: {device_index: 0, channels: 6}}
+  primary:   {backend: minimou, scale: [0.000714286, 0.000714286, 0.000714286], settings: {device_index: 0, handle_readout: raw, position_offset: [0.0, 0.171429, -0.571429], handle: {box: box, channel: 1}}}
+  secondary: {backend: minimou, scale: [0.000714286, 0.000714286, 0.000714286], settings: {device_index: 1, handle_readout: raw, position_offset: [0.171429, 0.171429, -0.571429], handle: {box: box, channel: 3}}}
+
+systems:                        # chole_tet_med's systems; length settings (stated or defaults) / 7
+  - type: particles
+    max_velocity: 0.5           # m/s (chole_tet_med: 5.0 of its units, ~0.7 m/s at life size); judged right by hand on the MiniMou
+  - type: tet
+    body: tissue
+    volume_epsilon: 4.16493e-12 # the 1e-8 default / 7^4: sum(w |grad V|^2) scales as length^4, so the same tets keep
+                                # their volume constraints as in chole_tet_med (the default skips all fat and gallbladder ones here)
+  - type: surface
+    tet: tet
+  - type: attachments
+    body: tissue
+    stiffness: 0.0005
+  - type: connectors
+    body: tissue
+  - type: instrument_control
+    max_velocity: 0.3           # m/s: an instrument tip's speed limit, below the tissue's 0.5 (tissue pushed by a tool moves up to
+                                # ~1.5x its speed); a gallbladder stab tunnels at none of 0.2-0.75 m/s with the tissue at 0.5
+  - type: instrument_contact
+    instruments: instrument_control
+    surface: surface
+    front_side_only: [liver]
+    margin: 0.000285714
+  - type: contact_paint
+    contacts: instrument_contact
+    surface: surface
+  - type: grasp
+    instruments: instrument_control
+    contacts: instrument_contact
+  - type: volumetric_grasp
+    instruments: instrument_control
+    body: tissue
+  - type: hook
+    instruments: instrument_control
+    contacts: instrument_contact
+    instrument: hook
+    part: fat
+    engage_overlap: 0.000142857
+    retention_slack: 0.000428571
+    puncture_distance: 0.00285714
+  - type: tool_force
+    instruments: instrument_control
+    contacts: instrument_contact
+    grasp: grasp
+    volumetric_grasp: volumetric_grasp
+    hook: hook
+  - type: static_contact        # the cavity holds the liver too (chole_tet_med: fat and gallbladder only, since the liver
+    body: tissue                # is authored through the wall: 498 of its particles start behind it, up to 1.9 cm here;
+    mesh: cavity                # those within the query reach are pushed back into the cavity)
+    parts: [liver, fat, gallbladder]
+    margin: 0.00142857
+    search: 0.00285714
+  - type: thermal
+    surface: surface
+    contacts: instrument_contact
+    instruments: instrument_control
+    hook: hook
+    instrument: hook
+  - type: cutting
+    surface: surface
+    instruments: instrument_control
+    instrument: scissors
+    trigger: closing
+    blood: 1.0
+    margin: 0.000571429
+  - type: stretch_breaking      # stretch ratios: not lengths
+    surface: surface
+    parts: [fat]
+    threshold: 12.0
+    damage_start: 4.0
+    damage_full: 8.0
+  - type: centreline
+    body: tissue
+  - type: clipping
+    centreline: centreline
+    instruments: instrument_control
+    instrument: clip_applier
+    reach: 0.0285714
+    line: [cystic_duct, cystic_artery]
+  - type: fluid
+  - type: fluid_contact
+    fluid: fluid
+    surface: surface
+    margin: 0.000285714
+    search: 0.00142857
+  - type: static_contact
+    id: blood_cavity
+    body: blood
+    mesh: cavity
+    margin: 0.000285714
+    search: 0.00285714
+  - type: static_contact
+    id: irrigation_cavity
+    body: irrigation
+    mesh: cavity
+    margin: 0.000285714
+    search: 0.00285714
+  - type: bleeding
+    fluid: fluid
+    body: blood
+    centreline: centreline
+    instruments: instrument_control
+    clipping: clipping
+    cutting: cutting
+    line: cystic_artery
+    margin: 0.000571429
+    spawn_radius: 0.00142857
+  - type: emitter
+    fluid: fluid
+    body: irrigation
+    instruments: instrument_control
+    instrument: suction
+    rate: 4096.0
+    speed: 5.0
+    spawn_radius: 0.00285714
+  - type: suction
+    fluid: fluid
+    instruments: instrument_control
+    instrument: suction
+    radius: 0.0142857
+    removal_radius: 0.00142857
+  - type: smoke
+    instruments: instrument_control
+    contacts: instrument_contact
+    thermal: thermal
+    instrument: hook
+    texture: "${DATA}/textures/smoke1.png"
+    spawn_radius: 0.00357143
+    start_size: 0.00142857
+    end_size: 0.0285714
+  - type: tissue_contact
+    id: liver_gallbladder_contact
+    enabled: false
+    surface: surface
+    surface_part: liver
+    particle_parts: [gallbladder]
+    margin: 0.000285714
+  - type: bounds                # last: the final positional projection of tissue and fluids
+    lower: [-0.285714, 0.0, -1.14286]
+    upper: [0.285714, 1.42857, -0.428571]
+
+haptics:                        # as chole_tet_med: force units are not rescaled (see the header)
+  enabled: false
+  newtons_per_unit: 0.01
+  max_force_n: 0.5              # keep the bench tests at or below 0.5 N
+  handles: {max_force_n: 30.0}
+
+render:
+  backend: slang
+  size: [1920, 1080]
+  env: 0
+  vsync: false
+  exposure: 0.972
+  tonemap: aces
+  post: {ao_enabled: true, ao_intensity: 1.637, ao_radius: 0.00185714, ao_bias: 0.00214286, ao_power: 1.608,   # AO radius and bias are view-space lengths
+         bloom_enabled: true, bloom_threshold: 0.5, bloom_intensity: 1.783, bloom_radius: 6.182, fxaa_enabled: true}  # bloom radius is in pixels
+  camera: {position: [0.0670893, 0.171751, -0.350877], fov: 45.0, pitch: 6.8, yaw: 4.3, up: [0.0, 1.0, 0.0], near: 0.00142857, far: 14.2857,
+           target_distance: 0.142857,   # the orbit pivot starts this far ahead (the camera default 1.0 / 7)
+           move_speed: 0.75,            # WASD/QE: distances to the pivot per second (the default), at least
+           min_distance: 0.0357143,     # this distance (the default 0.25 / 7)
+           rotate_speed: 1.0,           # orbit multiplier (arrow keys, left-button drag)
+           turbo: 3.0, slow: 0.25}      # held Shift / Ctrl multiply flying and the arrow keys' orbit
+  environment: {path: "${DATA}/environments/abdomen.hdr", intensity: 0.84, pitch_degrees: -90.0, rotation_degrees: 0.0, lighting: true}
+  headlight: {color: [1.0, 0.92, 0.78], intensity: 0.59}
+  debug_spheres: false
+  tip: {instrument: grasper, distance: 0.0}
+  xr:
+    world_units_per_meter: 1.0  # now one unit is one metre of anatomy: the headset shows the organs at life size
+    runtime: {mode: managed, host_client: true}
+    mirror: left
+    inputs:
+      pickup: {distance: 0.0214286, proxy_radius: 0.00714286, keys: {primary: "1", secondary: "2"},
+               start: {primary: hook, secondary: grasper}}
+      primary:   {backend: openxr, settings: {hand: right}}
+      secondary: {backend: openxr, settings: {hand: left}}

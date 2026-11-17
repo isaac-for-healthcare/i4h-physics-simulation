@@ -4,6 +4,7 @@
 from pathlib import Path
 
 import numpy as np
+from i4h_physics.checks import check_float
 from i4h_physics.loaders.tet_bundle import pack_tet_body, parse_materials, read_connectors, read_part
 from i4h_physics.scene import Body, ConnectorSet, PinSet, Scene
 from i4h_surgical.scene import CentrelineSet
@@ -32,13 +33,17 @@ def read_centreline(path: Path, particle_count: int) -> list[np.ndarray]:
 
 
 def add_tet_bundle(scene: Scene, name: str, path, parts: dict[str, dict], translation=(0.0, 0.0, 0.0), connectors=(),
-                   pin=None, centrelines=(), mass=0.1, radius=0.01) -> Body:
+                   pin=None, centrelines=(), mass=0.1, radius=0.01, scale=1.0) -> Body:
+    """Scale authored vertices/connector distances; other lengths are in destination units."""
+    scale = check_float(f"tet bundle {name!r}: scale", scale)
+    if not scale > 0.0:
+        raise ValueError(f"tet bundle {name!r}: scale must be positive, got {scale}")
     roots = [Path(p).expanduser() for p in ([path] if isinstance(path, (str, Path)) else path)]
     for root in roots:
         if not root.is_dir():
             raise FileNotFoundError(f"tet bundle {name!r}: {root} is not a directory")
     materials, visuals = parse_materials(parts)
-    variants = [{pname: read_part(root / pname, translation, mass) for pname in parts} for root in roots]
+    variants = [{pname: read_part(root / pname, translation, mass, scale) for pname in parts} for root in roots]
     body = pack_tet_body(scene, name, variants, materials, radius, visuals)
     from types import SimpleNamespace
     for part, visual in zip(body.parts.values(), visuals):
@@ -69,7 +74,7 @@ def add_tet_bundle(scene: Scene, name: str, path, parts: dict[str, dict], transl
                 particle[v, s : s + n] = pid + body.parts[c["particle_part"]].particle_start
                 tri[v, s : s + n] = t + body.parts[c["triangle_part"]].particle_start
                 bar[v, s : s + n] = b
-                rest[v, s : s + n] = r
+                rest[v, s : s + n] = r * scale
         body.connectors = ConnectorSet(
             particle, tri, bar, rest, group,
             np.array([float(c["stiffness"]) for c in specs], np.float32),

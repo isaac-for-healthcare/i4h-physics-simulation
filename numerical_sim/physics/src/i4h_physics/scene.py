@@ -365,7 +365,7 @@ class Scene:
         if self.env_rotated and model is not None:
             from i4h_physics.newton_model import component_gravity
 
-            model.i4h.scene_gravity.assign(component_gravity(model, self))
+            model.i4h.scene_gravity[:self.envs].assign(component_gravity(model, self))
 
     def adopt_gravity(self, gravity) -> None:
         """Take the host's gravity as the case gravity (a case that declares none)."""

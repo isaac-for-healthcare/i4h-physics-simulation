@@ -1,0 +1,12 @@
+{
+  "path": "/home/pkorzeniowsk/Projects/i4h-v2/i4h-v2-physics-simulation",
+  "commit": "16882a4da24a2457f81a7180b4730ffe354906f3",
+  "source_sha256": {
+    "training/src/i4h_poking/scene_setup.py": "6cfe8ad05f95d5cb4e7e3480b144b532e4fdf5551859ba7dee40ecaa4a028348",
+    "training/src/i4h_poking/manager_terms.py": "bc111f742831fe00050defa8a2610a91bf733e635eef87f26879b6b63ba8095a",
+    "training/src/i4h_poking/manager_ppo.py": "b2cd33419b5d2fc52bf9e1551055efe0249c82233bc8d46483c460952f3ee408",
+    "training/src/i4h_poking/teleop_input.py": "db842b68c18a23856f3e77cc863174ba66b7d9c7702f5f24f1643ba970b8acda",
+    "src/i4h_v2_physics_simulation/follou_input.py": "d003eae70685cee0b742e01b5e42eda7e252847d88a138570ce69246105a9fa8",
+    "training/scripts/prepare_versius.py": "f3a88eb35f9a37dfa53c774d84bd46425df7da3996addd69883b1327c5432468"
+  }
+}

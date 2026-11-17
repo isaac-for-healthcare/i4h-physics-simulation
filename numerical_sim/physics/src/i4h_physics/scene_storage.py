@@ -96,8 +96,11 @@ def register_scene_finalizers(builder, scene):
             raise RuntimeError("complete Scene storage before finalization")
         validate_scene(scene)
         from i4h_physics.newton_model import component_gravity
-        data = (wp.array(component_gravity(model, scene), dtype=wp.vec3, device=model.device)
-                if scene.env_rotated else model.gravity[:scene.envs])
+        data = model.gravity[:model._attribute_frequency_count(newton.Model.AttributeFrequency.WORLD)]
+        if scene.env_rotated:
+            values = data.numpy().copy()
+            values[:scene.envs] = component_gravity(model, scene)
+            data = wp.array(values, dtype=wp.vec3, device=model.device)
         model.add_attribute(attribute.name, data, attribute.frequency, attribute.assignment,
                             attribute.namespace, attribute.references)
     register("i4h:scene_gravity", gravity_finalizer)
