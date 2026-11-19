@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import gymnasium as gym
 import isaaclab.sim as sim_utils
 import torch
 from i4h_isaaclab.component import I4hComponent, I4hComponentCfg
@@ -130,14 +129,19 @@ class PokeCfg(ManagerBasedRLEnvCfg):
     terminations: TerminationsCfg = TerminationsCfg()
 
 
-def configuration(name, usd, *, envs=1, graph=False, coupling="two_way", teleop=False):
+def configuration(name, usd, *, envs=1, graph=True, coupling="two_way", teleop=False):
+    import os
+
+    usd = usd or os.environ.get("I4H_VERSIUS_USD")
+    if not usd or not Path(usd).expanduser().is_file():
+        raise ValueError("Versius requires --usd or I4H_VERSIUS_USD pointing to the prepared robot USD")
     physical = profile(name)
     cfg = PokeCfg(profile=name, teleop=teleop)
     cfg.scene.num_envs = envs
     cfg.scene.robot = ArticulationCfg(
         prim_path="{ENV_REGEX_NS}/Robot",
         spawn=sim_utils.UsdFileCfg(
-            usd_path=str(Path(usd).resolve()),
+            usd_path=str(Path(usd).expanduser().resolve()),
             variants={"Physics": "mujoco"},
             rigid_props={
                 "/.*": [
@@ -199,10 +203,7 @@ class PokeEnv(I4hHostMixin, ManagerBasedRLEnv):
         if cfg is None:
             import os
 
-            usd = os.environ.get(
-                "I4H_VERSIUS_USD",
-                "/home/pkorzeniowsk/Projects/i4h-v2/i4h-v2-physics-simulation/training/generated/usd/versius_poke_2/versius_poke.usda",
-            )
+            usd = os.environ.get("I4H_VERSIUS_USD")
             cfg, physical = configuration(profile_name, usd)
         self.physical = physical or profile(cfg.profile)
         import hashlib
@@ -447,10 +448,13 @@ class PokeEnv(I4hHostMixin, ManagerBasedRLEnv):
         self.progress_step[ids] = self.common_step_counter
 
 
-for name in ("Block", "Chole", "Chole-1x"):
-    gym.register(
-        id=f"I4h-Versius-Poke-{name}-v0",
-        entry_point="i4h_versius.task:PokeEnv",
-        disable_env_checker=True,
-        kwargs={"profile_name": name.lower()},
-    )
+def block_cfg():
+    return configuration("block", None)[0]
+
+
+def chole_cfg():
+    return configuration("chole", None)[0]
+
+
+def chole_1x_cfg():
+    return configuration("chole-1x", None)[0]

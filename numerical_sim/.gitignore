@@ -26,3 +26,5 @@ baselines/
 # catheter parity (scripts/parity): the reference venv and run outputs
 /.parity/
 /parity/
+
+.venvs/

@@ -122,18 +122,14 @@ class ReplayInput:
 
 class FollouPositionInput:
     def __init__(self, device_index=0):
-        from i4h_versius.follou_input import FollouInput
+        from i4h_standalone.input.follou import MiniMouController
 
-        self.device = FollouInput.open(device_index=device_index)
+        self.device = MiniMouController(device_index=device_index)
 
     def sample(self, dt):
         try:
-            self.device.read_position()
-            # Common controller owns the device-to-scene axis mapping.
-            return PositionSample(
-                self.device.raw_position * 0.001, status="MiniMou tracking"
-            )
-        except Exception as exc:  # noqa: BLE001 - SDK failures must freeze motion and discard anchors.
+            return PositionSample(self.device.read_raw_position(), status="MiniMou tracking")
+        except Exception as exc:  # SDK failures freeze motion and discard anchors.
             return PositionSample(None, status=f"MiniMou tracking lost: {exc}")
 
     def close(self):

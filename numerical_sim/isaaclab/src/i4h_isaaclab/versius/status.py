@@ -9,41 +9,57 @@ def snapshot(env):
     products = env.i4h.state()
     force = products["tool_force.force"].reshape(env.num_envs, 3)
     contacts = products["tool_force.count"].reshape(env.num_envs, -1).sum(1)
+    import torch
+
+    # One batched diagnostic readback; the viewer throttles these snapshots to 6 Hz.
+    values = torch.cat((
+        torch.stack((depth[0], lateral[0], distance[0], contacts[0], force[0].norm(),
+                     env.hold_time[0], env.success[0], valid[0], failed.any(),
+                     env.reference_patch[0, 2] - tcp[0, 2],
+                     (env.target_tcp[0] - tcp[0]).norm(), env.episode_length_buf[0])),
+        force[0], tcp[0], patch[0],
+        *(mask.float() for mask in flags.values()),
+    )).detach().cpu().tolist()
     reasons = []
-    names = {
-        "nonfinite": "nonfinite tissue/robot state",
-        "indentation_limit": "tissue indentation limit exceeded",
-        "tip_depth_limit": "tool tip below allowed depth",
-    }
-    for name, mask in flags.items():
-        for world in mask.nonzero().flatten().tolist():
-            reasons.append(f"env {world}: {names[name]}")
+    names = ("nonfinite tissue/robot state", "tissue indentation limit exceeded",
+             "tool tip below allowed depth")
+    for index, name in enumerate(names):
+        for world in range(env.num_envs):
+            if values[21 + index * env.num_envs + world]:
+                reasons.append(f"env {world}: {name}")
     return {
         "profile": env.physical.name,
         "geometry_scale": getattr(env.physical, "geometry_scale", 1.0),
         "envs": env.num_envs,
-        "depth": float(depth[0]),
+        "depth": values[0],
         "depth_low": env.cfg.target_depth - env.cfg.depth_tolerance,
         "depth_high": env.cfg.target_depth + env.cfg.depth_tolerance,
         "depth_limit": env.cfg.max_depth,
         "tip_depth_limit": env.cfg.max_tool_depth,
-        "tip_depth": float(env.reference_patch[0, 2] - tcp[0, 2]),
-        "lateral": float(lateral[0]),
-        "distance": float(distance[0]),
-        "contacts": int(contacts[0]),
-        "force": force[0].tolist(),
-        "force_norm": float(force[0].norm()),
-        "hold": float(env.hold_time[0]),
-        "success": bool(env.success[0]),
-        "valid": bool(valid[0]),
-        "failed": bool(failed.any()),
+        "tip_depth": values[9],
+        "lateral": values[1],
+        "distance": values[2],
+        "contacts": int(values[3]),
+        "force": values[12:15],
+        "force_norm": values[4],
+        "hold": values[5],
+        "success": bool(values[6]),
+        "valid": bool(values[7]),
+        "failed": bool(values[8]),
         "reasons": reasons,
-        "tcp": tcp[0].tolist(),
-        "tracking_error": float((env.target_tcp[0] - tcp[0]).norm()),
-        "steps": int(env.episode_length_buf[0]),
+        "tcp": values[15:18],
+        "tracking_error": values[10],
+        "steps": int(values[11]),
         "graph": bool(env.graph_seen),
-        "patch": patch[0].tolist(),
+        "patch": values[18:21],
     }
+
+
+def failure_status(env):
+    """Synchronize one failure bit before physics; read detailed diagnostics only on failure."""
+    if bool(terms.measurements(env)[5].any()):
+        return snapshot(env)
+    return {"failed": False}
 
 
 def guidance(state):

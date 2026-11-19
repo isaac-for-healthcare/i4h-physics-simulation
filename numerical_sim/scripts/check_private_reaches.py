@@ -32,6 +32,8 @@ ALLOWED = {
     },
     "Isaac Lab internals at the pinned revisions": {
         "isaaclab/src/i4h_isaaclab/env.py": {"_reset_idx"},
+        "isaaclab/src/i4h_isaaclab/versius/task.py": {"_reset_idx"},
+        "isaaclab/src/i4h_isaaclab/versius/qualification.py": {"_reset_idx"},
         "isaaclab/src/i4h_isaaclab/lab30.py": {"_cfg", "_contacts", "_create_solver", "_initialize_contacts", "_invalidate_graph", "_needs_collision_pipeline",
                                                "_prepare_builder_for_finalize", "_register_builder_attributes", "_registers_builder_attributes_from_solver",
                                                "_solver", "_supports_contact_sensors", "_supports_rigid_body_force_input", "_use_single_state"},

@@ -56,7 +56,9 @@ def _viewer_pitch_yaw(camera: dict) -> tuple[float, float]:
 
 
 class GlRenderer:
-    def __init__(self, sim, *, size=(1280, 720), env=0, camera=None, procedure=None):
+    def __init__(self, sim, *, size=(1280, 720), env=0, camera=None, procedure=None,
+                 native_model=None, native_state=None, component_pose=None, headless=False,
+                 show_instrument_spheres=True):
         from newton.viewer import ViewerGL
 
         scene = sim.scene
@@ -66,7 +68,16 @@ class GlRenderer:
         self.task_markers = _GlMarkers(73, scene.device) if procedure is not None and not procedure.sequence else None
         self.task_procedure = procedure
         self.task_row = None
-        self.viewer = ViewerGL(width=int(size[0]), height=int(size[1]))
+        self.viewer = ViewerGL(width=int(size[0]), height=int(size[1]), headless=headless)
+        self.show_instrument_spheres = show_instrument_spheres
+        self.native_state = native_state
+        self.component_pose = wp.transform(*component_pose) if component_pose is not None else None
+        self.transformed = {}
+        self.recorder = None
+        self.extra_points = []
+        if native_model is not None:
+            self.viewer.set_model(native_model)
+            self.viewer.show_particles = False
         camera = dict(camera or {})
         if "position" in camera:
             self.viewer.set_camera(wp.vec3(*[float(v) for v in camera["position"]]), *_viewer_pitch_yaw(camera))
@@ -76,9 +87,9 @@ class GlRenderer:
             look = {"texture": str(require_asset(appearance(m)["diffuse"]))} if "diffuse" in appearance(m) else {"color": tuple(appearance(m).get("color", (0.6, 0.6, 0.6)))}
             self.viewer.log_mesh(
                 f"static/{m.name}",
-                wp.array(m.points, dtype=wp.vec3, device=dev),
+                self.transform(wp.array(m.points, dtype=wp.vec3, device=dev)),
                 wp.array(m.indices.reshape(-1).astype(np.int32), dtype=wp.int32, device=dev),
-                normals=wp.array(m.normals, dtype=wp.vec3, device=dev),
+                normals=self.transform(wp.array(m.normals, dtype=wp.vec3, device=dev), vectors=True),
                 uvs=wp.array(m.uvs, dtype=wp.vec2, device=dev) if m.uvs is not None else None,
                 **look,
             )
@@ -135,12 +146,46 @@ class GlRenderer:
                 self.smokes.append((s, wp.zeros(n, dtype=wp.vec3, device=dev), wp.zeros(n, dtype=wp.float32, device=dev),
                                     wp.array(np.tile(np.float32((0.8, 0.78, 0.72)), (n, 1)), dtype=wp.vec3, device=dev)))
         S = self.control.sphere_count if self.control is not None else 0
+        self.sphere_points = self.control.sphere_q[self.env] if S else None
         self.sphere_radii = wp.zeros(S, dtype=wp.float32, device=dev) if S else None  # 0 for inactive spheres
         if S:  # collision spheres magenta, a scissors' cutting spheres yellow
             colors = np.where((self.control.host_sphere_chain == CHAIN_CUT)[:, None], np.float32(CUT_SPHERE_COLOR), np.float32(SPHERE_COLOR))
             self.sphere_colors = wp.array(np.ascontiguousarray(colors, dtype=np.float32), dtype=wp.vec3, device=dev)
         else:
             self.sphere_colors = None
+
+    def transform(self, points, *, vectors=False):
+        """Persistent device-side component-to-world publication, with no vertex host round trip."""
+        if self.component_pose is None:
+            return points
+        key = (id(points), vectors)
+        if key not in self.transformed:
+            self.transformed[key] = (points, wp.empty_like(points))
+        out = self.transformed[key][1]
+        wp.launch(transform_points, dim=points.size, inputs=[points, self.component_pose, vectors],
+                  outputs=[out], device=self.scene.device)
+        return out
+
+    def add_points(self, name, count, radii, colors):
+        """Register device-updated world-coordinate markers with persistent draw buffers."""
+        points = wp.zeros(count, dtype=wp.vec3, device=self.scene.device)
+        self.extra_points.append((name, points,
+                                  wp.array(radii, dtype=wp.float32, device=self.scene.device),
+                                  wp.array(colors, dtype=wp.vec3, device=self.scene.device)))
+        return points
+
+    def record_video(self, path, fps=30):
+        """Record the shared GL view, including registered status panels."""
+        import subprocess
+        from pathlib import Path
+
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        frame = self.viewer.get_frame(render_ui=True)
+        height, width = frame.shape[:2]
+        self.recorder = subprocess.Popen([
+            "ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pixel_format", "rgb24",
+            "-video_size", f"{width}x{height}", "-framerate", str(fps), "-i", "-", "-an",
+            "-c:v", "libx264", "-crf", "24", "-pix_fmt", "yuv420p", str(path)], stdin=subprocess.PIPE)
 
     def add_markers(self, count: int):
         """The app's idle-device proxies as points: host arrays assigned each publish (the GL view is single-threaded)."""
@@ -180,17 +225,17 @@ class GlRenderer:
 
     def draw(self) -> bool:
         self.viewer.begin_frame(self.time)
-        host = {}  # one device -> host copy per surface system per frame (debug view: the host path is allowed)
+        if self.native_state is not None:
+            self.viewer.log_state(self.native_state())
         for name, points, p, source, color, indices in self.parts:
             if isinstance(source, Surface):
-                if id(source) not in host:
-                    host[id(source)] = source.tris[self.env].numpy()  # one env's row, not the whole table
-                tris = host[id(source)]
+                wp.launch(part_indices, dim=p.tri_count,
+                          inputs=[source.tris[self.env], p.tri_start, p.particle_start],
+                          outputs=[indices], device=self.scene.device)
             else:
-                tris = source
-            local = tris[p.tri_start : p.tri_start + p.tri_count] - p.particle_start
-            indices.assign(np.ascontiguousarray(local.reshape(-1), dtype=np.int32))
-            self.viewer.log_mesh(name, points, indices, color=color)
+                local = source[p.tri_start : p.tri_start + p.tri_count] - p.particle_start
+                indices.assign(np.ascontiguousarray(local.reshape(-1), dtype=np.int32))
+            self.viewer.log_mesh(name, self.transform(points), indices, color=color)
         for skin, points, normals, indices in zip(self.skins, self.piece_points, self.piece_normals, self.piece_indices):
             self.viewer.log_mesh(f"instruments/{self.control.names[skin.instrument]}/{skin.name}", points, indices, normals=normals,
                                  color=skin.color)
@@ -206,13 +251,17 @@ class GlRenderer:
         if getattr(self, "markers", None) is not None:
             m = self.markers
             self.viewer.log_points("markers", m.q, m.radii, m.colors)
-        if self.sphere_radii is not None:
-            self.viewer.log_points("instruments/spheres", self.control.sphere_q[self.env], self.sphere_radii, self.sphere_colors)
+        if self.sphere_radii is not None and self.show_instrument_spheres:
+            self.viewer.log_points("instruments/spheres", self.transform(self.sphere_points), self.sphere_radii, self.sphere_colors)
         for body, _, radii, colors in self.fluids:  # dead particles have radius 0 (the viewer wants arrays for both)
             self.viewer.log_points(f"fluid/{body.name}", self.scene.field("q", body)[self.env], radii, colors)
         for i, (_, pos, radii, colors) in enumerate(self.smokes):
             self.viewer.log_points(f"smoke/{i}", pos, radii, colors)
+        for name, points, radii, colors in self.extra_points:
+            self.viewer.log_points(name, points, radii, colors)
         self.viewer.end_frame()
+        if self.recorder is not None:
+            self.recorder.stdin.write(self.viewer.get_frame(render_ui=True).numpy().tobytes())
         self.time += self.sim.dt
         return self.viewer.is_running()
 
@@ -223,7 +272,13 @@ class GlRenderer:
         return self.viewer.get_frame().numpy().astype(np.float32) / 255.0  # (H, W, 3) uint8 from Newton -> [0, 1]
 
     def close(self) -> None:
-        self.viewer.close()
+        try:
+            if self.recorder is not None:
+                self.recorder.stdin.close()
+                if self.recorder.wait() != 0:
+                    raise RuntimeError("OpenGL recording encoder failed")
+        finally:
+            self.viewer.close()
 
 
 @wp.kernel
@@ -302,3 +357,22 @@ class GlKeys:
         register = getattr(getattr(renderer.viewer, "renderer", None), "register_key_press", None)
         if register is not None:
             register(lambda symbol, modifiers: [handler(_KeyPress(symbol)) for handler in self.key_handlers])
+
+
+@wp.kernel
+def transform_points(points: wp.array(dtype=wp.vec3), pose: wp.transform, vectors: bool,
+                     out: wp.array(dtype=wp.vec3)):
+    i = wp.tid()
+    if vectors:
+        out[i] = wp.transform_vector(pose, points[i])
+    else:
+        out[i] = wp.transform_point(pose, points[i])
+
+
+@wp.kernel
+def part_indices(tris: wp.array(dtype=wp.vec3i), start: int, offset: int,
+                 out: wp.array(dtype=wp.int32)):
+    i = wp.tid()
+    tri = tris[start + i]
+    for j in range(3):
+        out[3 * i + j] = tri[j] - offset

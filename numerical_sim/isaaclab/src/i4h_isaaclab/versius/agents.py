@@ -25,7 +25,7 @@ class PokeRunnerCfg(RslRlOnPolicyRunnerCfg):
         hidden_dims=[64, 64], activation="elu", obs_normalization=True
     )
     algorithm = RslRlPpoAlgorithmCfg(
-        class_name="i4h_versius.manager_ppo:TerminalObservationPPO",
+        class_name="i4h_isaaclab.versius.manager_ppo:TerminalObservationPPO",
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,

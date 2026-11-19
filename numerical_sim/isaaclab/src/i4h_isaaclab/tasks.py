@@ -94,3 +94,17 @@ for _id, _cfg in {**TASKS, **MANAGER_TASKS}.items():
             kwargs={"env_cfg_entry_point": f"i4h_isaaclab.tasks:{_cfg}",
                     "rsl_rl_cfg_entry_point": f"i4h_isaaclab.agents:{_runner}"},
         )
+
+VERSIUS_TASKS = {
+    f"I4h-Versius-Poke-{name}-v0": name.lower() for name in ("Block", "Chole", "Chole-1x")
+}
+for _id, _profile in VERSIUS_TASKS.items():
+    if _id not in gym.registry:
+        gym.register(
+            id=_id,
+            entry_point="i4h_isaaclab.versius.task:PokeEnv",
+            disable_env_checker=True,
+            kwargs={"profile_name": _profile,
+                    "env_cfg_entry_point": f"i4h_isaaclab.versius.task:{_profile.replace('-', '_')}_cfg",
+                    "rsl_rl_cfg_entry_point": "i4h_isaaclab.versius.agents:PokeRunnerCfg"},
+        )

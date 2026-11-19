@@ -63,9 +63,20 @@ def parse(argv):
     parser.add_argument("--success-on-timeout", action="store_true", help="headless: episodes that time out are successful")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="cuda:0")
+    from i4h_isaaclab.versius.cli import add_arguments
+    add_arguments(parser)
+    parser.add_argument("--task", help="registered task for Cartesian-target robot control")
+    parser.add_argument("--input", choices=("keyboard", "replay", "follou", "openhaptics"), default="keyboard")
+    parser.add_argument("--axis-map")
+    parser.add_argument("--gain", type=float, default=1.0)
+    parser.add_argument("--follou-device-index", type=int, default=0)
+    parser.add_argument("--hd-device", default="Default Device")
+    parser.add_argument("--hd-library")
     args = parser.parse_args(argv)
     if args.data:
         os.environ["I4H_DATA"] = str(Path(args.data).expanduser().resolve())
+    if args.task and args.input == "replay" and not args.replay:
+        parser.error("--input replay requires --replay FILE.json")
     if args.record_camera and args.camera <= 0:
         parser.error("--record-camera needs --camera N")
     if args.render == "none" and args.steps <= 0:
@@ -142,6 +153,29 @@ def show_demo(env, renderer, path, demo, realtime: bool) -> None:
 def main(argv=None) -> int:
     wp.config.enable_backward = False
     args = parse(sys.argv[1:] if argv is None else argv)
+    if args.headless and args.render == "gl":
+        import pyglet
+        pyglet.options["headless"] = True
+    if args.task:
+        import gymnasium as gym
+        from i4h_isaaclab.versius.cli import make_cfg, workflow_args
+        from i4h_standalone.cartesian import teleop as cartesian_teleop
+        from isaaclab.app.sim_launcher import launch_simulation
+        if args.render == "xr":
+            raise ValueError("Versius Cartesian control supports --render gl|none")
+        if args.haptics:
+            raise ValueError("Versius force output is disabled")
+        cfg = make_cfg(args, teleop=True)
+        options = workflow_args(args)
+        options.no_real_time = args.realtime is False or (args.realtime is None and args.render == "none")
+        with launch_simulation(cfg, args):
+            env = gym.make(args.task, cfg=cfg)
+            try:
+                env.reset()
+                print(cartesian_teleop(env.unwrapped, options))
+            finally:
+                env.close()
+        return 0
     from i4h_isaaclab.composition import read_case
     from i4h_isaaclab.env import I4hEnv, I4hEnvCfg
     from i4h_standalone.app.haptics import HapticsConfig
@@ -170,7 +204,7 @@ def main(argv=None) -> int:
 
                     render_cfg = case.get("render") or {}
                     renderer = GlRenderer(u.simulator, size=tuple(render_cfg.get("size", (1280, 720))), env=0,
-                                          camera=render_cfg.get("camera"))
+                                          camera=render_cfg.get("camera"), headless=args.headless)
                 show_demo(env, renderer, *demo_file, realtime=args.realtime if args.realtime is not None else renderer is not None)
                 return 0
             if args.replay:
@@ -201,7 +235,7 @@ def main(argv=None) -> int:
 
                 render_cfg = case.get("render") or {}
                 renderer = GlRenderer(u.simulator, size=tuple(render_cfg.get("size", (1280, 720))), env=0,
-                                      camera=render_cfg.get("camera"))
+                                      camera=render_cfg.get("camera"), headless=args.headless)
                 keys = GlKeys(renderer)
             teleop = Teleop(env, inputs, haptics_cfg, others=args.others, renderer=keys)
             if args.teleop_device:

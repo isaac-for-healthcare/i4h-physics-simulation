@@ -20,6 +20,7 @@ class _MiniMouSampleState:
     tool_min: float | None = None
     tool_max: float | None = None
     handle_connection_confirmed: bool = False
+    raw_position: np.ndarray | None = None
     last_error: str = ""  # why the last poll returned INACTIVE ("" after a good one; the Haptics status shows it)
 
 
@@ -57,6 +58,8 @@ def fail_and_release(original):
 class MiniMouController:
     def __init__(self, *, device_index: int = 0, scale=1.0, handle_readout: str = "normalized") -> None:
         """``device_index`` and ``handle_readout`` (raw | normalized) are validated by ``DeviceConfig``."""
+        if int(device_index) < 0:
+            raise ValueError("Follou device index must be nonnegative")
         self._manager, self._mini_mou_cls = acquire_manager()
         self.device_index = int(device_index)
         self.scale = scale
@@ -64,7 +67,10 @@ class MiniMouController:
         self._closed = False
         self._sample_state = _MiniMouSampleState()
 
-        self._controller = self._manager.get_device_controller(self._mini_mou_cls, count=self.device_index)
+        try:
+            self._controller = self._manager.get_device_controller(self._mini_mou_cls, count=self.device_index)
+        except BaseException as error:
+            fail_and_release(error)
 
         if self._controller is None:
             available = [type(device).__name__ for device in getattr(self._manager, "devices", [])]
@@ -72,6 +78,16 @@ class MiniMouController:
                 f"MiniMou device index {self.device_index} not available; "
                 f"discovered devices: {available or ['none']}"
             ))
+
+    def read_raw_position(self) -> np.ndarray:
+        """Finite SDK axes in metres, without scene mapping or gain; input-only."""
+        if self._closed:
+            raise RuntimeError("MiniMou controller is closed")
+        self._controller.set_force(0.0, 0.0, 0.0)
+        sample = self.poll()
+        if not sample["active"]:
+            raise RuntimeError(self.last_error)
+        return self._sample_state.raw_position.copy() * 0.001
 
     def poll(self) -> dict:
         if self._closed:
@@ -154,6 +170,7 @@ def poll_minimou_controller(controller, state: _MiniMouSampleState, *, scale=1.0
         ):
             state.last_error = "non-finite or zero pose"
             return INACTIVE
+        state.raw_position = position.astype(np.float64).copy()
         position *= np.asarray(scale, dtype=np.float32)
         if not np.all(np.isfinite(position)):
             state.last_error = "non-finite pose"

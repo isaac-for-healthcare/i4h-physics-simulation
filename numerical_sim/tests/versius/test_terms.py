@@ -1,7 +1,7 @@
 from types import SimpleNamespace as NS
 
 import torch
-from i4h_versius import terms
+from i4h_isaaclab.versius import terms
 
 
 def fixture():

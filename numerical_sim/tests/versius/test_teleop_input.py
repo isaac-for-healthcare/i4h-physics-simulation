@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from i4h_versius.teleop_input import (
+from i4h_standalone.input.cartesian import (
     FollouPositionInput,
     HDErrorInfo,
     OpenHapticsInput,
@@ -169,7 +169,6 @@ def test_openhaptics_missing_runtime_is_actionable(monkeypatch):
 
 
 def test_follou_adapter_keeps_raw_axes_for_common_mapping(monkeypatch):
-    from i4h_versius.follou_input import FollouInput
 
     source = SimpleNamespace(
         raw_position=np.array([100, 200, 300]), failed=False, closed=False
@@ -178,13 +177,13 @@ def test_follou_adapter_keeps_raw_axes_for_common_mapping(monkeypatch):
     def read():
         if source.failed:
             raise RuntimeError("disconnected")
-        return np.array([-0.1, -0.3, 0.2])
+        return source.raw_position * 0.001
 
     def close():
         source.closed = True
 
-    source.read_position, source.close = read, close
-    monkeypatch.setattr(FollouInput, "open", lambda **kwargs: source)
+    source.read_raw_position, source.close = read, close
+    monkeypatch.setattr("i4h_standalone.input.follou.MiniMouController", lambda **kwargs: source)
     device = FollouPositionInput()
     sample = device.sample(1 / 30)
     np.testing.assert_allclose(sample.position, [0.1, 0.2, 0.3])
@@ -195,3 +194,26 @@ def test_follou_adapter_keeps_raw_axes_for_common_mapping(monkeypatch):
     assert device.sample(1 / 30).position is None
     device.close()
     assert source.closed
+
+
+def test_shared_follou_raw_units_loss_recovery_and_zero_force(monkeypatch):
+    from i4h_standalone.input import follou
+
+    forces, releases = [], []
+    controller = SimpleNamespace(
+        set_force=lambda *v: forces.append(v), perform_update=lambda: None,
+        get_position=lambda: [100, 200, 300], get_orientation=lambda: [0, 0, 0, 1],
+        get_handle_connection_state=lambda: 1)
+    manager = SimpleNamespace(get_device_controller=lambda *a, **kw: controller)
+    monkeypatch.setattr(follou, 'acquire_manager', lambda: (manager, object))
+    monkeypatch.setattr(follou, 'release_manager', lambda: releases.append(True))
+    device = FollouPositionInput()
+    np.testing.assert_allclose(device.sample(0.1).position, [0.1, 0.2, 0.3])
+    controller.get_position = lambda: [np.nan, 0, 0]
+    assert device.sample(0.1).position is None
+    controller.get_position = lambda: [400, 500, 600]
+    np.testing.assert_allclose(device.sample(0.1).position, [0.4, 0.5, 0.6])
+    device.close()
+    device.close()
+    assert len(releases) == 1
+    assert forces and all(v == (0, 0, 0) for v in forces)

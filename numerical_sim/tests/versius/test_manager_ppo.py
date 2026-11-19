@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 import torch
-from i4h_versius.manager_ppo import TerminalObservationPPO
+from i4h_isaaclab.versius.manager_ppo import TerminalObservationPPO
 from rsl_rl.algorithms import PPO
 from tensordict import TensorDict
 
@@ -34,7 +34,7 @@ def test_terminal_value_replaces_pre_step_bootstrap(monkeypatch):
 
 
 def test_manager_configuration_constructs_terminal_aware_algorithm():
-    from i4h_versius.agents import PokeRunnerCfg
+    from i4h_isaaclab.versius.agents import PokeRunnerCfg
     from isaaclab.utils import to_dict
 
     cfg = to_dict(PokeRunnerCfg())

@@ -1,7 +1,7 @@
 import json
 
 import numpy as np
-from i4h_versius.teleop_input import (
+from i4h_standalone.input.cartesian import (
     KeyboardInput,
     RelativePositionControl,
     ReplayInput,

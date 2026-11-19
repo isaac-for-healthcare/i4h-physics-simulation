@@ -66,6 +66,12 @@ def parse(argv):
     parser.add_argument("--train", type=int, default=0, help="PPO learning iterations (rsl_rl) instead of the policy loop")
     parser.add_argument("--log_dir", default=None, help="rsl_rl log directory (tensorboard, checkpoints); none by default")
     parser.add_argument("--save-frame", default=None, help="write a contact sheet of every env's last camera frame (needs --camera)")
+    from i4h_isaaclab.versius.cli import add_arguments
+
+    add_arguments(parser)
+    parser.add_argument("--validation", choices=("construct", "scripted", "mechanics", "lifecycle"))
+    parser.add_argument("--episodes", type=int, default=10)
+    parser.add_argument("--record", type=Path, help="GL video output")
     from isaaclab.app.sim_launcher import add_launcher_args
 
     add_launcher_args(parser)  # --device, --visualizer, ...
@@ -78,6 +84,12 @@ def parse(argv):
 def main(argv=None):
     wp.config.enable_backward = False  # before any kernel module is built (Isaac Lab's scripts do the same)
     args = parse(sys.argv[1:] if argv is None else argv)
+    if args.headless and args.render == "gl":
+        import pyglet
+        pyglet.options["headless"] = True
+    if args.render == "gl":
+        from i4h_standalone.render.versius import Viewer
+        args.viewer_factory = Viewer
     if args.check:
         return check(args)
     from isaaclab.app.sim_launcher import launch_simulation
@@ -93,7 +105,21 @@ def main(argv=None):
         print(f"built ({getattr(cfg, 'backend', 'newton')} backend) in {time.perf_counter() - t0:.2f} s, "
               f"device memory +{(free0 - torch.cuda.mem_get_info()[0]) / 2**20:.0f} MB")
         try:
-            if args.train:
+            if args.validation:
+                from i4h_isaaclab.versius.cli import run_validation
+                if not hasattr(env.unwrapped, "physical"):
+                    raise ValueError("--validation requires a registered Versius task")
+                run_validation(env, args)
+            elif hasattr(env.unwrapped, "physical") and (args.train or args.policy.startswith("checkpoint:")):
+                from i4h_isaaclab.versius.cli import workflow_args
+                from i4h_isaaclab.versius.qualification import policy
+                options = workflow_args(args)
+                options.mode = "train" if args.train else "play"
+                options.output = Path(args.log_dir) if args.log_dir else args.output
+                options.output.mkdir(parents=True, exist_ok=True)
+                env.reset()
+                print(policy(env.unwrapped, options))
+            elif args.train:
                 train(env, args)
             elif args.render == "gl":
                 view_loop(env, args)
@@ -115,6 +141,9 @@ def make_cfg(args):
     from i4h_isaaclab.env import I4hEnvCfg
     from isaaclab_tasks.utils.parse_cfg import load_cfg_from_registry
 
+    if args.task in tasks.VERSIUS_TASKS and not args.case:
+        from i4h_isaaclab.versius.cli import make_cfg as versius_cfg
+        return versius_cfg(args)
     if args.policy.startswith("replay_hdf5:"):  # the recorded env; only explicitly given options override it
         from i4h_isaaclab.recording import env_cfg_from_recording, load_demo, replay_path
 
@@ -282,19 +311,40 @@ def view_loop(env, args):
     u = env.unwrapped
     obs, _ = env.reset()
     policy = Policy(args.policy, env, args.seed or 0)
-    render_cfg = read_case(u.cfg.case).get("render") or {}
-    renderer = GlRenderer(u.simulator, size=tuple(render_cfg.get("size", (1280, 720))), env=int(args.env),
-                          camera=render_cfg.get("camera"))
+    if hasattr(u, "physical"):
+        from i4h_standalone.render.versius import Viewer
+        renderer = Viewer(u, args)
+        viewer = renderer.viewer
+    else:
+        render_cfg = read_case(u.cfg.case).get("render") or {}
+        renderer = GlRenderer(u.simulator, size=tuple(render_cfg.get("size", (1280, 720))), env=int(args.env),
+                              camera=render_cfg.get("camera"), headless=args.headless)
+        if args.record:
+            renderer.publish()
+            renderer.draw()
+            renderer.record_video(args.record)
+        viewer = renderer
+    from i4h_standalone.render.timing import LoopTiming
+    timing = LoopTiming()
     n = 0
-    while renderer.is_running() and (args.steps == 0 or n < args.steps):
-        obs, rew, term, trunc, extras = env.step(policy())
-        renderer.publish()
-        renderer.draw()
-        n += 1
-    torch.cuda.synchronize()
-    renderer.close()
+    try:
+        while viewer.is_running() and (args.steps == 0 or n < args.steps):
+            start = time.perf_counter()
+            obs, rew, term, trunc, extras = env.step(policy())
+            torch.cuda.synchronize(u.device)
+            physics_end = time.perf_counter()
+            if not hasattr(u, "physical"):
+                renderer.publish()
+            renderer.draw()
+            torch.cuda.synchronize(u.device)
+            timing.add(start, physics_end, time.perf_counter(), warmup=n < args.warmup)
+            n += 1
+        torch.cuda.synchronize()
+    finally:
+        renderer.close()
     print(f"{args.case or args.task}: GL view closed after {n} steps, finite={bool(torch.isfinite(obs['policy']).all())}")
-    if u.camera is not None and args.save_frame:
+    print(timing.report())
+    if getattr(u, "camera", None) is not None and args.save_frame:
         save_frame(u.camera, args.save_frame)
 
 
@@ -350,6 +400,7 @@ def policy_loop(env, args):
         torch.cuda.profiler.start()
     if args.sync_debug:
         torch.cuda.set_sync_debug_mode("warn")
+    loop_start = time.perf_counter()
     with stream():
         for i in range(args.steps):
             a = act()
@@ -363,6 +414,7 @@ def policy_loop(env, args):
     if args.nsys_range:
         torch.cuda.profiler.stop()  # the end-of-loop synchronize below stays outside the profiled range
     torch.cuda.synchronize()
+    loop_ms = (time.perf_counter() - loop_start) * 1000.0 / args.steps
     times = [s.elapsed_time(e) for s, e in zip(starts, ends)]
     period = int(u.max_episode_length)
     if args.no_stagger:  # every env timed out together at fixed steps; report those steps apart
@@ -397,6 +449,7 @@ def policy_loop(env, args):
         if args.save_frame:
             save_frame(cam, args.save_frame)
     print(line)
+    print(f"mean ms: physics CUDA {statistics.fmean(times):.3f}, viewer 0.000, total loop {loop_ms:.3f}")
     assert finite, "non-finite observation"
 
 
@@ -422,7 +475,10 @@ def runner_cfg(u):
     """The task's PPO configuration: the procedure tasks observe the ``task`` group too."""
     from i4h_isaaclab.agents import I4hPPORunnerCfg, I4hProcedurePPORunnerCfg
 
-    procedure = u.i4h.procedure if hasattr(u, "i4h") else u.procedure  # -Manager envs hold it on the component
+    if u.spec is not None and "rsl_rl_cfg_entry_point" in u.spec.kwargs:
+        from isaaclab_tasks.utils.parse_cfg import load_cfg_from_registry
+        return load_cfg_from_registry(u.spec.id, "rsl_rl_cfg_entry_point")
+    procedure = u.i4h.procedure if hasattr(u, "i4h") else u.procedure  # --case has no registration
     return I4hProcedurePPORunnerCfg() if procedure is not None else I4hPPORunnerCfg()
 
 

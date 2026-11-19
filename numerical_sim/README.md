@@ -17,11 +17,14 @@ From the repository root:
 cd numerical_sim
 uv sync --locked --extra render --extra gl --group dev
 uv run i4h-sim chole_tet_med --data ./data
+uv run --extra render i4h-sim chole_tet_med_1x_deformation --data ./data --render slang --input keyboard
 uv run i4h-sim two_worlds --data ./data --render noop --steps 200
 I4H_DATA="$PWD/data" uv run pytest tests/runtime -q
 ```
 
 The window uses Tab to select a tool, IJKL/UO to move it, Space to grip, Shift for energy, F to fire, P to pause, N to step, Backspace to reset and F1 for panels. XR uses `--extra xr` instead of `--extra render`; these extras are mutually exclusive. Device and haptic support is optional and physical devices require separate qualification.
+
+`chole_tet_med_1x_deformation` copies the Versius `chole-1x` anatomy at 1/7 of the original chole scale, with the same materials, supports and cavity contact. It runs standalone with a grasper for contact and grasping; it has no robot arm, fluids, bleeding, thermal effects, smoke, cutting or topology deletion. The mechanics at this scale remain uncalibrated.
 
 Production assets are included in `data/` and licensed under Apache-2.0; `docs/asset-manifest.json` records each file's SHA-256, size and license. See `data/README.md`. They are excluded from wheels and source distributions. `scripts/fetch_assets.py --source PATH_OR_URL` can copy a matching asset tree into `data/` (or `$I4H_DATA`) and verifies every file. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; installed packages do not search for a checkout or download assets. Headless runs do not load unused textures.
 
@@ -64,3 +67,6 @@ Physical surfaces without appearance sidecars use the host renderer's default ma
 A requested texture that is missing raises an error naming its path; supply the original
 external data tree rather than substitute textures. Headless stepping does not require
 unused presentation assets.
+
+Versius robot tasks use the [shared Isaac Lab launchers](docs/versius.md).
+See [consolidation validation](docs/versius-consolidation-results.md) for results and retained limitations.

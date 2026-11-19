@@ -1,8 +1,6 @@
 """Immutable block, original chole and reference life-size anatomy profiles."""
 
-from copy import deepcopy
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 
@@ -26,65 +24,9 @@ def profile(name):
 
     if name not in ("block", "chole", "chole-1x"):
         raise ValueError(name)
-    case_source = (
-        (Path(__file__).with_name("cases") / "chole_tet_med_1x.yaml")
-        if name == "chole-1x"
-        else ("two_worlds" if name == "block" else "chole_tet_med")
-    )
-    original = read_case(case_source)
-    case = deepcopy(original)
+    case = read_case("versius_" + name.replace("-", "_"))
     geometry_scale = 1 / 7 if name == "chole-1x" else 1.0
     body_name = "block" if name == "block" else "tissue"
-    case["assets"] = {
-        k: v for k, v in case["assets"].items() if k in (body_name, "cavity")
-    }
-    if name == "block":
-        case["assets"]["block"]["dim"] = [4, 4, 4]
-    keep = {
-        "particles",
-        "tet",
-        "surface",
-        "attachments",
-        "connectors",
-        "static_contact",
-        "tissue_contact",
-        "bounds",
-    }
-    case["systems"] = [
-        x
-        for x in case["systems"]
-        if x["type"] in keep and x.get("body", body_name) == body_name
-    ]
-    # Match the original contact profile, including liver front-side filtering.
-    contact = next(
-        deepcopy(x) for x in original["systems"] if x["type"] == "instrument_contact"
-    )
-    before_bounds = next(
-        (i for i, x in enumerate(case["systems"]) if x["type"] == "bounds"),
-        len(case["systems"]),
-    )
-    case["systems"][before_bounds:before_bounds] = [
-        next(
-            deepcopy(x)
-            for x in original["systems"]
-            if x["type"] == "instrument_control"
-        ),
-        contact,
-        {
-            "type": "tool_force",
-            "instruments": "instrument_control",
-            "contacts": "instrument_contact",
-        },
-    ]
-    case["instruments"] = {
-        "probe": {
-            "kind": "sphere",
-            "radius": PROXY_RADIUS,
-            "initial": {"position": [0.0, 0.0, 100.0]},
-        }
-    }
-    case.pop("procedure", None)
-    case["sim"].update(dt=1 / 60, substeps=4 if name == "block" else 8, iterations=8)
     scene = load_scene(case, device="cpu", envs=1)
     body = scene.body(body_name)
     q = body.rest.q0[0]

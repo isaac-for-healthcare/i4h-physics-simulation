@@ -1,7 +1,7 @@
 from types import SimpleNamespace as NS
 
 import torch
-from i4h_versius import status
+from i4h_isaaclab.versius import status
 from test_terms import fixture
 
 
@@ -54,7 +54,7 @@ def test_fault_diagnostics_identify_thresholds_and_nonfinite_state():
 def test_paused_physics_reports_reason_once_and_stops_stepping(
     tmp_path, monkeypatch, capsys
 ):
-    from i4h_versius.workflows import teleop
+    from i4h_standalone.cartesian import teleop
 
     replay = tmp_path / "input.json"
     replay.write_text('[{"position":[0,0,0]}]')
@@ -82,7 +82,7 @@ def test_paused_physics_reports_reason_once_and_stops_stepping(
     )
     monkeypatch.setattr(
         status,
-        "snapshot",
+        "failure_status",
         lambda env: {
             "failed": True,
             "reasons": ["env 0: tissue indentation limit exceeded"],
@@ -94,3 +94,16 @@ def test_paused_physics_reports_reason_once_and_stops_stepping(
     assert "tissue indentation limit exceeded" in output
     assert result["paused_invalid_physics"]
     assert result["episode_steps"] == [0]
+
+
+def test_invalid_control_configuration_closes_viewer(monkeypatch):
+    import pytest
+    from i4h_standalone import cartesian
+
+    closed = []
+    viewer = NS(status_panel=NS(), close=lambda: closed.append(True))
+    monkeypatch.setattr(cartesian, 'Viewer', lambda *a: viewer)
+    args = NS(viewer=True, input='replay', axis_map='x,x,z', gain=1.0)
+    with pytest.raises(ValueError, match='axis map'):
+        cartesian.teleop(NS(), args)
+    assert closed == [True]

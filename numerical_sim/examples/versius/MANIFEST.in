@@ -1,3 +1,0 @@
-include README.md RESULTS.md NOTICE LICENSE requirements.lock stack.json reuse.json run.py bootstrap.py compare.py replay.json
-recursive-include tests *.py
-include life_size_reference.json

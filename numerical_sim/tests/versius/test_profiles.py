@@ -1,6 +1,6 @@
 import numpy as np
 from i4h_isaaclab.composition import read_case
-from i4h_versius.profiles import profile
+from i4h_isaaclab.versius.profiles import profile
 
 
 def test_original_chole_mechanics_and_support_are_preserved():

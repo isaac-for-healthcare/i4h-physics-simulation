@@ -97,3 +97,6 @@ Production assets are supplied separately with `--data` or `I4H_DATA`; missing a
 fail explicitly. No production geometry or native device binaries are packaged.
 See the numerical workspace README and architecture document for setup and package boundaries.
 Licensed under Apache-2.0; see this package's LICENSE and NOTICE.
+
+Native Versius robot tasks and their scripted, PPO and teleoperation commands are described in
+[the Versius guide](../docs/versius.md). They use surgical contact-case YAMLs and the shared launchers.
