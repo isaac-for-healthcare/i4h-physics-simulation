@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """Experiment-local RSL-RL 5.5.1 adapter; no Isaac Lab/runtime dependency changes."""
 

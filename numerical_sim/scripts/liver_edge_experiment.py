@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 # ruff: noqa: E402 -- Local package paths must be set before importing simulation modules.
 """Exploratory seeded edge grasping. Separate from the frozen qualification campaign."""

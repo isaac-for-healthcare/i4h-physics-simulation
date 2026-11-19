@@ -32,11 +32,11 @@ Final evidence is in `numerical_sim/artifacts/liver-grasp-reviewed/` (ignored ra
 artifacts, retained locally). Earlier development runs are separate. The final
 campaign's source hashes were checked against the delivered package files.
 
-[Machine report](../artifacts/liver-grasp-reviewed/report.json),
-[canonical snapshot](../artifacts/liver-grasp-reviewed/settled_snapshot.npz),
-[target/workspace manifest](../artifacts/liver-grasp-reviewed/target_workspace_manifest.json),
-[video with authored grasper](../artifacts/liver-grasp-reviewed/review_with_grasper.mp4) and
-[validation summary](../artifacts/liver-grasp-reviewed/validation_summary.json).
+Machine report (local: `artifacts/liver-grasp-reviewed/report.json`),
+canonical snapshot (local: `artifacts/liver-grasp-reviewed/settled_snapshot.npz`),
+target/workspace manifest (local: `artifacts/liver-grasp-reviewed/target_workspace_manifest.json`),
+video with authored grasper (local: `artifacts/liver-grasp-reviewed/review_with_grasper.mp4`) and
+validation summary (local: `artifacts/liver-grasp-reviewed/validation_summary.json`).
 
 | Check | Result |
 | --- | --- |

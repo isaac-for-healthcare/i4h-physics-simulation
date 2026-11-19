@@ -20,3 +20,9 @@ An initial broader package/runtime run was interrupted after 171 passes and thre
 The [Stage C closure](stage-c-closure.md) retains its two deferred P2 defects and its documented exclusions. The liver mechanics remain uncalibrated. Historical example training commands still require their separately retained datasets/recordings; those artifacts are not distributed by this source merge. Historical policy results do not establish successful full-cycle PPO training in Workflows.
 
 This branch and PR target the internal numerical repository. Public distribution requires a reviewed source sync onto the separately rooted public repository, a public commit, and a coordinated Workflows dependency repin. The Workflows bridge patch remains a compatibility measure for its previous pin until that repin.
+
+## GitHub CI follow-up
+
+After the source update, lint passed. CI identified missing copyright headers in the liver/Versius additions and links to their untracked local artifacts; the follow-up commit adds the headers and labels those artifact locations as local paths.
+
+The numerical smoke job was already failing at the previous public PR head `b921eca`. The current CPU-runner job invokes package tests that also request CUDA and production assets; it reported 256 failures, 356 passes and 16 skips. This infrastructure/suite split requires separate repair and is not hidden by new skips or weaker assertions. The markdown-link job also checks frozen Stage C reports whose `.tmp_tests` evidence lives outside Git. Their bytes and evidence hashes remain unchanged; an archive/publication policy for those references remains open.

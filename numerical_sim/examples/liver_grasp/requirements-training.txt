@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 # Added only to the isolated overlay; numerical and Torch pins come from I4H_PYTHON.
 rsl-rl-lib==5.5.1
 tensordict==0.15.6

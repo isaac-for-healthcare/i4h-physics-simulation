@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Task-local RSL-RL 5.5.1 configuration and terminal-value correction."""
 
 from isaaclab.utils import configclass

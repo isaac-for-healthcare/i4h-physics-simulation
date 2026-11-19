@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 export PYTHONPATH="$PWD/physics/src:$PWD/surgical/src:$PWD/standalone/src:$PWD/isaaclab/src:$PWD/assessment/src:$PWD/endoluminal/src${PYTHONPATH:+:$PYTHONPATH}"
