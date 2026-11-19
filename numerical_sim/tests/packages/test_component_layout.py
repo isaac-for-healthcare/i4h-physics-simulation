@@ -20,10 +20,11 @@ CASE = {"sim": {"device": "cpu", "envs": 2, "dt": .01, "substeps": 2}, "assets":
 HOST_BEFORE, HOST_AFTER = [(5.0, 5.0, 5.0), (6.0, 5.0, 5.0)], [(7.0, 5.0, 5.0)]
 
 
-def host_sim(rotations, gravity=(0.0, 0.0, -9.81)):
+def host_sim(rotations, gravity=(0.0, 0.0, -9.81), case_gravity=None):
     """A host model: one global particle in front, then per world two host particles, ours, one more host particle;
     world ``e`` placed at ``(e, 0, 0)`` with orientation ``rotations[e]`` (xyzw)."""
-    scene = load_scene(CASE)
+    case = CASE if case_gravity is None else CASE | {"sim": CASE["sim"] | {"gravity": list(case_gravity)}}
+    scene = load_scene(case)
     b = newton.ModelBuilder(gravity=gravity[2])
     b.add_particle((9.0, 9.0, 9.0), (0.0, 0.0, 0.0), 1.0)  # a global particle
     for e in range(scene.envs):
@@ -36,7 +37,7 @@ def host_sim(rotations, gravity=(0.0, 0.0, -9.81)):
     model.set_gravity(gravity)
     state = model.state()
     scene.allocate(model, state)
-    sim = Stepper(I4hSolver(model, scene, build_systems(scene, CASE), state), **sim_settings(CASE))
+    sim = Stepper(I4hSolver(model, scene, build_systems(scene, case), state), **sim_settings(case))
     return sim, model, state
 
 
@@ -107,3 +108,16 @@ def test_host_gravity_changes_reach_a_rotated_component():
         g = np.float32(g)
         np.testing.assert_allclose(sim.scene.gravity.numpy(), [g, quat_to_matrix(q1).T @ g], atol=1e-6)
         assert sim.scene.gravity.ptr == buffer
+
+
+
+def test_declared_case_gravity_is_the_world_gravity_of_a_rotated_component():
+    """A case's sim.gravity declares the world's gravity (I4hComponent.configure copies it to the host): a rotated
+    component whose case declares the host's gravity builds, and still sees R^T g in its own frame; a different
+    declaration is rejected."""
+    q1 = axis_angle_quat((1.0, 0.0, 0.0), np.pi / 2)
+    sim, model, state = host_sim([(0.0, 0.0, 0.0, 1.0), tuple(q1)], case_gravity=(0.0, 0.0, -9.81))
+    g = np.float32([0.0, 0.0, -9.81])
+    np.testing.assert_allclose(sim.scene.gravity.numpy(), [g, quat_to_matrix(q1).T @ g], atol=1e-5)
+    with pytest.raises(ValueError, match="differs from the case's sim.gravity"):
+        host_sim([(0.0, 0.0, 0.0, 1.0), tuple(q1)], case_gravity=(0.0, -9.81, 0.0))

@@ -121,6 +121,8 @@ class Mounts:
         sdt = dt / float(substeps)
         for g in self.groups:
             for s in g.sources:
+                if not s.enabled:  # structural: a change re-prepares and recaptures the step
+                    continue
                 wp.launch(fill_reaction, dim=(g.envs, g.count), inputs=[s.impulse, s.moment, g.instrument, 1.0 / (sdt * sdt * float(substeps))],
                           outputs=[g.force, g.torque], device=g.force.device)
 
@@ -160,6 +162,13 @@ class CoupledSolver(SolverBase):
         self.ours.step(state_in, state_in, control, None, dt)
         if self.mounts is not None:
             self.mounts.fill(self.ours.substeps, dt)
+
+    def update_contacts(self, contacts, state=None) -> None:
+        """The host's contact sensors: the rigid solver's contacts (MuJoCo's own); i4h's contacts are internal."""
+        self.rigid.update_contacts(contacts, state)
+
+    def get_max_contact_count(self) -> int:
+        return self.rigid.get_max_contact_count()
 
     def notify_model_changed(self, flags) -> None:
         self.rigid.notify_model_changed(flags)

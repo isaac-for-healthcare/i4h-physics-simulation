@@ -177,16 +177,20 @@ def finish_model(model, scene, state=None, *, host=False) -> None:
 
 
 def check_host_gravity(model, scene) -> None:
-    """The host owns gravity. A declared case gravity must match every env's world within 1e-6 (relative to 1 m/s^2
-    or the magnitude); without one the scene adopts world 0's, so ``scene.down`` follows the host."""
-    host = component_gravity(model, scene).astype(np.float64)
+    """The host owns gravity. A declared case gravity is the world's (``I4hComponent.configure`` copies it to the host)
+    and must match every world's within 1e-6 (relative to 1 m/s^2 or the magnitude), before any env rotation; a
+    rotated component then sees ``R_e^T g`` (``component_gravity``). Without one the scene adopts world 0's in the
+    component frame, so ``scene.down`` follows the host."""
     if not scene.gravity_declared:
-        scene._gravity = tuple(float(g) for g in host[0])
+        scene._gravity = tuple(float(g) for g in component_gravity(model, scene).astype(np.float64)[0])
         return
+    world = model.gravity.numpy()[: scene.envs].astype(np.float64)
     case = np.asarray(scene.gravity_vector, np.float64)
-    if np.abs(host - case).max() > 1.0e-6 * max(1.0, float(np.linalg.norm(case))):
-        raise ValueError(f"the host's gravity {host[0].tolist()} differs from the case's sim.gravity {case.tolist()}; "
-                         "set the host's gravity to the case's, or drop sim.gravity from the case to use the host's")
+    bad = np.abs(world - case).max(axis=1) > 1.0e-6 * max(1.0, float(np.linalg.norm(case)))
+    if bad.any():
+        raise ValueError(f"the host's gravity {world[int(np.argmax(bad))].tolist()} differs from the case's sim.gravity "
+                         f"{case.tolist()} (both world frame); set the host's gravity to the case's, or drop sim.gravity "
+                         "from the case to use the host's")
 
 
 def build_model(scene):

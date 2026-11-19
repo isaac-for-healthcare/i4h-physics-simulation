@@ -1160,3 +1160,69 @@ def test_physics_reset_clears_the_selected_worlds_pending_reactions(make_env):
     after, torque = group.force.numpy()[:, 0], group.torque.numpy()[:, 0]
     assert not after[0].any() and not torque[0].any(), "the reset world's reaction is cleared"
     np.testing.assert_array_equal(after[1], before[1])
+
+
+@pytest.mark.parametrize("backend", ["newton"])
+def test_host_contact_sensor_works_in_the_coupled_step(make_env):
+    """A workflow robot's Newton contact sensor keeps working when i4h is added: the coupled solver forwards
+    update_contacts to MuJoCo-Warp and the manager allocates the solver's contact buffer (MuJoCo's own contacts)."""
+    pytest.importorskip("mujoco_warp")
+    from isaaclab_newton.cloner import newton_builder_world_hook
+    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+
+    def ball_on_floor(builder, env, position, quaternion):
+        frame = wp.transform(wp.vec3(*map(float, position)), wp.quat(*map(float, quaternion)))
+        builder.add_shape_box(-1, xform=frame * wp.transform((0.0, 2.0, 0.0), wp.quat_identity()), hx=0.5, hy=0.5, hz=0.05,
+                              label="floor")
+        ball = builder.add_body(xform=frame * wp.transform((0.0, 2.0, 0.2), wp.quat_identity()), mass=1.0, label="ball")
+        builder.add_shape_sphere(ball, radius=0.1, label="ball_shape")
+
+    with newton_builder_world_hook(ball_on_floor):
+        env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg())
+    from i4h_isaaclab.newton_manager import I4hNewtonManager
+
+    # A workflow's ContactSensor registers while its scene is built, before the solver exists; the active manager's
+    # _initialize_contacts then allocates the buffer after _build_solver. Here the env is built already: same order.
+    NewtonManager.add_contact_sensor(body_names_expr=".*ball")
+    I4hNewtonManager._initialize_contacts()
+    NewtonManager._invalidate_graph()  # recaptured with the sensor
+    assert NewtonManager._contacts is not None and NewtonManager._contacts.force is not None
+    env.reset()
+    for _ in range(30):
+        env.step(torch.zeros((2, 10), device=env.device))
+    torch.cuda.synchronize()
+    sensor = next(iter(NewtonManager._newton_contact_sensors.values()))
+    force = sensor.total_force.numpy() if hasattr(sensor, "total_force") else None
+    assert int(NewtonManager._contacts.rigid_contact_count.numpy()[0]) > 0, "MuJoCo's contacts reach Lab's buffer"
+    if force is not None:
+        assert np.abs(force).max() > 1.0, "the ball's weight is reported"
+
+
+@pytest.mark.parametrize("backend", ["newton"])
+def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
+    """A host resets or randomizes its holder (joint state) before the component's reset: the reset instrument
+    starts at the holder's new pose (forward kinematics and the mount read in the reset itself, captured too); a
+    world that is not reset keeps its instrument."""
+    pytest.importorskip("mujoco_warp")
+    from isaaclab_newton.cloner import newton_builder_world_hook
+    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+
+    with newton_builder_world_hook(probe_holder):
+        env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg(), mounts={"probe": {"body": "holder"}})
+    env.reset()
+    for _ in range(10):
+        env.step(torch.zeros((2, 10), device=env.device))
+    sim = env.unwrapped.simulator
+    assert sim.reset_graph is not None
+    ic = next(s for s in sim.systems if type(s).__name__ == "InstrumentControl")
+    torch.cuda.synchronize()
+    before = ic.root.numpy()[:, 0].copy()
+    state = NewtonManager.get_state_0()
+    q = state.joint_q.numpy()
+    q[0] = q[0] - 0.04  # the host lowers world 0's holder on its slide (joint coordinates)
+    state.joint_q.assign(q)
+    sim.reset_physics(env_ids=[0])
+    wp.synchronize()
+    after = ic.root.numpy()[:, 0]
+    np.testing.assert_allclose(after[0, 2], before[0, 2] - 0.04, atol=1e-4)  # the reset world reads the new pose
+    np.testing.assert_array_equal(after[1], before[1])  # the other world keeps its instrument

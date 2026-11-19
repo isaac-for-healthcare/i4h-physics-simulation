@@ -128,10 +128,20 @@ class NewtonSim:
 
     def _reset_selected(self) -> None:
         """The selected worlds' i4h state, and the coupling's reactions still pending for them (a new episode must not
-        push its holder with the last one's contact). The rigid solver's internals are Lab's (its lazy reset)."""
+        push its holder with the last one's contact). Mounted tools first read their holders' current poses: a host
+        resets or randomizes its bodies (joint state) before this reset, so forward kinematics brings ``body_q`` up to
+        date and the mounts are driven from it; the instrument reset then starts from the new pose. The rigid solver's
+        internals are Lab's (its lazy reset)."""
+        mounts = self.coupled.mounts if self.coupled is not None else None
+        if mounts is not None:
+            import newton
+
+            model = self.solver.model
+            newton.eval_fk(model, self.state.joint_q, self.state.joint_qd, self.state)
+            mounts.drive(self.state)
         self.solver.reset(self.state, self.world_mask)
-        if self.coupled is not None and self.coupled.mounts is not None:
-            self.coupled.mounts.reset(self.world_mask)
+        if mounts is not None:
+            mounts.reset(self.world_mask)
 
 
 class I4hNewtonManager(NewtonManager):
@@ -171,9 +181,11 @@ class I4hNewtonManager(NewtonManager):
                                         getattr(solver_cfg, "rigid_substeps", 1))
             NewtonManager._solver = sim.coupled
             NewtonManager._supports_rigid_body_force_input = True
+            NewtonManager._supports_contact_sensors = True  # the rigid solver's contacts (CoupledSolver.update_contacts)
         else:
             NewtonManager._solver = solver
             NewtonManager._supports_rigid_body_force_input = False
+            NewtonManager._supports_contact_sensors = False  # no rigid solver: i4h's contacts are its own
         NewtonManager._use_single_state = True
         NewtonManager._needs_collision_pipeline = False  # i4h's contacts are its own; MuJoCo-Warp uses MuJoCo's
         I4hNewtonManager.simulator = sim
@@ -185,6 +197,21 @@ class I4hNewtonManager(NewtonManager):
             sim.physics.invalidate()
             I4hNewtonManager.simulator = None
             raise
+
+    @classmethod
+    def _initialize_contacts(cls) -> None:
+        """Coupled: a Contacts buffer sized to the rigid solver's maximum, which ``update_contacts`` fills from
+        MuJoCo-Warp's own contacts for the host's contact sensors (as NewtonMJWarpManager with use_mujoco_contacts). The
+        collision pipeline stays off: the rigid solver collides itself, i4h has its own contacts."""
+        sim = cls.simulator
+        if sim is None or sim.coupled is None:
+            return
+        from isaaclab.physics import PhysicsManager
+        from newton import Contacts
+
+        NewtonManager._contacts = Contacts(rigid_contact_max=sim.coupled.get_max_contact_count(), soft_contact_max=0,
+                                           device=PhysicsManager._device,
+                                           requested_attributes=cls.backend.model.get_requested_contact_attributes())
 
     @classmethod
     def step(cls) -> None:
