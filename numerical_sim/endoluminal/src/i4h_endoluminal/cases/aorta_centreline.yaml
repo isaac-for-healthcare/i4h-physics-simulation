@@ -1,9 +1,14 @@
-# Catheter insertion into a centreline-driven aorta: `aorta_static.yaml`'s catheter, mesh and pose with the vessel
+# Catheter insertion into a centreline-driven aorta: `aorta_static.yaml`'s mesh and pose with the vessel
 # deformation of `porcine_cta_centerline.yaml` (a PBD Cosserat tree along the lumen centreline, the surface
-# skinned to it). The tree was extracted from Mesh_004 with VMTK (i4h-validation/aorta_centreline/
-# aorta_to_centreline.py): 12 branches, 8 open ends, 5 mesh-unit (~5 mm) sampling, positions in the mesh prim's
-# local frame. The root is the right femoral end, where the catheter track ends; the other vessel ends are pinned
-# (arch branches and left femoral stay tethered). Z-up; 1 scene unit ~ 10 cm (mesh in mm, scale 0.01).
+# skinned to it) and `aorta_shell.yaml`'s catheter: 6.35 long (128 nodes), so at rest and fully retracted it lies
+# on its track and ends at the vessel's entry. (`aorta_static.yaml`'s 9.55 catheter reaches 3.2 into the lumen even
+# when retracted; on this deformable tree it pushed the wall from the first step and, after an insert and retract
+# cycle, held it in a new shape: NVBug 6940614.) Fully inserted, the tip stops in the arch (x ~ 12.5); the arch
+# branches, which a longer catheter reaches, are out of reach. The tree was extracted from Mesh_004 with VMTK
+# (i4h-validation/aorta_centreline/aorta_to_centreline.py): 12 branches, 8 open ends, 5 mesh-unit (~5 mm) sampling,
+# positions in the mesh prim's local frame. The root is the right femoral end, where the catheter track ends; the
+# other vessel ends are pinned (arch branches and left femoral stay tethered). Z-up; 1 scene unit ~ 10 cm (mesh in
+# mm, scale 0.01).
 sim:
   device: cuda:0
   dt: 0.016666667
@@ -17,7 +22,7 @@ assets:
     type: rod
     start: [0.0, 0.0, 1.0]
     direction: [1.0, 0.0, 0.0]
-    count: 192
+    count: 128                    # 6.35 = track_length: the retracted catheter is outside the vessel
     segment_length: 0.05
     radius: 0.02
     mass: 1.0                     # per node
@@ -51,6 +56,7 @@ systems:
     rod: rod
     track_length: 6.35
     tip_edges: 16
+    guide_tip: true               # the track holds a bent tip straight until it leaves the track at the entry
     upper: [6.35, 1.0e9, 1.5]     # insertion stops at the end of the track
   - type: rod_pbd                 # the vessel tree, porcine_cta_centerline settings
     id: tree

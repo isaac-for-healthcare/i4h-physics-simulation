@@ -13,6 +13,8 @@ from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
 from i4h_isaaclab.composition import load_case, read_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_rod
+from i4h_physics.mesh_utils import boundary_loops, cap_loop, classify_boundary, open_end_caps
+from i4h_physics.scene import StaticMesh
 from i4h_physics.systems.contact.rod_containment import RodContainment
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.rod_direct import RodDirect
@@ -78,6 +80,171 @@ def test_rod_loader():
         add_rod(scene, "short", [0, 0, 0], [1, 0, 0], 2, 0.02, 0.004)
     with pytest.raises(ValueError, match="non-zero"):
         add_rod(scene, "flat", [0, 0, 0], [0, 0, 0], 5, 0.02, 0.004)
+
+
+# open ends of a static mesh ---------------------------------------------------------------------------------
+
+
+def tube(x0, x1, ring=16, rings=6, radius=0.1, phase=0.0, section=None):
+    """An open cylinder along x, wound inward (face normals towards the axis) like a vessel mesh; ``section``: its
+    cross-section's (y, z) points counter-clockwise instead of a circle."""
+    angles = phase + 2.0 * np.pi * np.arange(ring) / ring
+    if section is None:
+        section = [(radius * np.cos(a), radius * np.sin(a)) for a in angles]
+    ring = len(section)
+    points = np.float32([[x, y, z] for x in np.linspace(x0, x1, rings) for y, z in section])
+    tris = []
+    for i in range(rings - 1):
+        for j in range(ring):
+            a, b = i * ring + j, i * ring + (j + 1) % ring
+            tris += [(a, a + ring, b), (b, a + ring, b + ring)]
+    return points, np.int32(tris)
+
+
+def slit(points, tris, ring=16, first=1, last=4, gap=1.0e-4):
+    """``tube``'s wall cut open along its angle-0 line from ring ``first`` to ring ``last``: the quads on the angle > 0
+    side get copies of the line's inner vertices ``gap`` away (not welded), a crack."""
+    copies = {i * ring: len(points) + k for k, i in enumerate(range(first + 1, last))}
+    extra = np.float32([points[v] + (0.0, 0.0, gap) for v in copies])
+    tris = tris.copy()
+    for i in range(first, last):
+        for t in (2 * i * ring, 2 * i * ring + 1):  # quad (i, 0)'s two triangles
+            tris[t] = [copies.get(int(v), int(v)) for v in tris[t]]
+    return np.concatenate([points, extra]), tris
+
+
+def pinch(points, ring=16, rings=6):
+    """``tube``'s far rim pinched: its vertices at angles pi/2 and 3 pi/2 moved onto the axis (welded there), so the open
+    end is a figure eight of two lobes (y > 0, y < 0) through one non-manifold vertex."""
+    points, last = points.copy(), (rings - 1) * ring
+    points[last + ring // 4] = points[last + 3 * ring // 4] = (points[last, 0], 0.0, 0.0)
+    return points
+
+
+def kinds(loops):
+    return sorted((loop.kind, round(float(loop.centroid[0]), 2)) for loop in loops)
+
+
+OUTSIDE = ((-0.7, 0.01, 0.0), (3.0, 0.01, 0.0))  # an insertion line from outside the tube through its x = 0 opening
+
+
+def test_open_end_caps_close_the_far_end_but_not_the_entry_a_seam_or_a_crack():
+    a_points, a_tris = slit(*tube(0.0, 1.0))  # a slit in the wall from x 0.2 to 0.8
+    b_points, b_tris = tube(1.0, 2.0, ring=15, phase=0.1)  # a second piece meeting the first rim to rim, unwelded
+    points, tris = np.concatenate([a_points, b_points]), np.concatenate([a_tris, b_tris + len(a_points)])
+    assert len(boundary_loops(points, tris)) == 5
+    cap_points, cap_tris, loops = open_end_caps(points, tris, lines=[OUTSIDE], clearance=0.09)
+    assert kinds(loops) == [("capped", 2.0), ("crack", 0.5), ("entry", 0.0), ("seam", 1.0), ("seam", 1.0)]
+    crack = next(loop for loop in loops if loop.kind == "crack")
+    assert len(crack.ids) == 6 and crack.width < 1.0e-4
+    far = next(loop for loop in loops if loop.kind == "capped")
+    assert far.method == "fan" and far.cosine == pytest.approx(1.0) and not far.pinched
+    closed_points, closed_tris = np.concatenate([points, cap_points]), np.concatenate([tris, cap_tris])
+    assert len(boundary_loops(closed_points, closed_tris)) == 4
+    p0, p1, p2 = (closed_points[cap_tris[:, k]] for k in range(3))
+    assert (np.cross(p1 - p0, p2 - p0)[:, 0] < 0.0).all()  # wound like the wall: the cap faces into the lumen (-x)
+    assert kinds(open_end_caps(points, tris)[2])[:2] == [("capped", 0.0), ("capped", 2.0)]  # no line: no entry
+
+
+def test_open_end_caps_close_both_lobes_of_a_pinched_end():
+    """A rim through a non-manifold vertex (the far end pinched into a figure eight) is split into its two lobes, each
+    capped; the loop passing that vertex twice was dropped with the cracks, leaving the end open."""
+    points, tris = tube(0.0, 1.0)
+    points = pinch(points)
+    loops = boundary_loops(points, tris)
+    far = [loop for loop in loops if np.allclose(loop.points[:, 0], 1.0)]
+    assert len(loops) == 3 and len(far) == 2 and all(loop.pinched for loop in far)
+    assert sorted(np.sign(loop.centroid[1]) for loop in far) == [-1.0, 1.0]
+    _, _, loops = open_end_caps(points, tris, lines=[OUTSIDE], clearance=0.09)
+    assert kinds(loops) == [("capped", 1.0), ("capped", 1.0), ("entry", 0.0)]
+
+
+def test_open_end_caps_fall_back_to_ear_clipping_for_a_concave_end():
+    """A fan around the centroid of a concave (C-shaped) rim folds: the centroid lies outside the rim. Ear clipping in
+    the plane normal to the rim's vector area cannot fold, so it closes the end instead."""
+    angles = np.linspace(np.pi / 6.0, 2.0 * np.pi - np.pi / 6.0, 12)
+    section = [(0.1 * np.cos(a), 0.1 * np.sin(a)) for a in angles] + [(0.06 * np.cos(a), 0.06 * np.sin(a)) for a in angles[::-2]]
+    points, tris = tube(0.0, 1.0, section=section)
+    far = next(loop for loop in classify_boundary(points, tris) if loop.centroid[0] > 0.5)
+    assert far.kind == "open"
+    with pytest.raises(ValueError, match="without folding"):
+        cap_loop(far, len(points), min_cosine=-1.0)  # the fan alone
+    new, cap, method, cosine = cap_loop(far, len(points))
+    assert method == "ear clipping" and cosine == pytest.approx(1.0) and len(new) == 0 and len(cap) == len(section) - 2
+    line = ((-0.7, -0.08, 0.0), (3.0, -0.08, 0.0))  # through the C's back
+    _, _, loops = open_end_caps(points, tris, lines=[line], clearance=0.09)
+    assert [(loop.kind, loop.method) for loop in sorted(loops, key=lambda loop: loop.centroid[0])] == [
+        ("entry", "ear clipping"), ("capped", "ear clipping")]
+
+
+def test_open_end_caps_keep_the_entry_of_the_insertion_line():
+    """The entry is the open end the insertion line first crosses into the lumen, wherever the rod rests on it; a line
+    starting in the lumen keeps none; ``keep`` names the entries instead; a line passing within ``clearance`` of a capped
+    end before it enters the vessel is an error (the containment would pull a node through that cap)."""
+    points, tris = tube(0.0, 1.0)
+    assert kinds(open_end_caps(points, tris, lines=[OUTSIDE], clearance=0.09)[2]) == [("capped", 1.0), ("entry", 0.0)]
+    inside = ((0.5, 0.01, 0.0), (3.0, 0.01, 0.0))  # its first crossing leaves the lumen
+    assert kinds(open_end_caps(points, tris, lines=[inside], clearance=0.09)[2]) == [("capped", 0.0), ("capped", 1.0)]
+    far = [(1.0, 0.0, 0.03)]  # within the far end's radius of its centroid
+    assert kinds(open_end_caps(points, tris, lines=[inside], keep=far, clearance=0.09)[2]) == [("capped", 0.0), ("entry", 1.0)]
+    with pytest.raises(ValueError, match=r"passes 0.0000 from the capped open end at \[0.0, "):
+        open_end_caps(points, tris, lines=[OUTSIDE], keep=far, clearance=0.09)  # OUTSIDE crosses the x = 0 cap
+    beside = ((-0.7, 0.15, 0.0), (3.0, 0.15, 0.0))  # past the tube, 0.05 from its rims
+    with pytest.raises(ValueError, match="before it enters the lumen"):
+        open_end_caps(points, tris, lines=[beside], clearance=0.09)
+    with pytest.raises(ValueError, match="keep_open"):
+        open_end_caps(points, tris, keep=[(0.5, 0.0, 0.0)])
+    with pytest.warns(RuntimeWarning, match="through the wall"):
+        open_end_caps(points, tris, lines=[((0.5, 0.3, 0.0), (0.5, -3.0, 0.0))])  # straight through the wall
+
+
+def tube_scene(rod_start, points, tris, count=14, segment=0.1):
+    scene = Scene("cuda:0", 1, (0.0, 0.0, 0.0))
+    body = add_rod(scene, "rod", rod_start, [1.0, 0.0, 0.0], count, segment, 0.02)
+    scene.static_meshes.append(StaticMesh("tube", points, tris, None, np.zeros_like(points), None))
+    scene.allocate()
+    return scene, body
+
+
+def move_tip(scene, body, cont, position):
+    """The tip node placed at ``position`` and projected once: its new position and the contact count."""
+    q = scene.field("q", body)
+    host = q.numpy()
+    host[0, -1] = position
+    q.assign(host)
+    cont.iteration(scene, 1.0 / 480.0, 0, 1)
+    return q.numpy()[0, -1], int(cont.contact_count.numpy()[0])
+
+
+@pytest.mark.parametrize("cap, pinched", [(True, False), (False, False), (True, True)])
+def test_rod_containment_holds_a_node_at_an_open_end(cap, pinched):
+    """A node pushed out past the far rim of an open tube: with no surface within ``search`` the query found nothing
+    and the node stayed outside (NVBug 6940633's mechanism); the cap brings it back inside by its radius, at a pinched
+    rim too (both lobes are capped)."""
+    points, tris = tube(0.0, 1.0)
+    scene, body = tube_scene([-0.5, 0.0, 0.0], pinch(points) if pinched else points, tris)  # x -0.5 .. 0.8, through x = 0
+    cont = RodContainment(scene, body="rod", mesh="tube", search=0.09, cap_open_ends=cap)
+    assert len(cont.capped_ends) == int(cap) * (2 if pinched else 1)
+    tip, contacts = move_tip(scene, body, cont, (1.04, 0.06, 0.0))  # past the x = 1 rim, more than search from it
+    if cap:
+        assert tip[0] == pytest.approx(1.0 - 0.02, abs=1e-5) and contacts == 1
+    else:
+        assert tip[0] == pytest.approx(1.04) and contacts == 0
+
+
+@pytest.mark.parametrize("keep_open", [None, [[0.0, 0.01, 0.0]]])
+def test_rod_containment_keeps_the_entry_of_a_rod_resting_outside(keep_open):
+    """A rod resting just outside the vessel (x -0.7 .. -0.05) crosses no opening at rest, so its entry was capped and
+    the containment pulled a node arriving at it through the cap (a one-way valve: aorta_static at count 128 stretched a
+    segment from 0.05 to 0.11). The entry is now the one its insertion line enters by, or the one ``keep_open`` names."""
+    points, tris = tube(0.0, 1.0)
+    scene, body = tube_scene([-0.7, 0.0, 0.0], points, tris, count=14, segment=0.05)
+    cont = RodContainment(scene, body="rod", mesh="tube", search=0.09, keep_open=keep_open)
+    assert kinds(cont.boundary) == [("capped", 1.0), ("entry", 0.0)]
+    tip, contacts = move_tip(scene, body, cont, (-0.03, 0.0, 0.0))  # 0.03 short of the entry
+    assert tip[0] == pytest.approx(-0.03) and contacts == 0
+    with pytest.raises(ValueError, match="name the entry with keep_open"):  # its line would cross the capped x = 0 end
+        RodContainment(scene, body="rod", mesh="tube", search=0.09, keep_open=[[1.0, 0.0, 0.0]])
 
 
 # two_worlds cantilever ------------------------------------------------------------------------------------
@@ -183,6 +350,30 @@ def test_tip_bend_curls_the_tip():
     assert segment_error(sim, body) < 1e-3
 
 
+@pytest.mark.parametrize("guide_tip", [True, False])
+def test_a_tip_on_the_track_stays_straight_until_it_leaves_it(guide_tip):
+    """``guide_tip`` (NVBug 6940614): a tip bent while it is still on the guide (the 1.6 rod on a 2.0 track) stays on the
+    line, like a steerable tip inside its introducer, and curls once inserted past the track's end. Without it
+    (omniendo's default) the tip curls on the track."""
+    sim, rod, ctl = free_rod(guide_tip=guide_tip)
+    ctl.track_length.fill_(2.0)  # live
+    scene, body = sim.scene, rod.body
+    run_rates(sim, 60, np.float32([[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]))  # 1 rad in both envs
+    run_rates(sim, 60, np.zeros((2, 3), np.float32))
+    q = scene.view(scene.q, body).numpy()
+    off_line = np.linalg.norm(q[:, -1, 1:] - [0.0, 1.0], axis=1)
+    if not guide_tip:
+        assert (off_line > 0.2).all(), off_line
+        return
+    assert off_line.max() < 1e-3  # the guide holds the bent tip on the line
+    run_rates(sim, 120, np.float32([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]]))  # env 0: 1.0 in, the tip 0.6 past the end
+    run_rates(sim, 120, np.zeros((2, 3), np.float32))
+    q = scene.view(scene.q, body).numpy()
+    off_line = np.linalg.norm(q[:, -1, 1:] - [0.0, 1.0], axis=1)
+    assert off_line[0] > 0.05 and off_line[1] < 1e-3, off_line  # out of the guide it curls; still inside, it does not
+    assert np.isfinite(q).all() and segment_error(sim, body) < 2e-3
+
+
 @pytest.mark.parametrize("backend", [RodDirect, RodPbd])
 def test_inactive_rod_holds_still(backend):
     """The inactive-body contract: nodes without the ACTIVE flag are not moved by the solver or the controls."""
@@ -282,6 +473,56 @@ def test_aorta_envs_insert_differently_and_stay_inside():
     assert segment_error(sim, body) < 5e-4  # the direct backend's stretch is near-rigid (compliance 1e-10)
     cont = find(sim, RodContainment)
     assert (cont.contact_count.numpy() > 0).all() and cont.contact_depth.numpy().max() < 0.01
+
+
+@needs_vessels
+def test_aorta_catheter_stops_at_a_cut_off_branch():
+    """NVBug 6940633: inserted at full speed the catheter turned into the lower arch branch at about 10 s and left
+    the model through that branch's cut-off end (2.1 units out at 24 s). The containment closes the open ends except
+    the catheter's entry; seams between mesh pieces and slit-like cracks stay as authored."""
+    sim = load_case("aorta_static", envs=2)
+    scene, body, cont = sim.scene, sim.scene.body("catheter"), find(sim, RodContainment)
+    mesh = scene.static_meshes[0]
+    ends = [mesh.points[i].astype(np.float64) for i in cont.capped_ends]
+    centroids = np.array([end.mean(axis=0) for end in ends])
+    assert len(ends) == 7  # the centreline's 8 open ends, less the right femoral one the catheter enters through
+    assert np.linalg.norm(centroids - [6.443, 0.012, 1.006], axis=1).min() > 0.5
+    assert np.linalg.norm(centroids - [12.931, -0.158, 0.359], axis=1).min() < 0.01  # the branch QA saw it leave by
+    run_rates(sim, 960, np.float32([[1.0, 0.0, 0.0], [0.85, 0.0, 0.0]]))  # both at the end of the track by 16 s
+    q = scene.view(scene.q, body).numpy().astype(np.float64)
+    assert np.isfinite(q).all()
+    for end, c in zip(ends, centroids):
+        normal = np.cross(end - c, np.roll(end, -1, axis=0) - c).sum(axis=0)
+        normal /= np.linalg.norm(normal)  # the rim's winding: out of the lumen
+        past = (q - c) @ normal
+        lateral = np.linalg.norm(q - c - past[..., None] * normal, axis=2)
+        near = lateral < 2.0 * np.linalg.norm(end - c, axis=1).max() + np.maximum(past, 0.0)  # a 45 degree cone past it
+        assert not near.any() or past[near].max() < 0.0, (c, past[near].max())
+    assert (inside_vessel(sim, body, 6.35) < -0.01).all(), "a node left the aorta"  # the tip sits in the cap's corner
+
+
+@needs_vessels
+@pytest.mark.parametrize("keep_open", [None, [[6.443, 0.012, 1.006]]])
+def test_aorta_catheter_resting_outside_keeps_its_entry_open(keep_open):
+    """aorta_static with aorta_shell's 6.35 catheter (count 128): it rests 0.09 short of the femoral entry, so its rest
+    pose crosses no opening and the entry was capped; inserted at 1.0, every node reaching that cap's outside was
+    pushed through it (contact depth 0.063, a 0.05 segment stretched to 0.11). The entry is the one its insertion line
+    enters by (or the one ``keep_open`` names): no cap stands in the way."""
+    cfg = read_case("aorta_static")
+    cfg["assets"]["catheter"]["count"] = 128
+    for system in cfg["systems"]:
+        if system["type"] == "rod_containment" and keep_open is not None:
+            system["keep_open"] = keep_open
+    sim = load_case(cfg, envs=1)
+    cont, body = find(sim, RodContainment), sim.scene.body("catheter")
+    entries = [loop.centroid for loop in cont.boundary if loop.kind == "entry"]
+    assert len(entries) == 1 and np.linalg.norm(entries[0] - [6.443, 0.012, 1.006]) < 0.01 and len(cont.capped_ends) == 7
+    depth = error = 0.0
+    for _ in range(36):  # 6 s: 3 into the vessel
+        run_rates(sim, 10, np.float32([[1.0, 0.0, 0.0]]))
+        depth, error = max(depth, float(cont.contact_depth.numpy().max())), max(error, segment_error(sim, body))
+    assert depth < 0.005 and error < 1e-3, (depth, error)
+    assert (inside_vessel(sim, body, 6.35) < -0.01).all()
 
 
 @needs_vessels

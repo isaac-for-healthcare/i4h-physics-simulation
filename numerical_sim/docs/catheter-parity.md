@@ -30,6 +30,8 @@ The bounds are docs/component-contracts.md section 4. Numerical qualification is
 
 **Why inertia.** With unit inertia, a 2e-5 kg-per-node wire cannot turn its frames: it stays straight under gravity and barely answers a tip command. The defaults keep omniendo's numerics, so the shipped cases and PHYS-1..8 are unchanged. A workflow catheter opts in.
 
+**Also opt-in, not from the workflow:** `catheter_control.guide_tip: true` holds the last `tip_edges` nodes on the track too while they are on it, so a tip bent there stays straight until it leaves the track, like a steerable tip inside its introducer. omniendo (the default) leaves them unguided. `aorta_centreline` opts in: its catheter rests on its track outside the deformable vessel, and a tip bent there could enter beside the lumen and drag the tree out with it. `aorta_shell` and `aorta_static` keep omniendo's behaviour.
+
 **Not ported:**
 
 - **Tip-bend taper** (`tip_bend_fraction`). It is off (1.0) in the shipped workflow scenes.

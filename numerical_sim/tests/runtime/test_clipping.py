@@ -24,11 +24,12 @@ LINES = [{"name": "cystic_artery", "path": "centrelines/cystic_artery.cntr", "pa
 
 
 def ring_radius(scene, body, centreline, env, node):
-    """Mean distance of a node's live clamp particles from their centroid."""
+    """Mean distance of a node's live clamp particles from their centroid (in float64: a float32 mean leaves about one
+    ulp of the coordinates, ~5e-7 here, on a ring collapsed onto its centroid)."""
     c = body.centrelines
     v = body.variant_of_env[env]
     ids = c.clamp[v, c.clamp_start[v, node] : c.clamp_start[v, node] + c.clamp_count[v, node]]
-    q = scene.view(scene.q, body).numpy()[env][ids]
+    q = scene.view(scene.q, body).numpy()[env][ids].astype(np.float64)
     return float(np.linalg.norm(q - q.mean(axis=0), axis=1).mean())
 
 
@@ -78,7 +79,9 @@ def test_tracker_and_clip():
         actions[0, ka, :3] = centreline.positions.numpy()[0, node]
         control.actions.assign(actions)
         sim.step()
-    before = ring_radius(scene, body, centreline, 0, node)
+    # the open rings, before the fire step: hold_clips pinches from the step that attaches the clip on (lumen 0,
+    # stiffness 1 in every iteration), so a ring measured after it is already closed, fully on some GPUs (NVBug 6940611)
+    open_rings = {int(k): ring_radius(scene, body, centreline, 0, k) for k in duct}
     root = control.root.numpy()[0, ka]
     gap = float(np.linalg.norm(root - centreline.positions.numpy()[0, node]))
     assert gap < 0.25, f"the root stayed {gap:.3f} from the node"
@@ -89,7 +92,7 @@ def test_tracker_and_clip():
     assert clipping.count.numpy().tolist() == [1, 0]  # env 1's applier is not within reach of any duct node
     node = int(clipping.node.numpy()[0, 0])  # the nearest duct node at that moment
     assert c.line[node] == 1 and clipping.clipped.numpy()[0, node] == 1 and clipping.clipped.numpy()[1].max() == 0
-    before = ring_radius(scene, body, centreline, 0, node)
+    before = open_rings[node]
     for _ in range(30):  # fire held: no second clip (edge), the ring pinches
         control.actions.assign(actions)
         sim.step()
@@ -97,7 +100,7 @@ def test_tracker_and_clip():
     after = ring_radius(scene, body, centreline, 0, node)
     assert after < 0.35 * before, (before, after)
     others = [k for k in duct if abs(k - node) > 2]
-    assert ring_radius(scene, body, centreline, 0, others[0]) > 0.6 * before  # neighbours keep their lumen
+    assert ring_radius(scene, body, centreline, 0, others[0]) > 0.6 * open_rings[int(others[0])]  # neighbours keep their lumen
     actions[:, ka, 9] = 0.0
     for _ in range(60):  # the clip holds while the tissue keeps sagging
         control.actions.assign(actions)
