@@ -187,11 +187,13 @@ These bounds are fixed before any candidate is evaluated. `L` is the catheter le
 
 ## 5. Dependency-check exceptions
 
-`uv pip check` must be clean, apart from exactly these three messages, which come from Isaac Lab 6864dd1's own lockfile:
+`uv pip check` must be clean, apart from exactly these messages. The first three come from Isaac Lab 6864dd1's own lockfile:
 
-- `open3d` requires `ipywidgets>=8.0.4`;
+- `open3d` requires `ipywidgets>=8.0.4` (x86_64 only: Isaac Lab installs open3d only off Linux aarch64);
 - `numba` requires `numpy>=1.22,<2.5`;
 - `cmeel-boost` requires `numpy>=2.3,<2.4`.
+
+On aarch64, both the Isaac Lab venv and the workspace venv also report that `nvidia-cusparselt-cu13` "was built for a different platform". torch pins `nvidia-cusparselt-cu13==0.8.1`, and that release's aarch64 wheel declares `Tag: py3-none-manylinux2014_sbsa` in its `WHEEL` file, which uv does not match to aarch64. For the same reason, every `uv sync` and `uv run` reinstalls the package there. `0.8.1.post1` (2026-10-21) ships the same files with the `manylinux2014_aarch64` tag, but `==0.8.1` excludes a post-release. The message goes away once torch pins `0.8.1.post1` or later.
 
 ## 6. Spike record (2026-10-06, Lab 6864dd1, Newton 1.6.1)
 
