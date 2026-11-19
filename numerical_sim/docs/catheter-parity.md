@@ -9,7 +9,7 @@ The bounds are docs/component-contracts.md section 4. Numerical qualification is
 
 ## Reference
 
-- **Solver.** `catheter_vasculature_solver` at this repo's `e4bed31`. That is what the i4h-workflows catheter-navigation reward branch installed, from `feature/newton-solverbase-isaaclab-integration`, now in `main`.
+- **Solver.** `catheter_vasculature_solver` at this repo's `v0.9.0` tag. That is the solver the i4h-workflows catheter-navigation reward branch installed, from `feature/newton-solverbase-isaaclab-integration`. The solver on `main` has changed since, so the reference stays on the tag.
 - **Stack.** The old stack's warp-lang 1.13.0. The solver needs only warp, torch and numpy.
 - **Configuration.** As the workflow's `CatheterRodSpec` configures it:
   - a 0.4 m rod in 120 segments, radius 0.5 mm;
@@ -39,7 +39,8 @@ The bounds are docs/component-contracts.md section 4. Numerical qualification is
 ## How to run
 
 ```bash
-scripts/parity/setup_reference.sh                       # .parity/reference: warp 1.13 + the e4bed31 solver
+scripts/parity/setup_reference.sh                       # .parity/reference: warp 1.13 + the v0.9.0 solver
+mkdir -p parity                                         # run outputs (gitignored; np.savez does not create it)
 .parity/reference/venv/bin/python scripts/parity/catheter.py run --engine reference --out parity/reference.npz
 $PY scripts/parity/catheter.py run --engine ours --out parity/ours.npz          # current stack
 $PY scripts/parity/catheter.py compare parity/reference.npz parity/ours.npz --report parity/report.json
