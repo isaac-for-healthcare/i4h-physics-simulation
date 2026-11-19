@@ -108,21 +108,42 @@ class I4hHostMixin:
             found = self._i4h_views[key] = build(self.i4h.sim)
         return found
 
+    def i4h_restore_ids(self, env_ids):
+        """Override to select IDs restored by i4h_restore_state after Lab reset events."""
+        return env_ids[:0]
+
+    def i4h_save_terminal(self, env_ids):
+        """Optional host-owned terminal results, saved before any reset bookkeeping."""
+
+    def i4h_restore_state(self, env_ids):
+        """Restore host assets/kinematics first, complete numerical state last."""
+        raise NotImplementedError("selected snapshot restore requires a host implementation")
+
+    def i4h_after_reset(self, env_ids):
+        """Optional host state reset for ordinary IDs, after numerical history/events."""
+
     def _reset_idx(self, env_ids):
-        """Terminal extras, then the physical reset, then Lab's reset (scene, events that may read and randomise the
-        new state, managers), then the procedure, which samples the state the events left."""
         if isinstance(env_ids, slice):
             env_ids = torch.arange(self.num_envs, device=self.device)[env_ids]
+        restored = self.i4h_restore_ids(env_ids)
+        ordinary = env_ids[~torch.isin(env_ids, restored)]
+        self.i4h_save_terminal(env_ids)
         task = self.i4h_task
         if task is not None:
             self.i4h.sync_views()
             task.save_terminal(self.extras, env_ids=env_ids)
-        self.i4h.reset(env_ids)  # Warp waits for torch's ids and extras first
-        self.i4h.sync_views()  # the events run on torch's stream, after the physical reset
+        if len(ordinary):
+            self.i4h.reset(ordinary)
+        self.i4h.sync_views()
         super()._reset_idx(env_ids)
-        self.i4h.initialize_particle_history(env_ids)  # complete event position writes before procedure consumers
+        if len(ordinary):
+            self.i4h.initialize_particle_history(ordinary)
+            if task is not None:
+                self.i4h.reset_procedure(ordinary)
+            self.i4h_after_reset(ordinary)
+        if len(restored):
+            self.i4h_restore_state(restored)
         if task is not None:
-            self.i4h.reset_procedure(env_ids)  # select_envs orders Warp after the events' writes
             task.clear_recorded(env_ids=env_ids)
         self.i4h.sync_views()
 

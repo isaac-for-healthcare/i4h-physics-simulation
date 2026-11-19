@@ -218,8 +218,19 @@ class I4hComponent:
         """
         self._rebuild.append(callback)
 
+    def on_post_physics(self, callback) -> None:
+        """Register allocation-free device work during on_rebuild, before host capture.
+
+        Callbacks run in registration order after each completed physics step,
+        including both steps of a decimated action. Re-register on hard rebuild.
+        """
+        if not getattr(self, "_binding_callbacks_open", False):
+            raise RuntimeError("register post-physics callbacks during on_rebuild, before graph capture")
+        self._live().post_physics.append(callback)
+
     def _bind(self, sim) -> None:
         self.sim = sim
+        sim.post_physics = []
         self._events = None
         self.procedure = None
         case = self.solver_cfg.case or {}
@@ -235,8 +246,12 @@ class I4hComponent:
         )  # after every manager step: torch reads (observations, rewards) see it
         if self._rebuild:
             self.sync_views()
-        for callback in list(self._rebuild):
-            callback(self)
+        self._binding_callbacks_open = True
+        try:
+            for callback in list(self._rebuild):
+                callback(self)
+        finally:
+            self._binding_callbacks_open = False
         if self._rebuild:
             self.initialize_particle_history()
 

@@ -172,6 +172,8 @@ class ConstructionContext:
         """Device-resident work, called exactly once per physics step inside the host graph."""
         if self.binding.procedure is not None:
             self.binding.procedure.update(self.binding.dt)
+        for callback in getattr(self.binding, "post_physics", ()):
+            callback()
 
     def check_prepared(self):
         self.check_coupling_config()
