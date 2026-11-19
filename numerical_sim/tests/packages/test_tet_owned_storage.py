@@ -164,10 +164,11 @@ def test_direct_scene_predeclaration_and_missing_declaration(device):
         Tet(missing, "body")
 
 
+@pytest.mark.parametrize("device", ["cuda:0"])
 @pytest.mark.parametrize("model", ["pbd", "xpbd"])
 @pytest.mark.parametrize("capture", [False, True])
-def test_scratch_lifetime_and_eager_capture_equivalence(model, capture):
-    a, _, m = authored("cuda:0", model=model, repeated=False)
+def test_scratch_lifetime_and_eager_capture_equivalence(model, capture, device):
+    a, _, m = authored(device, model=model, repeated=False)
     scene, systems = a.bind(m, m.state(), m.control())
     other, other_systems = a.bind(m, m.state(), m.control())
     tet = systems[1]
