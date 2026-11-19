@@ -26,3 +26,7 @@ This branch and PR target the internal numerical repository. Public distribution
 After the source update, lint passed. CI identified missing copyright headers in the liver/Versius additions and links to their untracked local artifacts; the follow-up commit adds the headers and labels those artifact locations as local paths.
 
 The numerical smoke job was already failing at the previous public PR head `b921eca`. The current CPU-runner job invokes package tests that also request CUDA and production assets; it reported 256 failures, 356 passes and 16 skips. This infrastructure/suite split requires separate repair and is not hidden by new skips or weaker assertions. The markdown-link job also checks frozen Stage C reports whose `.tmp_tests` evidence lives outside Git. Their bytes and evidence hashes remain unchanged; an archive/publication policy for those references remains open.
+
+### Frozen evidence link checking
+
+The Markdown checker excludes only `../.tmp_tests/stage-c*/` targets. They identify local qualification artifacts deliberately excluded from Git, rather than public documentation pages. The frozen reports keep their original bytes and evidence hashes. Other relative links and external links retain their existing checks. This exception does not publish the evidence or close its pending archive/publication work.

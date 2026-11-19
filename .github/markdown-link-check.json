@@ -9,6 +9,9 @@
         },
         {
             "pattern": "https://doi.org"
+        },
+        {
+            "pattern": "^\\.\\./\\.tmp_tests/stage-c[^/]+/"
         }
     ],
     "timeout": "20s",
