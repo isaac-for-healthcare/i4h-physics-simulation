@@ -30,3 +30,9 @@ The numerical smoke job was already failing at the previous public PR head `b921
 ### Frozen evidence link checking
 
 The Markdown checker excludes only `../.tmp_tests/stage-c*/` targets. They identify local qualification artifacts deliberately excluded from Git, rather than public documentation pages. The frozen reports keep their original bytes and evidence hashes. Other relative links and external links retain their existing checks. This exception does not publish the evidence or close its pending archive/publication work.
+
+### CPU smoke job configuration
+
+The GitHub-hosted smoke job now sets `I4H_DATA` to the checkout's `numerical_sim/data` and verifies its 82 production assets against the committed manifest before testing. These assets intentionally do not live inside installed Python packages.
+
+The Ubuntu runner has no GPU. Its package command is explicitly `pytest tests/packages -q -k 'not cuda'`, with `CUDA_VISIBLE_DEVICES` empty. CUDA parameterizations retain their existing assertions and remain selected by the normal unfiltered package-suite command on a GPU machine. The CPU job also retains the generated rod/tet/fluid/contact simulation and wheel/sdist boundary checks. No physics implementation or test assertion is changed by this CI fix.
