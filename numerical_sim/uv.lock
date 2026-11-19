@@ -363,6 +363,7 @@ dependencies = [
 gl = [
     { name = "imgui-bundle" },
     { name = "pyglet" },
+    { name = "pyopengl" },
 ]
 render = [
     { name = "pillow" },
@@ -392,6 +393,7 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'render'", specifier = ">=10.0" },
     { name = "pillow", marker = "extra == 'xr'", specifier = ">=10.0" },
     { name = "pyglet", marker = "extra == 'gl'", specifier = ">=2.1.13" },
+    { name = "pyopengl", marker = "extra == 'gl'", specifier = ">=3.1.10" },
     { name = "pyopenxr", marker = "extra == 'xr'", specifier = "==1.1.5301" },
     { name = "slangpy", marker = "extra == 'render'", specifier = "==0.43.1" },
 ]

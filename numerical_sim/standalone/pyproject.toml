@@ -14,7 +14,7 @@ dependencies = ["i4h-physics==0.9.0", "i4h-assessment==0.9.0", "i4h-surgical==0.
 [project.optional-dependencies]
 usd = ["i4h-surgical[usd]==0.9.0", "i4h-endoluminal[usd]==0.9.0"]  # outside Isaac Lab
 render = ["slangpy==0.43.1", "pillow>=10.0"]
-gl = ["pyglet>=2.1.13", "imgui-bundle>=1.92.801"]
+gl = ["pyglet>=2.1.13", "imgui-bundle>=1.92.801", "pyopengl>=3.1.10"]  # imgui_bundle's pyglet backend imports OpenGL
 xr = ["pillow>=10.0", "pyopenxr==1.1.5301", "isaacteleop[cloudxr]==1.4.145"]
 
 [project.scripts]
