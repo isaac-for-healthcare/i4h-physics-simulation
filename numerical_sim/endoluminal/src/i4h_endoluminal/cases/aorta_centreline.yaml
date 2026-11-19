@@ -70,5 +70,5 @@ systems:
 render:
   backend: noop
   env: 0
-  tip: {body: catheter}
+  tip: {body: catheter, distance: 0.0}   # C: the view from the catheter tip; the eye at the tip, not inside the tube (as aorta_shell)
   camera: {position: [9.8, -9.0, 3.0], pitch: -14.8, yaw: 0.0, up: [0.0, 0.0, 1.0], near: 0.05, far: 100.0}   # looks at the aorta from -y
