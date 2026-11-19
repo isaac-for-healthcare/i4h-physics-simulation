@@ -316,7 +316,8 @@ def test_direct_layout_freezes_at_declaration():
         scene.allocate()
 
 
-@pytest.mark.parametrize('change', ['dtype', 'device', 'shape', 'strides'])
+# A device mismatch requires allocating the command array on CUDA.
+@pytest.mark.parametrize('change', ['dtype', pytest.param('device', id='cuda_device'), 'shape', 'strides'])
 def test_invalid_command_array_layout(change):
     from i4h_physics.commands import CommandViews
     a, _, m = authored('cpu')
