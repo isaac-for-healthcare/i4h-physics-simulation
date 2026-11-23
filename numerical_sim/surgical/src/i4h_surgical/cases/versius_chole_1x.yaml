@@ -217,12 +217,6 @@ render:
     - 0.0
     near: 0.00142857
     far: 14.2857
-    target_distance: 0.142857
-    move_speed: 0.75
-    min_distance: 0.0357143
-    rotate_speed: 1.0
-    turbo: 3.0
-    slow: 0.25
   environment:
     path: ${DATA}/environments/abdomen.hdr
     intensity: 0.84

@@ -48,7 +48,7 @@ from i4h_surgical.systems.instruments.contact_paint import ContactPaint
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 
 
-def main(argv=None) -> int:
+def main(argv=None, *, panel_factory=None) -> int:
     parser = argparse.ArgumentParser(prog="i4h-sim", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("case", help="case YAML path or a shipped domain case name")
     parser.add_argument("--steps", type=int, default=None,
@@ -195,7 +195,8 @@ def main(argv=None) -> int:
                 haptics.mailbox.capture_lock = ring.lock  # the servo's event query never overlaps a recapture
             worker = PhysicsWorker(sim, drivers, ring, steps=args.steps, realtime=realtime, timings=timings, procedure=procedure)
             stats = threaded_loop(worker, ring, renderer, args.fps, cfg["sim"].get("gravity", (0.0, 0.0, -9.81)), timings,
-                                  overrides=(overrides_path, loaded), capture=capture, haptics=haptics)
+                                  overrides=(overrides_path, loaded), capture=capture, haptics=haptics,
+                                  panel_factory=(None if panel_factory is None else lambda r: panel_factory(sim, r, cfg)))
         graph_on = sim.graph is not None  # the timed run's state, before a profile leaves the simulator eager
         if args.profile:
             print(profile(sim, args.profile))
@@ -312,7 +313,7 @@ def serial_loop(sim, renderer, drivers, steps: int, realtime: bool, timings=None
 
 
 def threaded_loop(worker: PhysicsWorker, ring: Snapshots, renderer, fps: float, gravity, timings=None, overrides=None, capture=None,
-                  haptics=None) -> dict:
+                  haptics=None, panel_factory=None) -> dict:
     """Physics on ``worker``, render here: acquire the newest complete snapshot, publish it on the renderer's
     stream, draw, pace. The ring's lock also guards the renderer's reallocations (``set_env``). ``overrides`` is
     ``(path, loaded mapping)`` for the panel's Save and Load; ``capture`` records frames (``app/capture.py``)."""
@@ -330,6 +331,7 @@ def threaded_loop(worker: PhysicsWorker, ring: Snapshots, renderer, fps: float, 
             path, loaded = overrides if overrides is not None else ("overrides.yaml", {})
             panels = Panels(worker, renderer, controls, hub, timings=timings, overrides_path=path, loaded=loaded, haptics=haptics, procedure=worker.procedure)
             renderer.key_handlers.append(panels.handle_key)
+    extra_panel = panel_factory(renderer) if panel_factory is not None and getattr(renderer, "ui", None) is not None else None
     pacer = Pacer(1.0 / fps)
     frames = 0
     t0 = last_time = last_haptics = time.perf_counter()
@@ -351,6 +353,8 @@ def threaded_loop(worker: PhysicsWorker, ring: Snapshots, renderer, fps: float, 
                 if timings is not None and snap.step != seen:
                     timings.add("frame.age", ta - snap.time)
                 seen = snap.step
+                if extra_panel is not None:
+                    extra_panel.update(time.perf_counter(), snap)
                 renderer.publish(snap)
                 if panels is not None:
                     panels.publish_readouts(snap.readout_host)

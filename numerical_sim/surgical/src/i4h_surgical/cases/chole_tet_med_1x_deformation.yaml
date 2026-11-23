@@ -71,13 +71,13 @@ assets:
 instruments:
   grasper:
     kind: grasper
-    mesh: ${DATA}/instruments/pgrasp.usdc
+    mesh: ${DATA}/instruments/dvrk/dvrk_420049.usdc
     prims:
-      shaft: /root/shaft_color/shaft_color_001
-      body: /root/logobody_color/logobody_color_002
-      jaw_left: /root/jawLeft_color/jawLeft_color_001
-      jaw_right: /root/jawRight_color/jawRight_color_001
-    scale: 0.00107143
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 1.0714285714285714
     trocar:
     - -0.142857
     - 0.714286
@@ -88,16 +88,13 @@ instruments:
       - 0.171429
       - -0.428571
     input: primary
-    jaw_spheres:
-      radius: 0.00214286
-      distance: 0.00214286
-      offset:
-      - 0.0
-      - -0.00214286
-      - 0.0
     shaft_spheres:
       radius: 0.00571429
       distance: 0.00285714
+    jaw_spheres:
+      count: 13
+      radius: 0.0010714285714285713
+      distance: 0.0018782857140260082
 inputs:
   pickup:
     distance: 0.0214286
@@ -112,9 +109,9 @@ inputs:
   primary:
     backend: minimou
     scale:
-    - 0.000714286
-    - 0.000714286
-    - 0.000714286
+    - 0.001 #mm to meter
+    - 0.001 #mm to meter
+    - 0.001 #mm to meter
     settings:
       device_index: 0
       handle_readout: raw

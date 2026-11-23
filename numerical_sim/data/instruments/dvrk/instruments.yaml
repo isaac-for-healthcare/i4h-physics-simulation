@@ -1,0 +1,276 @@
+instruments:
+  '400006':
+    kind: grasper
+    mesh: dvrk_400006.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.006032499950379133
+  '400049':
+    kind: grasper
+    mesh: dvrk_400049.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013147999998182058
+  '400093':
+    kind: grasper
+    mesh: dvrk_400093.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_right: /Instrument/jaw_right
+      jaw_left: /Instrument/jaw_left
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013124934630468488
+  '400172':
+    kind: grasper
+    mesh: dvrk_400172.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013158312067389488
+  '400179':
+    kind: scissors
+    mesh: dvrk_400179.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.008156178519129753
+    cutting:
+      count: 8
+      radius: 0.00375
+      distance: 0.013982020318508148
+      offset:
+      - 0.0
+      - 0.0
+      - 0.0
+  '400183':
+    kind: hook
+    mesh: dvrk_400183.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      hook: /Instrument/hook
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.010047750547528267
+    wrist_end:
+    - 0.0
+    - 0.0
+    - 0.0
+  '400184':
+    kind: hook
+    mesh: dvrk_400184.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      hook: /Instrument/hook
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.010045500239357352
+    wrist_end:
+    - 0.0
+    - 0.0
+    - 0.0
+  '400194':
+    kind: grasper
+    mesh: dvrk_400194.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_right: /Instrument/jaw_right
+      jaw_left: /Instrument/jaw_left
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.007992437458597124
+  '400309':
+    kind: grasper
+    mesh: dvrk_400309.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_right: /Instrument/jaw_right
+      jaw_left: /Instrument/jaw_left
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.006768624880351126
+  '420006':
+    kind: grasper
+    mesh: dvrk_420006.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.006032499950379133
+  '420049':
+    kind: grasper
+    mesh: dvrk_420049.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013147999998182058
+  '420093':
+    kind: grasper
+    mesh: dvrk_420093.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_right: /Instrument/jaw_right
+      jaw_left: /Instrument/jaw_left
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013124934630468488
+  '420172':
+    kind: grasper
+    mesh: dvrk_420172.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013158312067389488
+  '420179':
+    kind: scissors
+    mesh: dvrk_420179.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.008156178519129753
+    cutting:
+      count: 8
+      radius: 0.00375
+      distance: 0.013982020318508148
+      offset:
+      - 0.0
+      - 0.0
+      - 0.0
+  '420183':
+    kind: hook
+    mesh: dvrk_420183.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      hook: /Instrument/hook
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.010047750547528267
+    wrist_end:
+    - 0.0
+    - 0.0
+    - 0.0
+  '420184':
+    kind: hook
+    mesh: dvrk_420184.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      hook: /Instrument/hook
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.010045500239357352
+    wrist_end:
+    - 0.0
+    - 0.0
+    - 0.0
+  '420194':
+    kind: grasper
+    mesh: dvrk_420194.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_right: /Instrument/jaw_right
+      jaw_left: /Instrument/jaw_left
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.007992437458597124
+  '420309':
+    kind: grasper
+    mesh: dvrk_420309.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_right: /Instrument/jaw_right
+      jaw_left: /Instrument/jaw_left
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.006768624880351126
+  '420327':
+    kind: clip_applier
+    mesh: dvrk_420327.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013874999713152647

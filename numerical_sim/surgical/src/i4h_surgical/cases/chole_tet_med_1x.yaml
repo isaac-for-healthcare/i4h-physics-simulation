@@ -83,48 +83,117 @@ instruments:                    # laparoscopic tools through trocars; actions[en
   # jaw sphere radius 0.015 and, for the scissors, the cutting chains (radius 0.01, distance 0.01, offset -0.005).
   grasper:
     kind: grasper
-    mesh: "${DATA}/instruments/pgrasp.usdc"
-    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
-    scale: 0.00107143
-    trocar: [-0.142857, 0.714286, 0.428571]
-    initial: {position: [0.0428571, 0.171429, -0.428571]}
+    mesh: ${DATA}/instruments/dvrk/dvrk_420049.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 1.0714285714285714
+    trocar:
+    - -0.142857
+    - 0.714286
+    - 0.428571
+    initial:
+      position:
+      - 0.0428571
+      - 0.171429
+      - -0.428571
     input: primary
-    jaw_spheres: {radius: 0.00214286, distance: 0.00214286, offset: [0.0, -0.00214286, 0.0]}
-    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
+    shaft_spheres:
+      radius: 0.00571429
+      distance: 0.00285714
+    jaw_spheres:
+      count: 13
+      radius: 0.0010714285714285713
+      distance: 0.0018782857140260082
   hook:
     kind: hook
-    mesh: "${DATA}/instruments/hook.usdc"
-    prims: {shaft: /root/shaft_color_001/shaft_color_001, body: /root/logobody_color_002/logobody_color_002, hook: /root/hook/Mesh_001}
-    scale: 0.00107143
-    trocar: [0.785714, 0.714286, 0.714286]
-    initial: {position: [0.1, 0.171429, -0.428571]}
+    mesh: ${DATA}/instruments/dvrk/dvrk_420183.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      hook: /Instrument/hook
+    scale: 1.0714285714285714
+    trocar:
+    - 0.785714
+    - 0.714286
+    - 0.714286
+    initial:
+      position:
+      - 0.1
+      - 0.171429
+      - -0.428571
     input: secondary
+    shaft_spheres:
+      radius: 0.00571429
+      distance: 0.00285714
     jaw_spheres:
-      count: 5
-      radius: 0.00214286
-      distance: 0.00142857
-      chains: {jaw_left: {offset: [0.0, 0.0, 0.0142857], euler: [-20.0, 0.0, 0.0]}, jaw_right: {offset: [0.0, 0.00285714, 0.0214286], euler: [80.0, 0.0, 0.0]}}
-    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
-    wrist_end: [0.0, 0.0, 0.00857143]
-  clip_applier:                 # the grasper mesh in its own colours: never grasps, F (fire) clips the duct or artery node in reach
+      count: 13
+      radius: 0.0010714285714285713
+      distance: 0.0014353929353611808
+    wrist_end:
+    - 0.0
+    - 0.0
+    - 0.0
+  clip_applier:
     kind: clip_applier
-    mesh: "${DATA}/instruments/pgrasp.usdc"
-    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
-    scale: 0.00107143
-    trocar: [0.428571, 0.714286, 0.428571]
-    initial: {position: [0.157143, 0.171429, -0.428571]}
-    jaw_spheres: {radius: 0.00214286, distance: 0.00214286, offset: [0.0, -0.00214286, 0.0]}
-    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
-  scissors:                     # 5 collision spheres per jaw and 8 finer cutting spheres per jaw; closing the jaw cuts fat
+    mesh: ${DATA}/instruments/dvrk/dvrk_420327.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 1.0714285714285714
+    trocar:
+    - 0.428571
+    - 0.714286
+    - 0.428571
+    initial:
+      position:
+      - 0.157143
+      - 0.171429
+      - -0.428571
+    shaft_spheres:
+      radius: 0.00571429
+      distance: 0.00285714
+    jaw_spheres:
+      count: 13
+      radius: 0.0010714285714285713
+      distance: 0.0019821428161646637
+  scissors:
     kind: scissors
-    mesh: "${DATA}/instruments/rts.usdc"
-    prims: {shaft: /root/shaft_color_001/shaft_color_003, body: /root/logobody_color_001/logobody_color_004, jaw_left: /root/jawLeft_color_001/jawLeft_color_003, jaw_right: /root/jawRight_color_001/jawRight_color_003}
-    scale: 0.00107143
-    trocar: [0.0, 0.242857, -0.285714]
-    initial: {position: [0.0428571, 0.171429, -0.428571]}   # as chole_tet_med: the grasper's rest pose too
-    jaw_spheres: {count: 5, radius: 0.00214286, distance: 0.00214286, offset: [0.0, -0.00214286, 0.0]}
-    shaft_spheres: {radius: 0.00571429, distance: 0.00285714}
-    cutting: {count: 8, radius: 0.00142857, distance: 0.00142857, offset: [0.0, -0.000714286, 0.0]}
+    mesh: ${DATA}/instruments/dvrk/dvrk_420179.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 1.0714285714285714
+    trocar:
+    - 0.0
+    - 0.242857
+    - -0.285714
+    initial:
+      position:
+      - 0.0428571
+      - 0.171429
+      - -0.428571
+    shaft_spheres:
+      radius: 0.00571429
+      distance: 0.00285714
+    jaw_spheres:
+      count: 13
+      radius: 0.0010714285714285713
+      distance: 0.001165168359875679
+    cutting:
+      count: 8
+      radius: 0.0005357142857142856
+      distance: 0.0019974314740725924
+      offset:
+      - 0.0
+      - 0.0
+      - 0.0
   suction:                      # irrigation and suction tube: grip irrigates, energy sucks
     kind: suction
     mesh: "${DATA}/instruments/suction_irrigation.usdc"
@@ -299,12 +368,7 @@ render:
   tonemap: aces
   post: {ao_enabled: true, ao_intensity: 1.637, ao_radius: 0.00185714, ao_bias: 0.00214286, ao_power: 1.608,   # AO radius and bias are view-space lengths
          bloom_enabled: true, bloom_threshold: 0.5, bloom_intensity: 1.783, bloom_radius: 6.182, fxaa_enabled: true}  # bloom radius is in pixels
-  camera: {position: [0.0670893, 0.171751, -0.350877], fov: 45.0, pitch: 6.8, yaw: 4.3, up: [0.0, 1.0, 0.0], near: 0.00142857, far: 14.2857,
-           target_distance: 0.142857,   # the orbit pivot starts this far ahead (the camera default 1.0 / 7)
-           move_speed: 0.75,            # WASD/QE: distances to the pivot per second (the default), at least
-           min_distance: 0.0357143,     # this distance (the default 0.25 / 7)
-           rotate_speed: 1.0,           # orbit multiplier (arrow keys, left-button drag)
-           turbo: 3.0, slow: 0.25}      # held Shift / Ctrl multiply flying and the arrow keys' orbit
+  camera: {position: [0.0670893, 0.171751, -0.350877], fov: 45.0, pitch: 6.8, yaw: 4.3, up: [0.0, 1.0, 0.0], near: 0.00142857, far: 14.2857}
   environment: {path: "${DATA}/environments/abdomen.hdr", intensity: 0.84, pitch_degrees: -90.0, rotation_degrees: 0.0, lighting: true}
   headlight: {color: [1.0, 0.92, 0.78], intensity: 0.59}
   debug_spheres: false

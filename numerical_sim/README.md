@@ -26,7 +26,9 @@ The window uses Tab to select a tool, IJKL/UO to move it, Space to grip, Shift f
 
 `chole_tet_med_1x_deformation` copies the Versius `chole-1x` anatomy at 1/7 of the original chole scale, with the same materials, supports and cavity contact. It runs standalone with a grasper for contact and grasping; it has no robot arm, fluids, bleeding, thermal effects, smoke, cutting or topology deletion. The mechanics at this scale remain uncalibrated.
 
-Production assets are included in `data/` and licensed under Apache-2.0; `docs/asset-manifest.json` records each file's SHA-256, size and license. See `data/README.md`. They are excluded from wheels and source distributions. `scripts/fetch_assets.py --source PATH_OR_URL` can copy a matching asset tree into `data/` (or `$I4H_DATA`) and verifies every file. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; installed packages do not search for a checkout or download assets. Headless runs do not load unused textures.
+`chole_*` cases use da Vinci Si instruments; `chole_grasp` inherits them from `chole_tet_med`. The supplied set has no suction equivalent, so the existing suction instrument remains. See `data/README.md` for model IDs and provenance.
+
+Production assets are included in `data/` and licensed under Apache-2.0, except for the MIT-licensed dVRK instruments; `docs/asset-manifest.json` records each file's SHA-256, size and license. See `data/README.md`. They are excluded from wheels and source distributions. `scripts/fetch_assets.py --source PATH_OR_URL` can copy a matching asset tree into `data/` (or `$I4H_DATA`) and verifies every file. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; installed packages do not search for a checkout or download assets. Headless runs do not load unused textures.
 
 Use each domain directly:
 
