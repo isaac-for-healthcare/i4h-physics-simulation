@@ -27,6 +27,8 @@ baselines/
 /.parity/
 /parity/
 
+.venvs/
+
 # Pinned-liver numerical qualification traces, snapshots and videos
 /artifacts/liver-grasp*/
 

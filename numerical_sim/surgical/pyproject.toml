@@ -21,4 +21,4 @@ where = ["src"]
 include = ["i4h_surgical*"]
 
 [tool.setuptools.package-data]
-"i4h_surgical" = ["cases/liver_pinned_grasp_1x.yaml", "cases/chole_grasp.yaml", "cases/chole_tet_med.yaml", "cases/liver.yaml", "cases/liver_h12.yaml", "cases/tissue_contact.yaml", "cases/two_worlds.yaml"]
+"i4h_surgical" = ["cases/liver_pinned_grasp_1x.yaml", "cases/versius_block.yaml", "cases/versius_chole.yaml", "cases/versius_chole_1x.yaml", "cases/chole_tet_med_1x.yaml", "cases/chole_grasp.yaml", "cases/chole_tet_med.yaml", "cases/chole_tet_med_1x_deformation.yaml", "cases/liver.yaml", "cases/liver_h12.yaml", "cases/tissue_contact.yaml", "cases/two_worlds.yaml"]
