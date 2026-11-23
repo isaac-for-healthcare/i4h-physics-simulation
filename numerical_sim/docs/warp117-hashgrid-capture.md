@@ -9,6 +9,19 @@ The stock 1.17.0 binary still has the defect. Version `1.17.0` alone does not
 identify the corrected binary: retain the patch and wheel/native-library hashes
 when installing or qualifying this stack.
 
+## Running the upstream regression
+
+`tests/runtime/test_hashgrid_capture.py` is skipped by default because it checks
+an upstream Warp defect and the stock dependency does not include the local fix.
+Run it explicitly when qualifying a patched or newer Warp build:
+
+```bash
+I4H_WARP_HASHGRID_TESTS=1 uv run --no-sync pytest tests/runtime/test_hashgrid_capture.py -q
+```
+
+The opt-in preserves all nine tests and their assertions. A default skip does not
+establish that the installed Warp binary is fixed or qualify captured simulations.
+
 ## Implementation
 
 `hash_grid_update_device_impl()` now uses an ordinary local descriptor.

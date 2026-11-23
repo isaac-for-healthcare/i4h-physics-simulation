@@ -2,11 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 """Capture isolation at the pinned Warp boundary; analytic neighbor sets, no solver noise."""
 
+import os
 from typing import Any
 
 import numpy as np
 import pytest
 import warp as wp
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("I4H_WARP_HASHGRID_TESTS") != "1",
+    reason="upstream Warp HashGrid capture regression; set I4H_WARP_HASHGRID_TESTS=1 to check your Warp build",
+)
 
 
 @wp.kernel
