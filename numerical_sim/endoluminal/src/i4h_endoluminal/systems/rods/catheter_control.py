@@ -136,6 +136,8 @@ class CatheterControl(System):
     def prepare(self, scene):
         scene.storage.check()
         super().prepare(scene)
+        if not self.enabled:  # step_start no longer clears them: the coupling must not read the last reaction again
+            self.zero(None, "impulse", "moment")
         new = check_int("catheter_control.tip_edges", self.tip_edges)
         if not 0 <= new < self.B:
             raise ValueError(f"catheter_control.tip_edges must be in [0, {self.B})")

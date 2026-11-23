@@ -23,7 +23,8 @@ HOST_BEFORE, HOST_AFTER = [(5.0, 5.0, 5.0), (6.0, 5.0, 5.0)], [(7.0, 5.0, 5.0)]
 def host_sim(rotations, gravity=(0.0, 0.0, -9.81), case_gravity=None):
     """A host model: one global particle in front, then per world two host particles, ours, one more host particle;
     world ``e`` placed at ``(e, 0, 0)`` with orientation ``rotations[e]`` (xyzw)."""
-    scene = load_scene(CASE)
+    case = CASE if case_gravity is None else CASE | {"sim": CASE["sim"] | {"gravity": list(case_gravity)}}
+    scene = load_scene(case)
     from i4h_physics.rod_storage import declare_rod_direct
     declare_rod_direct(scene, "rod")
     b = newton.ModelBuilder(gravity=gravity)

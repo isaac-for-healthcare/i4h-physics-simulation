@@ -292,7 +292,9 @@ def publish_rod(scene, declarations, system_id, *, body, backend, settings, expe
         flat=True,
     )
     if backend == "direct":
-        r.add("inertia_local", Owner.MODEL, wp.vec3, np.zeros((F, 3), np.float32), nodes=nodes)
+        # Each env's own rows: one geometry variant may carry different masses or radii per env.
+        r.add("inertia_local", Owner.MODEL, wp.vec3, np.zeros((E, F, 3), np.float32), runtime=True, nodes=nodes,
+              group="frames_runtime", flat=True)
         declarations.initializer(partial(initialize_inertia, scene_ref=ref(scene), record=r))
     else:
         r.add("unit_twist", Owner.MODEL, wp.float32, np.ones((E, shared.K), np.float32), runtime=True)
@@ -307,16 +309,19 @@ def initialize_inertia(model, *, scene_ref, record):
     scene, body = scene_ref(), record.body
     if scene is None:
         raise RuntimeError("rod authoring expired before finalization")
-    start = scene_record(scene).starts[0] + body.offset
+    starts = [scene_record(scene).starts[e] + body.offset for e in range(scene.envs)]
     # Read this finalized Model's exact i4h inverse mass and native radius, preserving the original float64 arithmetic.
     proxy = SimpleNamespace(
-        field=lambda name, b: (model.i4h.particle_inv_mass if name == "inv_mass" else model.particle_radius)[
-            start : start + b.count
-        ].reshape((1, b.count))
+        field=lambda name, b: SimpleNamespace(
+            numpy=lambda: np.stack(
+                [(model.i4h.particle_inv_mass if name == "inv_mass" else model.particle_radius)[s : s + b.count].numpy()
+                 for s in starts]
+            )
+        )
     )
     fields = model_fields(model, record)
     fields.inertia_local.assign(
-        cylinder_inv_inertia(proxy, body, model_fields(model, record.shared).rest_len.numpy()[0])
+        cylinder_inv_inertia(proxy, body, model_fields(model, record.shared).rest_len.numpy()[0]).reshape(-1, 3)
     )
 
 

@@ -185,7 +185,7 @@ def check_host_gravity(model, scene) -> None:
     rotated component then sees ``R_e^T g`` (``component_gravity``). Without one the scene adopts world 0's in the
     component frame, so ``scene.down`` follows the host."""
     if not scene.gravity_declared:
-        scene.adopt_gravity(host[0])
+        scene.adopt_gravity(component_gravity(model, scene).astype(np.float64)[0])
         return
     world = model.gravity.numpy()[: scene.envs].astype(np.float64)
     case = np.asarray(scene.gravity_vector, np.float64)

@@ -159,6 +159,8 @@ class Mounts:
         sdt = dt / float(substeps)
         for g in self.groups:
             for s in g.sources:
+                if not s.enabled:  # structural: a change re-prepares and recaptures the step
+                    continue
                 wp.launch(fill_reaction, dim=(g.envs, g.count), inputs=[s.impulse, s.moment, g.target, 1.0 / (sdt * sdt * float(substeps))],
                           outputs=[g.force, g.torque], device=g.force.device)
 
@@ -266,6 +268,13 @@ class CoupledSolver(SolverBase):
         particle = int(StateFlags.PARTICLE_Q | StateFlags.PARTICLE_QD | StateFlags.PARTICLE_F)
         selected = int(StateFlags.ALL) if flags is None else int(flags)
         self.rigid.reset(state, world_mask=world_mask, flags=selected & ~particle)
+        if self.mounts is not None:
+            # A host resets or randomizes its holders (joint state) before this reset: forward kinematics brings body_q
+            # up to date and the mounts are driven from it, so the instrument reset starts from the holder's new pose.
+            import newton
+
+            newton.eval_fk(self.model, state.joint_q, state.joint_qd, state)
+            self.mounts.drive(state)
         self.ours.reset(state, world_mask=world_mask, flags=selected & particle)
 
     def save_i4h(self, dst_state, dst_control, mask=None) -> None:

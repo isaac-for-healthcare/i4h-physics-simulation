@@ -382,3 +382,23 @@ def test_catheter_mujoco_warp_captured(mode):
     assert np.isfinite(state.body_q.numpy()).all()
     np.testing.assert_allclose(group.control.root.numpy(), group.control.mount_pose.numpy()[..., :3], atol=1e-6)
     assert bool(group.force.numpy().any()) == (mode == "two_way")
+
+def test_a_disabled_catheter_driver_stops_its_reaction():
+    """Disabling catheter_control (then prepare) clears its published reaction, and the coupling no longer fills or
+    applies a stale one: the holder feels no force on the following steps."""
+    systems, model, state, control, coupled = held_catheter("two_way")
+    for _ in range(30):
+        state.body_f.zero_()
+        coupled.step(state, state, control, None, 1.0 / 60)
+    group = coupled.mounts.groups[0]
+    wp.synchronize()
+    assert np.abs(group.force.numpy()).max() > 0.1, "the rod's weight hangs on the holder"
+    cc = by_type(systems, "CatheterControl")
+    cc.enabled = False
+    cc.prepare(coupled.ours.scene)
+    assert not cc.impulse.numpy().any() and not cc.moment.numpy().any(), "prepare clears the disabled driver's products"
+    for _ in range(3):
+        state.body_f.zero_()
+        coupled.step(state, state, control, None, 1.0 / 60)
+        wp.synchronize()
+        assert not group.force.numpy().any() and not group.torque.numpy().any(), "no stale reaction is filled"

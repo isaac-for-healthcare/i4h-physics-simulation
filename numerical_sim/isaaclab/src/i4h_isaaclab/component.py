@@ -33,7 +33,6 @@ the manager updates it after every physics step, and the host resets it with ``r
 
 from __future__ import annotations
 
-import dataclasses
 from contextlib import contextmanager
 from dataclasses import dataclass, field, fields
 
@@ -136,13 +135,13 @@ class I4hComponent:
             raise RuntimeError(
                 "this handle wraps a configured I4hSolverCfg; configure() needs an I4hComponentCfg"
             )
+        from i4h_isaaclab.coupling import check_rigid_solver_cfg
         from i4h_isaaclab.newton_manager import I4hSolverCfg, physics_cfg
         from isaaclab_newton.physics import NewtonCfg
 
         host = sim_cfg.physics
-        host_solver = (
-            getattr(host, "solver_cfg", None) if isinstance(host, NewtonCfg) else None
-        )
+        newton_host = isinstance(host, NewtonCfg)
+        host_solver = getattr(host, "solver_cfg", None) if newton_host else None
         if isinstance(host_solver, I4hSolverCfg):
             raise ValueError("the host's physics already steps an i4h component")
         if rigid and (not newton_host or str(getattr(host_solver, "solver_type", "")) != "mujoco_warp"):
