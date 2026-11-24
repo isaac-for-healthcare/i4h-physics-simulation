@@ -15,7 +15,10 @@ license.
 permanent cautery hook (420183), curved scissors (420179), and clip applier
 (420327). Their coordinates are in metres; chole cases retain the source's
 7.5 mesh scale, divided by seven for the `1x` cases. Collision and cutting
-chains use the same case scale. Existing input mappings and tool poses are
+chains use the same case scale. The chole grasper retains its original jaw-sphere
+radius, spacing and offsets for alignment review with the da Vinci visual mesh;
+the spheres still follow the da Vinci jaw bind transforms. Press X in Slang to
+toggle the collision overlay. Existing input mappings and tool poses are
 preserved. The source set has no suction instrument, so chole retains the
 existing suction mesh.
 

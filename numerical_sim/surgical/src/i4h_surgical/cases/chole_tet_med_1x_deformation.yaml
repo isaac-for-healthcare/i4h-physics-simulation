@@ -91,10 +91,12 @@ instruments:
     shaft_spheres:
       radius: 0.00571429
       distance: 0.00285714
+    # Original jaw proxies retained for alignment review with the da Vinci mesh.
     jaw_spheres:
       count: 13
-      radius: 0.0010714285714285713
-      distance: 0.0018782857140260082
+      radius: 0.00214286
+      distance: 0.00214286
+      offset: [0.0, -0.00214286, 0.0]
 inputs:
   pickup:
     distance: 0.0214286

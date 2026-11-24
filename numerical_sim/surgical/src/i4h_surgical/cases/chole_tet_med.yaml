@@ -91,10 +91,12 @@ instruments:                    # laparoscopic tools through trocars; actions[en
       - 1.2
       - -3.0
     input: primary
+    # Original jaw proxies retained for alignment review with the da Vinci mesh.
     jaw_spheres:
       count: 13
-      radius: 0.0075
-      distance: 0.013147999998182058
+      radius: 0.015
+      distance: 0.015
+      offset: [0.0, -0.015, 0.0]
   hook:
     kind: hook
     mesh: ${DATA}/instruments/dvrk/dvrk_420183.usdc
