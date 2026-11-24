@@ -302,7 +302,7 @@ def test_fresh_runtime_resumes_a_catheter_in_graph_containment(device, captured)
     cfg, a, m = aorta(device)
     state, control = m.state(), m.control()
     sim = runtime(cfg, a, m, captured, state=state, control=control)
-    drive(sim, 40)
+    drive(sim, 160)  # the 6.35 catheter reaches the wall after ~140 steps at 0.1
     gc = system(sim, "GraphContainment")
     assert gc.cand_count.numpy().any() and gc.ref_samples.numpy().any() and gc.built.numpy().any()
     saved_state, saved_control = m.state(), m.control()

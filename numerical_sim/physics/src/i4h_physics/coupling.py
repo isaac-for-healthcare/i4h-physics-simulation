@@ -268,13 +268,6 @@ class CoupledSolver(SolverBase):
         particle = int(StateFlags.PARTICLE_Q | StateFlags.PARTICLE_QD | StateFlags.PARTICLE_F)
         selected = int(StateFlags.ALL) if flags is None else int(flags)
         self.rigid.reset(state, world_mask=world_mask, flags=selected & ~particle)
-        if self.mounts is not None:
-            # A host resets or randomizes its holders (joint state) before this reset: forward kinematics brings body_q
-            # up to date and the mounts are driven from it, so the instrument reset starts from the holder's new pose.
-            import newton
-
-            newton.eval_fk(self.model, state.joint_q, state.joint_qd, state)
-            self.mounts.drive(state)
         self.ours.reset(state, world_mask=world_mask, flags=selected & particle)
 
     def save_i4h(self, dst_state, dst_control, mask=None) -> None:

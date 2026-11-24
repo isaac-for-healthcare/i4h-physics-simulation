@@ -463,7 +463,7 @@ def endoluminal(case, device, captured):
     return cfg, a, m
 
 
-@pytest.mark.parametrize("case,steps,rate,contact", [("aorta_centreline", 40, 0.1, "GraphContainment"),
+@pytest.mark.parametrize("case,steps,rate,contact", [("aorta_centreline", 160, 0.1, "GraphContainment"),
                                                      ("aorta_shell", 120, 0.3, "ShellContainment")])
 @pytest.mark.parametrize("device,captured", MODES)
 def test_catheter_cases_resume(device, captured, case, steps, rate, contact):

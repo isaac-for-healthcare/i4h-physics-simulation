@@ -159,7 +159,7 @@ def test_rod_channels_commands_history_and_accounting(device, captured, backend,
         np.testing.assert_array_equal(rod.frames0.numpy()[0], rod.frame.numpy().reshape(3, rod.frame_count, 4)[0])
         if backend == "direct":
             np.testing.assert_array_equal(
-                rod.inertia_local.numpy(), cylinder_inv_inertia(scene, rod.body, rod.rest_len.numpy()[0])
+                rod.inertia_local.numpy(), cylinder_inv_inertia(scene, rod.body, rod.rest_len.numpy()[0]).reshape(-1, 3)
             )
         if regional:
             provider = s[f"m{i}"]
@@ -411,7 +411,7 @@ def test_finalizer_uses_exact_custom_inverse_mass_of_each_model():
     second.particle_grid = None
     sim, s = runtime(a, second)
     np.testing.assert_array_equal(
-        s["r0"].inertia_local.numpy(), cylinder_inv_inertia(sim.scene, s["r0"].body, s["r0"].rest_len.numpy()[0])
+        s["r0"].inertia_local.numpy(), cylinder_inv_inertia(sim.scene, s["r0"].body, s["r0"].rest_len.numpy()[0]).reshape(-1, 3)
     )
     assert not np.array_equal(second.particle_inv_mass.numpy(), second.i4h.particle_inv_mass.numpy())
 
