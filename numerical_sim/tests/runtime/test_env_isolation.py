@@ -19,15 +19,13 @@ import pytest
 import warp as wp
 from helpers import deterministic, needs_chole, needs_vessels
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 
 # Measured run-to-run noise of these fixtures is below 1e-7. Burning is chaotic once tets start to die (two
 # identical single-env runs drift ~3e-3 a few steps after the first deletion), so the burn check stops shortly
 # after the first deletions and compares the topology masks exactly.
 ATOL = 1e-5
-
-
 
 
 def with_first_variant(case: dict, asset: str, variant: int) -> dict:

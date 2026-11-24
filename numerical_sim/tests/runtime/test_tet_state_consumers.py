@@ -5,7 +5,7 @@ import newton
 import numpy as np
 import pytest
 from helpers import find, push_actions, run
-from i4h_isaaclab.composition import maps, read_case, sim_settings
+from i4h_host.composition import maps, read_case, sim_settings
 from i4h_physics import Stepper, author_case, tet_fields
 from i4h_physics.systems.mechanics.tet import Tet
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl

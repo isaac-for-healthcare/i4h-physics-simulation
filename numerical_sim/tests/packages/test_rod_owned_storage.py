@@ -480,7 +480,7 @@ def test_catheter_recording_replay_and_host_named_view_lifetime(tmp_path):
             recorder.record(obs)
         assert recorder.end(True) == "demo_0"
         recorder.close()
-        episode, args = load_demo(recorder.path, "demo_0")
+        episode, args = load_demo(recorder.path, "demo_0", device="cpu")
         assert args["format_version"] == 1
         assert args["action_layout"] == [["control", 3, ["catheter"]]]
         torch.testing.assert_close(episode.data["actions"], torch.stack(rows).cpu(), rtol=0, atol=0)

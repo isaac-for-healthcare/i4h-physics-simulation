@@ -69,7 +69,7 @@ class I4hComponentCfg:
         """The physical part of a case (a name, path or mapping, ``composition.read_case``): its assets, systems,
         instruments and ``sim``, and with ``procedure`` its ``procedure:``; an app's other keys (render, inputs, ...)
         are left out."""
-        from i4h_isaaclab.composition import read_case
+        from i4h_host.composition import read_case
 
         cfg = read_case(case)
         if procedure:
@@ -234,7 +234,7 @@ class I4hComponent:
         self.procedure = None
         case = self.solver_cfg.case or {}
         if case.get("procedure"):
-            from i4h_isaaclab.composition import build_procedure
+            from i4h_host.composition import build_procedure
 
             self.procedure = build_procedure(case, sim, horizon_s=self.horizon_s)
         sim.procedure = (

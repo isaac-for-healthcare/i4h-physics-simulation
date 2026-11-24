@@ -23,7 +23,7 @@ import time
 def measure(case: str, envs: int, steps: int, warmup: int, device: str, navigation=False) -> dict:
     import numpy as np
     import warp as wp
-    from i4h_isaaclab.composition import load_case, read_case
+    from i4h_host.composition import load_case, read_case
 
     wp.config.log_level = wp.LOG_WARNING if hasattr(wp, "LOG_WARNING") else None
     wp.init()
@@ -42,7 +42,7 @@ def measure(case: str, envs: int, steps: int, warmup: int, device: str, navigati
     control = actions = None
     if navigation:
         from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-        from i4h_standalone.app.catheter import scripted_rates
+        from i4h_host.navigation import scripted_rates
         control = next(s for s in sim.systems if isinstance(s, CatheterControl))
         actions = np.zeros((envs, 3), np.float32)
     for i in range(warmup):

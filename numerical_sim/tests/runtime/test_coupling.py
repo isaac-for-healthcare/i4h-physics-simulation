@@ -115,7 +115,7 @@ TARGET = 0.12  # the holder's slide (it sags 1 cm under gravity): probe root nea
 
 def probe_case():
     """two_worlds' block and probe only (no rod, fluid or cautery)."""
-    from i4h_isaaclab.composition import read_case
+    from i4h_host.composition import read_case
 
     cfg = copy.deepcopy(read_case("two_worlds"))
     cfg["sim"]["cuda_graph"] = False
@@ -127,8 +127,8 @@ def probe_case():
 
 def held_probe(mode):
     """Per world a holder sliding along z (a stiff drive towards TARGET) from z -0.05, then the block and probe."""
-    from i4h_isaaclab.composition import build_systems as build
-    from i4h_isaaclab.composition import load_scene as scene_of
+    from i4h_host.composition import build_systems as build
+    from i4h_host.composition import load_scene as scene_of
     from i4h_physics import declare_tet
 
     cfg = probe_case()
@@ -253,8 +253,8 @@ def test_mount_configuration_errors():
 def held_catheter(mode):
     """Per world a holder on a vertical slide (a stiff drive at the rod's rest root, z 1) carrying the catheter driver
     of a horizontal 20-node rod under gravity; the driver frame is the rod's rest root frame."""
-    from i4h_isaaclab.composition import build_systems as build
-    from i4h_isaaclab.composition import load_scene as scene_of
+    from i4h_host.composition import build_systems as build
+    from i4h_host.composition import load_scene as scene_of
     from test_catheter_mount import case as catheter_case
 
     cfg = catheter_case(gravity=(0.0, 0.0, -9.81), track=0.0)

@@ -12,7 +12,7 @@ for package in (
     "surgical",
     "isaaclab",
     "assessment",
-    "standalone",
+    "host",
     "endoluminal",
 ):
     sys.path.insert(0, str(root / package / "src"))

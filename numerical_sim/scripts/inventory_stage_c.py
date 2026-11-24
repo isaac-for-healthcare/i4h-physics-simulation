@@ -15,7 +15,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-PACKAGES = ("physics", "surgical", "endoluminal", "isaaclab", "standalone", "assessment")
+PACKAGES = ("physics", "surgical", "endoluminal", "isaaclab", "host", "assessment")
 ALLOCATORS = {"array", "zeros", "zeros_like", "ones", "ones_like", "empty", "empty_like", "full", "full_like", "clone", "cat", "stack"}
 STRUCTURES = {"HashGrid", "Bvh", "Mesh"}
 

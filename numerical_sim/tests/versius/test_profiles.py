@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 import numpy as np
-from i4h_isaaclab.composition import read_case
+from i4h_host.composition import read_case
 from i4h_isaaclab.versius.profiles import profile
 
 
@@ -43,7 +43,7 @@ def test_block_is_fixed_fixture_with_original_tet_iterations():
 
 
 def test_life_size_geometry_support_materials_and_reference_settings():
-    from i4h_isaaclab.composition import load_scene
+    from i4h_host.composition import load_scene
 
     original = profile("chole")
     life = profile("chole-1x")
@@ -74,7 +74,7 @@ def test_life_size_geometry_support_materials_and_reference_settings():
 
 
 def test_life_size_volume_cutoff_preserves_original_active_constraints():
-    from i4h_isaaclab.composition import load_scene
+    from i4h_host.composition import load_scene
 
     def denominator(name):
         p = profile(name)

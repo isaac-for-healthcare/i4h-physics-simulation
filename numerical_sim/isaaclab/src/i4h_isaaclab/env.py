@@ -41,7 +41,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 import warp as wp
-from i4h_isaaclab.composition import check_dt, read_case, sim_settings
+from i4h_host.composition import check_dt, read_case, sim_settings
 from i4h_isaaclab.lab import require
 from i4h_isaaclab.newton_manager import I4hSolverCfg, physics_cfg
 from i4h_isaaclab.terminal import ProcedureTorch
@@ -88,7 +88,7 @@ class I4hEnvCfg(DirectRLEnvCfg):
     mounts: dict | None = None  # with rigid_solver_cfg: {instrument: {"body": label, "offset": (pos, quat_xyzw)}}
     rigid_substeps: int = 1  # with rigid_solver_cfg: rigid solver steps per physics step
     gravity_from_case: bool = True  # a case's sim.gravity sets sim.gravity; False: sim.gravity rules, a different one raises
-    teleop_devices: DevicesCfg = DevicesCfg()  # none by default; i4h_standalone.devices.configure_teleop adds "i4h"
+    teleop_devices: DevicesCfg = DevicesCfg()  # none by default; i4h_isaaclab_standalone.devices.configure_teleop adds "i4h"
 
 
     def __post_init__(self):
@@ -230,7 +230,7 @@ class I4hEnv(DirectRLEnv):
     def _bind(self, sim):
         """Zero-copy views, bounds and camera over the current PhysicsBinding."""
         case = self.resolved_case
-        from i4h_isaaclab.composition import build_procedure
+        from i4h_host.composition import build_procedure
 
         self.procedure = build_procedure(case, sim, horizon_s=self.max_episode_length * self.step_dt)
         sim.procedure = self.procedure

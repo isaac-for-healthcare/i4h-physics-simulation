@@ -9,7 +9,7 @@ import copy
 
 import numpy as np
 import pytest
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 
 
 def settled_bottom(model, dt, substeps, iterations, spring=500.0, volume=1.0e9, seconds=3.0):

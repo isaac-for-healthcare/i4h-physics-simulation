@@ -90,7 +90,7 @@ episodes and session replay; the manager env has none of these.
 Isaac Lab's manager-based step calls `reset_buf.nonzero()` (a host sync) every step, which `I4hEnv` avoids with its mask
 reset. At 64 envs the measured difference is below 2% (`docs/performance.md`).
 
-Teleoperation devices are not configured by default; `i4h_standalone.devices.configure_teleop(cfg)`
+Teleoperation devices are not configured by default; `i4h_isaaclab_standalone.devices.configure_teleop(cfg)`
 installs the `i4h` device (requires `i4h-standalone`).
 
 Production assets are supplied separately with `--data` or `I4H_DATA`; missing assets

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import warp as wp
 from helpers import find, push_actions, run
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics import I4hSolver
 from i4h_physics.scene import ACTIVE_INT
 from i4h_physics.systems.mechanics.tet import Tet
@@ -180,7 +180,7 @@ def test_per_world_builder_matches_replicate():
     """add_env_particles inside each world (Isaac Lab's per-world hook form) lays the main block out exactly like the
     replicate fast path, and an owner's finalized model plus its early state end with every env's own rows."""
     import newton
-    from i4h_isaaclab.composition import load_scene, read_case
+    from i4h_host.composition import load_scene, read_case
     from i4h_physics import Scene
     from i4h_physics.newton_model import add_env_particles, build_builder, complete_scene
 

@@ -66,6 +66,33 @@ def action_layout(sim) -> list:
     return [[s.id, int(v.shape[1]), targets(s)] for s, v in zip(controls(sim), action_views(sim))]
 
 
+def append_sample(episode, key, value, clone=True):
+    """Accumulate samples through EpisodeData.data, shared by qualified Lab main and 3.0.
+
+    Lab main's EpisodeData is now a tensor container; the host recorder owns collection.
+    Keep the original nested keys, clone semantics and leading sample dimension.
+    """
+    if isinstance(value, dict):
+        for name, sample in value.items():
+            append_sample(episode, f"{key}/{name}", sample, clone=clone)
+        return
+    data = episode.data
+    keys = key.split("/")
+    for name in keys[:-1]:
+        data = data.setdefault(name, {})
+    stored = value.clone() if clone and isinstance(value, torch.Tensor) else value
+    data.setdefault(keys[-1], []).append(stored)
+
+
+def stack_samples(data):
+    """Finalize the same tensor tree formerly produced by EpisodeData.pre_export()."""
+    for key, value in data.items():
+        if isinstance(value, dict):
+            stack_samples(value)
+        elif isinstance(value, list):
+            data[key] = torch.stack(value)
+
+
 class Recorder:
     def __init__(self, path, teleop, record_camera: bool = False):
         from i4h_isaaclab.views import state_names
@@ -115,7 +142,7 @@ class Recorder:
             self.teleop.reset()
         self.episode = EpisodeData()
         self.episode.seed = int(self.u.cfg.seed)
-        self.episode.add("initial_episode_length", self.u.episode_length_buf[0:1].clone())
+        append_sample(self.episode, "initial_episode_length", self.u.episode_length_buf[0:1].clone())
 
     def record(self, obs: dict) -> None:
         """One step, after ``teleop.step()``: the action it applied and ``obs``, the observation that step returned."""
@@ -124,24 +151,24 @@ class Recorder:
             return
         u = self.u
         action = self.teleop.physical[0]
-        ep.add("actions", action)
-        ep.add("actions_normalized", torch.clamp((action - u.action_mid) / u.action_half, -1.0, 1.0), clone=False)
-        ep.add("obs/policy", obs["policy"][0])
+        append_sample(ep, "actions", action)
+        append_sample(ep, "actions_normalized", torch.clamp((action - u.action_mid) / u.action_half, -1.0, 1.0), clone=False)
+        append_sample(ep, "obs/policy", obs["policy"][0])
         if self.record_camera:
             for key in ("rgb", "depth"):
                 if key in obs:
-                    ep.add(f"obs/{key}", obs[key][0])
+                    append_sample(ep, f"obs/{key}", obs[key][0])
         for name, view in zip(self.state_names, u.state_views):
-            ep.add(f"states/{name}", view[0])
+            append_sample(ep, f"states/{name}", view[0])
         for dev, st in self.teleop.devices.states.items():
-            ep.add(f"devices/{dev}", {"position": torch.tensor(np.asarray(st.position, np.float32)),
+            append_sample(ep, f"devices/{dev}", {"position": torch.tensor(np.asarray(st.position, np.float32)),
                                       "rotation": torch.tensor(np.asarray(st.rotation, np.float32)),
                                       "grip": torch.tensor([float(st.grip)]),
                                       "buttons": torch.tensor([float(st.buttons.get(b, False)) for b in ("grab", "secondary", "fire")])},
                    clone=False)
         if self.tool_force is not None:
-            ep.add("haptics/force", wp.to_torch(self.tool_force.force)[0])
-            ep.add("haptics/jaw_load", wp.to_torch(self.tool_force.jaw_load)[0])
+            append_sample(ep, "haptics/force", wp.to_torch(self.tool_force.force)[0])
+            append_sample(ep, "haptics/jaw_load", wp.to_torch(self.tool_force.jaw_load)[0])
 
     def end(self, success: bool) -> str | None:
         """Write the episode (``demo_N``, returned) with its ``success`` flag; an empty episode writes nothing."""
@@ -149,7 +176,7 @@ class Recorder:
         if ep is None or ep.is_empty():
             return None
         ep.success = bool(success)
-        ep.pre_export()
+        stack_samples(ep.data)
         name = f"demo_{self.handler.get_num_episodes()}"
         self.handler.write_episode(ep)
         self.handler.flush()

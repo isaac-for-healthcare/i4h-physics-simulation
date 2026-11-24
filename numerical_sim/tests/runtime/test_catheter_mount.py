@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 import warp as wp
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 
 P, MASS, SEG = 20, 0.01, 0.01
 REST = ((0.0, 0.0, 1.0), None)  # the rest root: start [0, 0, 1], frame from the rod's rest frames

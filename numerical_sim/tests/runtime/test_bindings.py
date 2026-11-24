@@ -9,7 +9,7 @@ from helpers import needs_external_data
 from i4h_assessment.executor import Procedure
 from i4h_endoluminal.assessment import ReachTarget, single_target_assessor
 from i4h_endoluminal.bindings import CatheterBinding
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 
 
 @pytest.mark.parametrize("captured", [False, True])

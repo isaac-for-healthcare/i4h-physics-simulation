@@ -1,16 +1,25 @@
-import os
-
-import numpy as np
-import pytest
-import warp as wp
-import yaml
-from assessment_host import AssessmentHost
-from i4h_isaaclab.composition import build_procedure, load_case, read_case
-
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 
+
+import numpy as np
+
+
+import pytest
+
+
+import warp as wp
+
+
+import yaml
+
+
+from assessment_host import AssessmentHost
+
+
+from i4h_host.composition import build_procedure, load_case, read_case
 
 
 def rod_task(device="cpu", graph=False):
@@ -149,26 +158,6 @@ def test_exit_attached_invalid_timeout():
     assert np.all(sim.procedure.rows.numpy()[:, 11] == 2)
 
 
-def test_threaded_snapshot_matches_assessment():
-    from i4h_standalone.app.worker import PhysicsWorker
-    from i4h_standalone.render.snapshots import Snapshots
-
-    sim, _ = rod_task("cuda:0", True)
-    sim.prepare()
-    ring = Snapshots(sim, procedure=sim.procedure)
-    worker = PhysicsWorker(sim.simulation, [], ring, steps=35, procedure=sim.procedure)
-    worker.start()
-    worker.join(10)
-    assert not worker.is_alive()
-    worker.check()
-    wp.synchronize_device(sim.scene.device)
-    snap = ring.acquire()
-    np.testing.assert_array_equal(snap.task_host, sim.procedure.rows.numpy())
-    np.testing.assert_array_equal(snap.q.numpy(), sim.scene.q.numpy())
-    assert snap.t == pytest.approx(35 * sim.dt)
-    assert np.all(snap.task_host[:, 11] == 1)
-
-
 @pytest.mark.parametrize("case", ["aorta_static", "aorta_shell"])
 @pytest.mark.skipif(not os.environ.get("I4H_DATA"), reason="external case requires I4H_DATA")
 def test_reference_physics_matches_original(case):
@@ -280,18 +269,3 @@ def test_surface_barycentric_wrong_tool_part_and_dead_tet():
     live.fill_(1)
     held.zero_()
     assert evaluate() == 0
-
-
-def test_cli_reference_and_disable_procedure(tmp_path, capsys):
-    from i4h_standalone.app import cli
-
-    _, cfg = rod_task()
-    procedure = cfg.pop("procedure")
-    (tmp_path / "physics.yaml").write_text(yaml.safe_dump(cfg))
-    path = tmp_path / "task.yaml"
-    path.write_text(yaml.safe_dump({"case": "physics.yaml", "procedure": procedure}))
-    args = [str(path), "--device", "cpu", "--steps", "1", "--input", "noop", "--render", "noop"]
-    assert cli.main(args) == 0
-    assert '"result": "running"' in capsys.readouterr().out
-    assert cli.main(args + ["--no-procedure"]) == 0
-    assert '"result"' not in capsys.readouterr().out

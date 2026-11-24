@@ -10,7 +10,7 @@ import argparse
 
 import numpy as np
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import build_procedure, load_case, read_case
+from i4h_host.composition import build_procedure, load_case, read_case
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.volumetric_grasp import VolumetricGrasp
 

@@ -183,6 +183,10 @@ def test_configuration_preserves_host_settings():
     # Even unsupported settings must reach the adapter's explicit validation.
     cfg.sim.physics.collision_cfg = {"unsupported": True}
     previous = cfg.sim.physics
+    with pytest.raises(ValueError, match="collision_cfg"):
+        component.configure(cfg.sim)
+    assert cfg.sim.physics is previous
+    cfg.sim.physics.collision_cfg = None
     component.configure(cfg.sim)
     for field in fields(previous):
         if field.name not in ("class_type", "solver_cfg", "num_substeps"):

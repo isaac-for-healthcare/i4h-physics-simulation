@@ -25,7 +25,7 @@ def main():
     dest = target / 'lib/python3.12/site-packages'
     subprocess.run(['cp', '-a', '--reflink=auto', str(site) + '/.', str(dest)], check=True)
     paths = [newton, *(root / name / 'src' for name in
-             ('physics', 'surgical', 'endoluminal', 'isaaclab', 'assessment', 'standalone')),
+             ('physics', 'surgical', 'endoluminal', 'isaaclab', 'assessment', 'host')),
              *sorted(p for p in (lab / 'source').iterdir() if p.is_dir())]
     # Keep third-party editable hooks, including any locally patched binary package.
     # Explicit source overlays must take precedence over copied seed paths.

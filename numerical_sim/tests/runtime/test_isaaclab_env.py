@@ -6,27 +6,58 @@
 process at a time: the fixture closes the previous env and clears Isaac Lab's simulation context. Every test runs on
 the sole Newton host path, on either qualified Lab release."""
 
+
 import json
 
+
 import numpy as np
+
+
 import pytest
+
+
 import warp as wp
+
+
 import yaml
+
+
 from helpers import lab_runtime, needs_external_data
 
+
 torch = pytest.importorskip("torch")
+
+
 pytest.importorskip("isaaclab.envs")
+
+
 gym = pytest.importorskip("gymnasium")
 
-import i4h_isaaclab.tasks  # noqa: E402, F401  registers the ids
+
 from helpers import find, needs_chole, needs_vessels  # noqa: E402
-from i4h_isaaclab.composition import read_case  # noqa: E402
+
+
+from i4h_host.composition import read_case  # noqa: E402
+
+
 from i4h_isaaclab.env import I4hEnv, I4hEnvCfg  # noqa: E402
+
+
 from i4h_physics.systems.mechanics.particles import Particles  # noqa: E402
+
+
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl  # noqa: E402
+
+
 from isaaclab.managers import EventTermCfg  # noqa: E402
+
+
 from isaaclab.scene import InteractiveSceneCfg  # noqa: E402
+
+
 from isaaclab.sim import SimulationContext  # noqa: E402
+
+
 from isaaclab.utils.configclass import configclass  # noqa: E402
 
 
@@ -672,8 +703,9 @@ def test_close_and_reopen(make_env, backend):
 @pytest.mark.parametrize("case", ["two_worlds", pytest.param("aorta_static", marks=needs_vessels)])
 def test_standalone_matches_host(make_env, case, tmp_path):
     """The standalone Stepper and host adapter run identical core actions and ordering."""
-    from i4h_isaaclab.composition import load_case
-    from i4h_isaaclab.views import controls, observation, observation_views, state_views
+    from i4h_host.composition import load_case
+    from i4h_host.controls import controls
+    from i4h_isaaclab.views import observation, observation_views, state_views
 
     env = make_env(case=case, stagger_episodes=False)
     u = env.unwrapped
@@ -1039,56 +1071,6 @@ def test_effective_timeout_source_is_exported(make_env, deadline, source):
         pytest.fail("the effective deadline never terminated the episode")
 
 
-def test_adapter_without_assessment_or_standalone():
-    """The Isaac Lab adapter without the [apps] extra or i4h-standalone: its modules import, physics cases build and
-    step on both backends, and a procedure case asks for the extra."""
-    import os
-    import subprocess
-    import sys
-    import textwrap
-
-    from helpers import VESSELS
-
-    vessels = bool(os.environ.get("I4H_DATA")) or (VESSELS / "AortaWithVesselsStatic.usdc").is_file()  # as needs_vessels
-
-    script = textwrap.dedent(f"""
-        import importlib, sys
-        class Block:
-            def find_spec(self, fullname, path=None, target=None):
-                if fullname.split(".")[0] in ("i4h_assessment", "i4h_standalone"):
-                    raise ModuleNotFoundError(fullname, name=fullname)
-        sys.meta_path.insert(0, Block())
-        import torch
-        for name in ("newton_manager", "views", "env", "tasks", "recording", "composition", "lab"):
-            importlib.import_module("i4h_isaaclab." + name)
-        from i4h_isaaclab.env import I4hEnv, I4hEnvCfg
-        from isaaclab.scene import InteractiveSceneCfg
-        from isaaclab.sim import SimulationContext
-        cases = ["two_worlds"] + (["aorta_static"] if {vessels!r} else [])
-        for case in cases:
-            for backend in ("newton",):
-                cfg = I4hEnvCfg(case=case, backend=backend, stagger_episodes=False)
-                cfg.scene = InteractiveSceneCfg(num_envs=2, env_spacing=1.0)
-                env = I4hEnv(cfg)
-                env.reset()
-                for _ in range(3):
-                    obs, *_ = env.step(torch.zeros((2, env.low.numel()), device=env.device))
-                assert env.procedure is None and torch.isfinite(obs["policy"]).all()
-                env.close()
-                SimulationContext.clear_instance()
-        try:
-            I4hEnv(I4hEnvCfg(case="chole_grasp"))
-        except ModuleNotFoundError as error:
-            assert error.name == "i4h_assessment" and "[apps]" in str(error), error
-        else:
-            raise AssertionError("a procedure case built without i4h-assessment")
-        print("adapter ok", cases)
-    """)
-    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
-    assert out.returncode == 0 and "adapter ok" in out.stdout, out.stderr[-3000:]
-
-
-
 @pytest.mark.parametrize("backend", ["newton"])
 def test_host_particles_share_the_model(make_env):
     """F1: a host hook adds its own particles to every world before ours: our rows are found among them, the env's
@@ -1213,7 +1195,6 @@ def test_mounted_probe_two_way_under_lab(make_env):
     assert np.isfinite(body_two).all()
 
 
-
 @pytest.mark.parametrize("backend", ["newton"])
 def test_physics_reset_clears_the_selected_worlds_pending_reactions(make_env):
     """A masked physics reset (the captured reset graph) clears the reset worlds' queued two_way reactions, so a new
@@ -1288,11 +1269,11 @@ def test_mount_owned_host_rebuild_commands_and_close(make_env):
 @pytest.mark.parametrize("backend", ["newton"])
 def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
     """A host resets or randomizes its holder (joint state) before the component's reset: the reset instrument
-    starts at the holder's new pose (forward kinematics and the mount read in the reset itself, captured too); a
+    starts at the holder's new pose (forward kinematics and the mount read by the hosted reset); a
     world that is not reset keeps its instrument."""
     pytest.importorskip("mujoco_warp")
     from isaaclab_newton.cloner import newton_builder_world_hook
-    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+    from isaaclab_newton.physics import MJWarpSolverCfg
 
     with newton_builder_world_hook(probe_holder):
         env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg(), mounts={"probe": {"body": "holder"}})
@@ -1300,11 +1281,11 @@ def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
     for _ in range(10):
         env.step(torch.zeros((2, 10), device=env.device))
     sim = env.unwrapped.simulator
-    assert sim.reset_graph is not None
+    assert sim.prepared and env.unwrapped.sim.backend_manager.backend.graphs
     ic = next(s for s in sim.systems if type(s).__name__ == "InstrumentControl")
     torch.cuda.synchronize()
     before = ic.root.numpy()[:, 0].copy()
-    state = NewtonManager.get_state_0()
+    state = sim.state
     q = state.joint_q.numpy()
     q[0] = q[0] - 0.04  # the host lowers world 0's holder on its slide (joint coordinates)
     state.joint_q.assign(q)
@@ -1313,3 +1294,53 @@ def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
     after = ic.root.numpy()[:, 0]
     np.testing.assert_allclose(after[0, 2], before[0, 2] - 0.04, atol=1e-4)  # the reset world reads the new pose
     np.testing.assert_array_equal(after[1], before[1])  # the other world keeps its instrument
+
+
+def test_adapter_without_assessment_or_standalone():
+    """The Isaac Lab adapter without the [apps] extra or i4h-standalone: its modules import, physics cases build and
+    step on both backends, and a procedure case asks for the extra."""
+    import os
+    import subprocess
+    import sys
+    import textwrap
+
+    from helpers import VESSELS
+
+    vessels = bool(os.environ.get("I4H_DATA")) or (VESSELS / "AortaWithVesselsStatic.usdc").is_file()  # as needs_vessels
+
+    script = textwrap.dedent(f"""
+        import importlib, sys
+        class Block:
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname.split(".")[0] in ("i4h_assessment", "i4h_standalone", "i4h_isaaclab_standalone"):
+                    raise ModuleNotFoundError(fullname, name=fullname)
+        sys.meta_path.insert(0, Block())
+        import torch
+        for name in ("newton_manager", "views", "env", "tasks", "recording", "lab"):
+            importlib.import_module("i4h_isaaclab." + name)
+        importlib.import_module("i4h_host.composition")
+        from i4h_isaaclab.env import I4hEnv, I4hEnvCfg
+        from isaaclab.scene import InteractiveSceneCfg
+        from isaaclab.sim import SimulationContext
+        cases = ["two_worlds"] + (["aorta_static"] if {vessels!r} else [])
+        for case in cases:
+            for backend in ("newton",):
+                cfg = I4hEnvCfg(case=case, backend=backend, stagger_episodes=False)
+                cfg.scene = InteractiveSceneCfg(num_envs=2, env_spacing=1.0)
+                env = I4hEnv(cfg)
+                env.reset()
+                for _ in range(3):
+                    obs, *_ = env.step(torch.zeros((2, env.low.numel()), device=env.device))
+                assert env.procedure is None and torch.isfinite(obs["policy"]).all()
+                env.close()
+                SimulationContext.clear_instance()
+        try:
+            I4hEnv(I4hEnvCfg(case="chole_grasp"))
+        except ModuleNotFoundError as error:
+            assert error.name == "i4h_assessment" and "i4h-host[assessment]" in str(error), error
+        else:
+            raise AssertionError("a procedure case built without i4h-assessment")
+        print("adapter ok", cases)
+    """)
+    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert out.returncode == 0 and "adapter ok" in out.stdout, out.stderr[-3000:]

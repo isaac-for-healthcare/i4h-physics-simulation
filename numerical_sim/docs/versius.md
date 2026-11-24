@@ -1,3 +1,5 @@
+> Viewer and teleoperation commands require the separate `i4h-isaaclab-standalone` bridge. Headless training/evaluation remains available through upstream `scripts/isaaclab_run.py`.
+
 # Versius surgical tasks
 
 Versius uses canonical surgical cases, a native Isaac Lab articulation and the
@@ -41,19 +43,19 @@ control decimation 2, five rigid substeps, and four/eight tissue substeps for
 block/chole. `--num_envs` selects replicated worlds.
 
 ```bash
-$PY scripts/isaaclab_run.py --task I4h-Versius-Poke-Block-v0 \
+i4h-lab-run --task I4h-Versius-Poke-Block-v0 \
   --validation scripted --episodes 10 --num_envs 2 --output OUTPUT
-$PY scripts/isaaclab_run.py --task I4h-Versius-Poke-Block-v0 \
+i4h-lab-run --task I4h-Versius-Poke-Block-v0 \
   --train 5 --num_envs 2 --log_dir OUTPUT
-$PY scripts/isaaclab_run.py --task I4h-Versius-Poke-Block-v0 \
+i4h-lab-run --task I4h-Versius-Poke-Block-v0 \
   --policy checkpoint:OUTPUT/i4h_solver_versius_block_24obs.pt --steps 200
-$PY scripts/isaaclab_run.py --task I4h-Versius-Poke-Chole-1x-v0 \
+i4h-lab-run --task I4h-Versius-Poke-Chole-1x-v0 \
   --validation scripted --episodes 10 --output LIFE_SIZE_OUTPUT
-$PY scripts/isaaclab_teleop.py --task I4h-Versius-Poke-Chole-1x-v0 \
+i4h-lab-teleop --task I4h-Versius-Poke-Chole-1x-v0 \
   --input follou --render gl --steps 0
-$PY scripts/isaaclab_teleop.py --task I4h-Versius-Poke-Block-v0 \
+i4h-lab-teleop --task I4h-Versius-Poke-Block-v0 \
   --input replay --replay examples/versius/replay.json --render none --steps 190
-$PY scripts/isaaclab_teleop.py --task I4h-Versius-Poke-Block-v0 \
+i4h-lab-teleop --task I4h-Versius-Poke-Block-v0 \
   --input keyboard --render gl --steps 0 --record OUTPUT/teleop.mp4
 ```
 
@@ -103,7 +105,7 @@ SDK temporarily without changing the environment:
 ```bash
 FOLLOU_LIB_PATH=/path/to/native/library \
 uv run --no-project --python "$PY" --with /path/to/follou-sdk \
-  python scripts/isaaclab_teleop.py --task I4h-Versius-Poke-Chole-1x-v0 \
+  python i4h-lab-teleop --task I4h-Versius-Poke-Chole-1x-v0 \
   --input follou --render gl --steps 0
 ```
 

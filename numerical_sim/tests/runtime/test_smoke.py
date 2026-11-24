@@ -5,7 +5,7 @@
 
 import numpy as np
 from helpers import find, push_actions, run
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
 from i4h_surgical.systems.fluids.smoke import Smoke
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl

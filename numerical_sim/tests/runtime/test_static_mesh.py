@@ -8,7 +8,7 @@ import shutil
 
 import numpy as np
 import pytest
-from i4h_isaaclab.composition import data_dir
+from i4h_host.composition import data_dir
 from i4h_physics import Scene
 from i4h_physics.loaders import add_static_mesh
 from i4h_physics.loaders.static_mesh import smooth_tangents, weld_map

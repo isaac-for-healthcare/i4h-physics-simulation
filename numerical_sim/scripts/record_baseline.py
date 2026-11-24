@@ -232,7 +232,7 @@ def source_identity():
     if root != expected:
         raise RuntimeError(f"wrong implementation imported: {root}; expected {expected}")
     files = {}
-    for member in ("physics", "isaaclab", "standalone", "endoluminal", "surgical", "assessment"):
+    for member in ("physics", "isaaclab", "host", "endoluminal", "surgical", "assessment"):
         for path in sorted((workspace / member / "src").rglob("*")):
             if path.suffix in (".py", ".yaml", ".slang"):
                 files[str(path.relative_to(workspace))] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -249,7 +249,7 @@ def digest(array):
 
 
 def run_case(name: str, envs: int, steps: int, device: str) -> dict[str, np.ndarray]:
-    from i4h_isaaclab.composition import load_case, read_case
+    from i4h_host.composition import load_case, read_case
 
     sim = load_case(read_case(name), device=device, envs=envs)
     ctrl, mid, half = controls_and_bounds(sim)

@@ -8,7 +8,7 @@ import os
 import numpy as np
 import pytest
 import warp as wp
-from i4h_isaaclab.composition import data_dir
+from i4h_host.composition import data_dir
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_static_mesh, add_tet_grid
 from i4h_physics.systems.contact.static_contact import StaticContact

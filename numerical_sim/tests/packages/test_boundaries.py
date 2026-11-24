@@ -111,7 +111,7 @@ def violations(source: str, forbidden: tuple, guarded: tuple = ()) -> list[str]:
 @pytest.mark.parametrize("member,forbidden,guarded", [
     ("surgical", ("i4h_endoluminal", "i4h_isaaclab", "i4h_standalone"), ()),
     ("endoluminal", ("i4h_surgical", "i4h_isaaclab", "i4h_standalone"), ()),
-    ("isaaclab", ("i4h_standalone",), DOMAINS),
+    ("isaaclab", ("i4h_standalone", "i4h_isaaclab_standalone"), DOMAINS),
 ])
 def test_domain_and_camera_lazy_import_boundaries(member, forbidden, guarded):
     for path in (WORKSPACE / member / "src").rglob("*.py"):
@@ -120,8 +120,8 @@ def test_domain_and_camera_lazy_import_boundaries(member, forbidden, guarded):
 
 
 @pytest.mark.parametrize("source,count", [
-    ("import i4h_standalone.devices", 1),
-    ("class_type = 'i4h_standalone.devices:I4hTeleopDevice'", 1),
+    ("import i4h_isaaclab_standalone.devices", 1),
+    ("class_type = 'i4h_isaaclab_standalone.devices:I4hTeleopDevice'", 1),
     ("m = __import__('i4h_standalone.app')", 2),  # the call and its module-path string
     ("import importlib\nm = importlib.import_module('i4h_standalone')", 2),
     ("from i4h_surgical.systems import X", 1),  # module level, unguarded
@@ -132,7 +132,7 @@ def test_domain_and_camera_lazy_import_boundaries(member, forbidden, guarded):
     ("if error.name != 'i4h_surgical':\n    raise", 0),
 ])
 def test_boundary_rules_catch_planted_violations(source, count):
-    found = violations(source, ("i4h_standalone",), DOMAINS)
+    found = violations(source, ("i4h_standalone", "i4h_isaaclab_standalone"), DOMAINS)
     assert len(found) == count, found
 
 
@@ -142,10 +142,10 @@ def test_isaaclab_root_and_lab_pin_import_without_isaac_lab_or_standalone():
 import importlib, sys
 class Block:
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.split(".")[0] in ("isaaclab", "isaaclab_newton", "isaaclab_tasks", "isaaclab_rl", "i4h_standalone"):
+        if fullname.split(".")[0] in ("isaaclab", "isaaclab_newton", "isaaclab_tasks", "isaaclab_rl", "i4h_standalone", "i4h_isaaclab_standalone"):
             raise ModuleNotFoundError(fullname, name=fullname)
 sys.meta_path.insert(0, Block())
-for name in ("i4h_isaaclab", "i4h_isaaclab.lab"):
+for name in ("i4h_isaaclab", "i4h_isaaclab.lab", "i4h_isaaclab.views", "i4h_isaaclab.camera.tiled", "i4h_isaaclab.run", "i4h_isaaclab.versius.status"):
     importlib.import_module(name)
 try:
     importlib.import_module("i4h_isaaclab.env")

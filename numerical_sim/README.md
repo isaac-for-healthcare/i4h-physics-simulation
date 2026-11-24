@@ -9,24 +9,19 @@ Six distributions share the Warp/Newton mechanics and one numerical workspace lo
 | i4h-surgical | i4h_surgical | Instruments, appearance, surgical systems, grasp measurements |
 | i4h-assessment | i4h_assessment | Shared executor, history, evidence consumption, reward products |
 | i4h-isaaclab | i4h_isaaclab | Isaac Lab hosts, gym tasks, tiled camera |
-| i4h-standalone | i4h_standalone | i4h-sim app, Slang/GL, recording, XR, devices, panel adapters |
+| i4h-host | i4h_host | Case composition, procedures, camera geometry, appearance, controls |
 
-From the repository root:
+For the standalone viewer, device backends, capture and XR, use the separate
+[i4h-standalone-simulator repository](https://github.com/isaac-for-healthcare/i4h-standalone-simulator).
+The optional `i4h-isaaclab-standalone` bridge supplies `i4h-lab-run` and `i4h-lab-teleop`.
+The numerical repository retains headless Lab training/evaluation and all task measurements.
 
 ```bash
 cd numerical_sim
-uv sync --locked --extra render --extra gl --group dev
-uv run i4h-sim chole_tet_med --data ./data
-uv run --extra render i4h-sim chole_tet_med_1x_deformation --data ./data --render slang --input keyboard
-uv run i4h-sim two_worlds --data ./data --render noop --steps 200
-I4H_DATA="$PWD/data" uv run pytest tests/runtime -q
+uv sync --locked --group dev
+I4H_DATA="$PWD/data" uv run pytest tests/runtime tests/packages -q
+uv run python examples/core_synthetic.py --device cpu
 ```
-
-The window uses Tab to select a tool, IJKL/UO to move it, Space to grip, Shift for energy, F to fire, P to pause, N to step, Backspace to reset and F1 for panels. XR uses `--extra xr` instead of `--extra render`; these extras are mutually exclusive. Device and haptic support is optional and physical devices require separate qualification.
-
-`chole_tet_med_1x_deformation` copies the Versius `chole-1x` anatomy at 1/7 of the original chole scale, with the same materials, supports and cavity contact. It runs standalone with a grasper for contact and grasping; it has no robot arm, fluids, bleeding, thermal effects, smoke, cutting or topology deletion. The mechanics at this scale remain uncalibrated.
-
-`chole_*` cases use da Vinci Si instruments; `chole_grasp` inherits them from `chole_tet_med`. The supplied set has no suction equivalent, so the existing suction instrument remains. See `data/README.md` for model IDs and provenance.
 
 Production assets are included in `data/` and licensed under Apache-2.0, except for the MIT-licensed dVRK instruments; `docs/asset-manifest.json` records each file's SHA-256, size and license. See `data/README.md`. They are excluded from wheels and source distributions. `scripts/fetch_assets.py --source PATH_OR_URL` can copy a matching asset tree into `data/` (or `$I4H_DATA`) and verifies every file. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; installed packages do not search for a checkout or download assets. Headless runs do not load unused textures.
 
@@ -49,16 +44,9 @@ There is no `i4h_sim` compatibility package. Assessment is constructed and advan
 Build members with `uv build --all-packages`. Use Python `>=3.12,<3.13`; development
 continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton at revision `7f0c13af` (1.9.0.dev0, pinned in `physics/pyproject.toml`); coupling uses MuJoCo and MuJoCo-Warp 3.17.0.
 
-Camera observations are owned by Isaac Lab and do not require standalone. Teleoperation
-adapters now import from `i4h_standalone.devices` and `i4h_standalone.teleop`.
-Follou support requires the separately installed `follou-sdk` Python wrappers and
-`FOLLOU_LIB_PATH` pointing to the vendor native library file. Local development uses
-`uv run --with /path/to/follou-sdk i4h-sim CASE --input devices --data /path/to/data`.
-Fake devices, keyboard and headless runs remain independent of the SDK.
-
-Missing textures raise an explicit asset error when rendering consumes them. Physical
-surfaces without appearance metadata render with host defaults. Haptic force sliders
-can only reduce and restore each device's configured pose and handle ceilings.
+Camera observations are owned by Isaac Lab and require neither standalone nor the bridge.
+Shared helpers live in `i4h_host`; neither host depends on the other. See
+[split migration](docs/standalone-split.md) for moved Python symbols and launchers.
 
 See [architecture](docs/package-migration.md), [contribution](CONTRIBUTING.md)
 and [license notices](../NOTICE).

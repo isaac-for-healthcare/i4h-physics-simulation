@@ -17,7 +17,7 @@ This repository holds numerical simulators under [`numerical_sim/`](./numerical_
 | i4h-endoluminal | `i4h_endoluminal` | Vessel anatomy, catheter control and binding, reach measurements |
 | i4h-assessment | `i4h_assessment` | Shared executor, history and reward products |
 | i4h-isaaclab | `i4h_isaaclab` | Isaac Lab hosts, gym tasks and tiled cameras |
-| i4h-standalone | `i4h_standalone` | The `i4h-sim` app: rendering, recording, XR, devices and panels |
+| i4h-host | `i4h_host` | Host-neutral case composition, procedures, cameras, appearance and controls |
 
 Available in-tree today:
 
@@ -27,7 +27,7 @@ Available in-tree today:
 - YAML-authored cases: cholecystectomy (`chole_tet_med`, `chole_grasp`), `liver`, `tissue_contact` and the two-world demo `two_worlds`
 - Endoluminal catheter cases in an aorta (`aorta_static`, `aorta_shell`, `aorta_centreline` and their `_reach` variants), with an endoscope view from the catheter tip
 - Isaac Lab tasks `I4h-TwoWorlds-Direct`, `I4h-Aorta-Direct`, `I4h-ReachTarget-Direct`, `I4h-GraspTarget-Direct` and `I4h-Chole-Direct`
-- Render backends `noop` (headless), `slang`, `gl` and `xr` (Meta Quest 3 through CloudXR; see the [XR guide](./numerical_sim/docs/xr.md))
+- In the [standalone repository](https://github.com/isaac-for-healthcare/i4h-standalone-simulator): render backends `noop` (headless), `slang`, `gl` and `xr` (Meta Quest 3 through CloudXR; see the [XR guide](https://github.com/isaac-for-healthcare/i4h-standalone-simulator/blob/main/docs/xr.md))
 - Optional haptic devices (MiniMou, and Follou through its separately installed SDK), and controller vibration in XR
 
 Not available yet:
@@ -35,12 +35,12 @@ Not available yet:
 - Bronchoscope and other non-catheter endoluminal devices
 - Airway and colon cases
 
-Production assets (meshes, textures, centrelines and USD) are included under `numerical_sim/data/` and licensed under Apache-2.0. `scripts/fetch_assets.py` can also install them from a copy you supply and checks each file against [`docs/asset-manifest.json`](./numerical_sim/docs/asset-manifest.json); see [numerical_sim/data/README.md](./numerical_sim/data/README.md).
+Production assets (meshes, textures, centrelines and USD) are included under `numerical_sim/data/` and licensed under Apache-2.0, except MIT-licensed dVRK instruments. `scripts/fetch_assets.py` can also install them from a copy you supply and checks each file against [`docs/asset-manifest.json`](./numerical_sim/docs/asset-manifest.json); see [numerical_sim/data/README.md](./numerical_sim/data/README.md).
 
 ```bash
 cd numerical_sim
-uv sync --locked --extra render --extra gl --group dev
-uv run i4h-sim chole_tet_med --data ./data
+uv sync --locked --group dev
+uv run python examples/core_synthetic.py --device cpu
 ```
 
 To embed i4h physics in an Isaac Lab scene, see the [component contracts](./numerical_sim/docs/component-contracts.md) and the [Isaac Lab compatibility notes](./numerical_sim/isaaclab/README.md#isaac-lab-compatibility).
@@ -87,8 +87,8 @@ Full setup, configs, and system requirements: [Cosmos-H-Dreams README](https://g
 ## Repository Layout
 
 ```text
-numerical_sim/            # Six Warp / Newton packages and the i4h-sim app
-├── physics/  surgical/  endoluminal/  assessment/  isaaclab/  standalone/
+numerical_sim/            # Six Warp / Newton numerical and host packages
+├── physics/  surgical/  endoluminal/  assessment/  isaaclab/  host/
 ├── docs/                 # Architecture, component contracts, XR, performance, examples
 ├── examples/  scripts/  tests/
 └── data/                 # Apache-2.0 production assets

@@ -22,7 +22,7 @@ class Profile:
 
 
 def profile(name):
-    from i4h_isaaclab.composition import load_scene, read_case
+    from i4h_host.composition import load_scene, read_case
 
     if name not in ("block", "chole", "chole-1x"):
         raise ValueError(name)

@@ -4,21 +4,51 @@
 """M5 checks: the rod loader, the cantilever in two_worlds, catheter controls on a free rod, and the aorta
 case (insertion per env, containment, isolation, masked reset, graph replay, both backends, Isaac Lab views)."""
 
+
 import numpy as np
+
+
 import pytest
+
+
 import warp as wp
+
+
 from conftest import env_slice
+
+
 from helpers import find, free_rod, needs_vessels, run_rates, signed_phi
+
+
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import load_case, read_case
+
+
+from i4h_host.composition import load_case, read_case
+
+
 from i4h_physics import Scene, Stepper
+
+
 from i4h_physics.loaders import add_rod
+
+
 from i4h_physics.mesh_utils import boundary_loops, cap_loop, classify_boundary, open_end_caps
+
+
 from i4h_physics.scene import StaticMesh
+
+
 from i4h_physics.systems.contact.rod_containment import RodContainment
+
+
 from i4h_physics.systems.mechanics.particles import Particles
+
+
 from i4h_physics.systems.rods.rod_direct import RodDirect
+
+
 from i4h_physics.systems.rods.rod_pbd import RodPbd
+
 
 ROD = (RodDirect, RodPbd)
 
@@ -56,9 +86,6 @@ def roll_about_z(f0, f):
     return 2.0 * np.arctan2(rel[2], rel[3])
 
 
-# loader ---------------------------------------------------------------------------------------------------
-
-
 def test_rod_loader():
     scene = Scene("cuda:0", 2, (0.0, 0.0, 0.0))
     body = add_rod(scene, "rod", [0.1, 0.2, 0.3], [0.0, 0.0, 2.0], 9, 0.02, 0.004, mass=0.01)
@@ -80,9 +107,6 @@ def test_rod_loader():
         add_rod(scene, "short", [0, 0, 0], [1, 0, 0], 2, 0.02, 0.004)
     with pytest.raises(ValueError, match="non-zero"):
         add_rod(scene, "flat", [0, 0, 0], [0, 0, 0], 5, 0.02, 0.004)
-
-
-# open ends of a static mesh ---------------------------------------------------------------------------------
 
 
 def tube(x0, x1, ring=16, rings=6, radius=0.1, phase=0.0, section=None):
@@ -247,9 +271,6 @@ def test_rod_containment_keeps_the_entry_of_a_rod_resting_outside(keep_open):
         RodContainment(scene, body="rod", mesh="tube", search=0.09, keep_open=[[1.0, 0.0, 0.0]])
 
 
-# two_worlds cantilever ------------------------------------------------------------------------------------
-
-
 def gravity_rod(backend, **stiffness):
     """A 9-node cantilever under gravity, root locked, on either backend (two_worlds runs the PBD one)."""
     scene = Scene("cuda:0", 2, (0.0, 0.0, -9.81))
@@ -261,8 +282,6 @@ def gravity_rod(backend, **stiffness):
     return Stepper.create(scene, [Particles(scene, max_velocity=5.0), rod], dt=1 / 60, substeps=4, iterations=8), rod
 
 
-# omniendo's unit rotational inertia makes the direct rod nearly rigid under its own 10 g weight (4 um of
-# droop at young 1e6), so the gravity check uses a soft modulus there; the PBD multipliers droop as shipped.
 @pytest.mark.parametrize("backend, stiffness, softer", [(RodDirect, {"young": 1.0e3}, {"young": 1.0e2}), (RodPbd, {}, {"bend": 0.05})])
 def test_cantilever_droops(backend, stiffness, softer):
     sim, rod = gravity_rod(backend, **stiffness)
@@ -299,9 +318,6 @@ def test_cantilever_masked_reset(case):
     assert np.array_equal(env_slice(scene, scene.q, body, 1), env_slice(scene, scene.q0, body, 1))
     assert np.array_equal(frames[1], body.rod.frames[0, :frames.shape[1]])
     assert not rod.omega.numpy().reshape(scene.envs, -1, 3)[1].any()
-
-
-# controls on a free rod (no vessel) -------------------------------------------------------------------------
 
 
 def test_insertion_follows_the_target():
@@ -415,26 +431,6 @@ def test_inactive_node_splits_the_rod(backend):
     assert q1[-1, 0] > env_slice(scene, scene.q0, body, 1)[-1, 0] + 0.1, "env 1 (all live) did not move as a whole"
 
 
-@pytest.mark.parametrize("backend", [RodDirect, RodPbd])
-def test_rod_tube_rings_follow_the_nodes(backend):
-    from i4h_standalone.render.rods import RodDraw
-    from i4h_standalone.render.snapshots import Snapshot
-
-    sim, rod, ctl = free_rod(backend=backend)
-    run_rates(sim, 30, np.float32([[1.0, 0.5, 0.5], [0.0, 0.0, 0.0]]))
-    scene, body = sim.scene, rod.body
-    draw = RodDraw(body, rod, resolution=8)
-    pos = wp.zeros(draw.count, dtype=wp.vec3, device=scene.device)
-    normals = wp.zeros(draw.count, dtype=wp.vec3, device=scene.device)
-    draw.place(Snapshot(sim), 0, pos, normals, scene.device)
-    ring = pos.numpy().reshape(body.count, 8, 3)
-    q = env_slice(scene, scene.q, body, 0)
-    assert np.allclose(ring.mean(axis=1), q, atol=1e-5)  # each ring is centred on its node (PBD: the last node reuses the last segment frame)
-    assert np.allclose(np.linalg.norm(ring - q[:, None], axis=2), draw.radius, atol=1e-5)
-    assert np.allclose(np.linalg.norm(normals.numpy(), axis=1), 1.0, atol=1e-5)
-    assert draw.indices.size == (body.count - 1) * 8 * 6 and draw.indices.max() == draw.count - 1
-
-
 def test_structural_and_live_settings():
     sim, rod, ctl = free_rod()
     sim.step()
@@ -463,9 +459,6 @@ def test_structural_and_live_settings():
         free_rod(tip_edges=40)
     with pytest.raises(TypeError):
         CatheterControl(sim.scene, rod=find(sim, Particles), track_length=1.0)
-
-
-# aorta ------------------------------------------------------------------------------------------------------
 
 
 @needs_vessels

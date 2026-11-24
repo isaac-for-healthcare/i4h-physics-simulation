@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 
 SEG, R, N = 0.4 / 120, 5.0e-4, 121
 MASS = 7800.0 * math.pi * R * R * SEG  # the workflow's 0.5 mm steel-like wire, 2e-5 kg per node
@@ -125,7 +125,6 @@ def test_parity_tube_bend_keeps_ours_in_the_lumen():
     gap = np.linalg.norm(q[:, None] - (lumen[None, :-1] + t[..., None] * seg[None]), axis=-1).min(axis=1)
     assert gap.max() <= parity.TUBE_RADIUS - rod.radius + 2e-4, gap.max()
     assert q[-1, 1] > 0.05, "the tip turned into the +y leg"
-
 
 
 def test_physical_inertia_follows_each_envs_mass():

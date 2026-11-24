@@ -48,7 +48,7 @@ import math
 import newton
 import numpy as np
 import warp as wp
-from i4h_isaaclab.appearance import appearance
+from i4h_host.appearance import appearance
 from i4h_physics.scene import ACTIVE
 from newton.sensors import SensorTiledCamera
 
@@ -59,8 +59,8 @@ except ModuleNotFoundError as error:
         raise
     InstrumentControl = ()
 from i4h_isaaclab.camera import FLUID_COLOR, PART_COLORS, ROD_COLOR
-from i4h_isaaclab.camera.camera import Camera
-from i4h_isaaclab.camera.rig import resolve_tip
+from i4h_host.camera.camera import Camera
+from i4h_host.camera.tip import resolve_tip
 from i4h_physics.loaders.static_mesh import smooth_normals
 from i4h_physics.quat import matrix_to_quat
 from i4h_physics.systems.mechanics.surface import Surface

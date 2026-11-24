@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import warp as wp
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import data_dir
+from i4h_host.composition import data_dir
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_rod
 from i4h_physics.scene import ACTIVE_INT
@@ -126,7 +126,7 @@ def haptic_case(tmp_path, envs=2, handle=False, **haptics):
     """A two_worlds copy whose probe is driven by a fake device pressing into the block, with a haptics: block; with ``handle``
     an instrument box (listed first) whose channel 0 the pad mounts."""
     import yaml
-    from i4h_isaaclab.composition import resolve_case
+    from i4h_host.composition import resolve_case
 
     cfg = yaml.safe_load(resolve_case("two_worlds").read_text())
     cfg["sim"]["envs"] = envs
@@ -149,7 +149,7 @@ def regional_case(tmp_path):
     """An aorta_centreline copy with regional catheter and vessel materials and a region workspace: the catheter uses
     the shared instrument regions, the vessel tree names branches 0-2 (the other branches stay unassigned)."""
     import yaml
-    from i4h_isaaclab.composition import resolve_case
+    from i4h_host.composition import resolve_case
 
     cfg = yaml.safe_load(resolve_case("aorta_centreline").read_text())
     sidecar = tmp_path / "aorta_regions.yaml"

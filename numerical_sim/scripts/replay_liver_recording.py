@@ -13,7 +13,7 @@ root = Path(__file__).resolve().parents[1]
 for package in (
     "physics",
     "surgical",
-    "standalone",
+    "host",
     "assessment",
     "isaaclab",
     "endoluminal",

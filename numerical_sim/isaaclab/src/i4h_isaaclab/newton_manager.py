@@ -8,7 +8,7 @@ from importlib.util import find_spec
 
 import numpy as np
 import warp as wp
-from i4h_isaaclab.composition import check_dt, maps, sim_settings
+from i4h_host.composition import check_dt, maps, sim_settings
 from i4h_physics import PhysicsBinding, author_case
 from i4h_physics.coupling import CoupledSolver, Mounts
 from isaaclab.utils import configclass

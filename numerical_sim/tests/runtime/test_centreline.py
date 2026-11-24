@@ -4,14 +4,25 @@
 """M9a part 2: centreline trees (JSON loader, welding and stitching, spline topology, tree frames and bend pairs, the
 Y junction on rod_pbd from omniendo tests/test_pbd_branching.py), then lumen containment and the aorta centreline case."""
 
-import contextlib
+
 import json
 
+
 import numpy as np
+
+
 import pytest
+
+
 import warp as wp
+
+
 import yaml
+
+
 from helpers import find, run_rates
+
+
 from i4h_endoluminal.loaders.centreline import (
     add_centreline_tree,
     build_tree,
@@ -20,11 +31,23 @@ from i4h_endoluminal.loaders.centreline import (
     spline_topology,
     tree_frames,
 )
+
+
 from i4h_endoluminal.rod_storage import declare_control_layout, declare_drag
+
+
 from i4h_physics import Scene, Stepper
+
+
 from i4h_physics.containment_storage import declare_graph_containment
+
+
 from i4h_physics.rod_storage import declare_rod_pbd
+
+
 from i4h_physics.systems.mechanics.particles import Particles
+
+
 from i4h_physics.systems.rods.rod_pbd import RodPbd
 
 
@@ -65,7 +88,6 @@ def test_json_weld_stitch_and_radii(tmp_path):
     assert body.tree.root_neighbor == 1 and body.tree.root_arc[0, 4] == pytest.approx(0.4, abs=1e-5)
 
 
-# omniendo tests/test_pbd_branching.py:24-49: three branches 120 degrees apart with a +z tilt from a shared junction.
 def build_y(per_branch=12, seg_len=0.05):
     dirs = []
     for k in range(3):
@@ -157,9 +179,9 @@ def test_y_masked_reset_and_isolation():
     assert np.array_equal(tree.frame.numpy().reshape(2, -1, 4)[1], body.tree.frames[0])
 
 
-# --- lumen containment (omniendo tests/test_xcath_centerline_collision.py:39-525, through a Scene) ------------------
-
 from i4h_physics.scene import ACTIVE_INT, Part, ParticleRest  # noqa: E402
+
+
 from i4h_physics.systems.contact.graph_containment import (  # noqa: E402
     GraphContainment,
     clamp_deltas,
@@ -274,6 +296,8 @@ def test_lumen_spline_taper_and_open_root():
 
 
 CHAIN4 = np.asarray(((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0), (3.0, 0.0, 0.0)), np.float32)
+
+
 EDGES4 = ((0, 1), (1, 2), (2, 3))
 
 
@@ -398,13 +422,20 @@ def test_lumen_open_root_requires_open_tree():
     assert lc.root == -1 and lc.samples == 1 and lc.S == 3
 
 
-# --- a real tree case: aorta_centreline ---------------------------------------------------------------------------
-
 from conftest import env_slice  # noqa: E402
+
+
 from helpers import needs_vessels  # noqa: E402
+
+
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl  # noqa: E402
-from i4h_isaaclab.composition import load_case  # noqa: E402
+
+
+from i4h_host.composition import load_case  # noqa: E402
+
+
 from i4h_physics.systems.rods.rod_direct import RodDirect  # noqa: E402
+
 
 TREE_RATES = np.float32([[1.0, 0.3, 0.2], [0.75, -0.2, 0.4]])  # insertion, rotation, tip bend per env
 
@@ -513,65 +544,6 @@ def test_tree_case_wall_returns_to_rest_after_retraction():
         assert (lc.contact_count.numpy() == 0).all() and (displacement() < 0.01).all(), (cycle, displacement())
 
 
-# --- skinning ------------------------------------------------------------------------------------------------------
-
-from i4h_endoluminal.loaders.centreline import bind_skin  # noqa: E402
-from i4h_physics.systems.rods.rod_pbd import qmul_np  # noqa: E402
-from i4h_standalone.render.skin import Skinner  # noqa: E402
-from i4h_standalone.render.snapshots import Snapshot  # noqa: E402
-
-
-def tube(rings=4, around=8, radius=0.1, length=1.0):
-    """A tube along +x: ``rings`` rings of ``around`` vertices, triangulated between rings."""
-    x = np.linspace(0.0, length, rings)
-    theta = np.linspace(0.0, 2 * np.pi, around, endpoint=False)
-    pts = np.asarray([[xi, radius * np.cos(t), radius * np.sin(t)] for xi in x for t in theta], np.float32)
-    tris = []
-    for r in range(rings - 1):
-        for k in range(around):
-            a, b = r * around + k, r * around + (k + 1) % around
-            tris += [(a, b, a + around), (b, b + around, a + around)]
-    return pts, np.asarray(tris, np.int32)
-
-
-def test_skin_rigid_motion():
-    pts, tris = tube()
-    pos = np.asarray([[0.0, 0.0, 0.0], [0.5, 0.0, 0.0], [1.0, 0.0, 0.0]], np.float32)
-    scene = Scene("cuda:0", 2, gravity=(0.0, 0.0, 0.0))
-    body = add_centreline_tree(scene, "v", pos, np.asarray([[0, 1], [1, 2]], np.int32), 0.1, root=0, pinned_nodes=[0], mass=1.0)
-    declare_rod_pbd(scene, "v")
-    scene.allocate()
-    body.skin = skin = bind_skin("v", pts, tris, body.tree, "cuda:0", {"color": [0.5, 0.5, 0.5]})
-    assert skin.adj_offsets[-1] == len(skin.adj_vertices) and (np.diff(skin.adj_offsets) >= 4).all()
-    assert (skin.bound_edge[:16] == 0).all() and (skin.bound_edge[16:] == 1).all()  # rings at x 0, 1/3 | 2/3, 1
-    rod = RodPbd(scene, body="v")
-    sim = Stepper.create(scene, [Particles(scene), rod], dt=1.0 / 60.0, substeps=1, iterations=1)
-    snap = Snapshot(sim)
-    sk = Skinner(body, rod, "cuda:0")
-    out = wp.zeros(sk.count, dtype=wp.vec3, device="cuda:0")
-    sk.place(snap, 1, out, "cuda:0")
-    np.testing.assert_allclose(out.numpy(), pts, atol=1e-5)  # the rest pose skins to itself
-    d = np.float32([0.2, -0.1, 0.3])
-    q = scene.view(scene.q, body).numpy()
-    q[1] += d
-    scene.view(scene.q, body).assign(q)
-    sk.place(snap, 1, out, "cuda:0")
-    np.testing.assert_allclose(out.numpy(), pts + d, atol=1e-5)
-    sk.place(snap, 0, out, "cuda:0")
-    np.testing.assert_allclose(out.numpy(), pts, atol=1e-5)  # env 0 untouched
-    # A rigid rotation of positions and frames rotates the surface.
-    axis, angle = np.float32([0.0, 0.0, 1.0]), 0.7
-    r = np.float32([*(axis * np.sin(angle / 2)), np.cos(angle / 2)])
-    R = np.asarray([[np.cos(angle), -np.sin(angle), 0.0], [np.sin(angle), np.cos(angle), 0.0], [0.0, 0.0, 1.0]], np.float32)
-    q[1] = pos @ R.T
-    scene.view(scene.q, body).assign(q)
-    frames = rod.frame.numpy().reshape(2, -1, 4)
-    frames[1] = np.asarray([qmul_np(r, f) for f in body.tree.frames[0]], np.float32)
-    rod.frame.assign(frames.reshape(-1, 4))
-    sk.place(snap, 1, out, "cuda:0")
-    np.testing.assert_allclose(out.numpy(), pts @ R.T, atol=1e-4)
-
-
 @needs_vessels
 def test_tree_case_skin_binds_every_vertex():
     sim = load_case("aorta_centreline", envs=1)
@@ -584,11 +556,7 @@ def test_tree_case_skin_binds_every_vertex():
     assert len(np.unique(skin.bound_edge)) > S // 2  # most segments drive some surface
 
 
-# --- dragging -------------------------------------------------------------------------------------------------------
-
 from i4h_endoluminal.systems.rods.drag import Drag, geodesic_weights  # noqa: E402
-from i4h_isaaclab.camera.camera import Camera  # noqa: E402
-from i4h_standalone.app.drag import DragDriver, pick_node, ray_plane  # noqa: E402
 
 
 def test_drag_weights_and_reach_target():
@@ -650,91 +618,9 @@ def test_drag_motion_limit_and_zero_velocity(substeps):
         assert np.linalg.norm(qd[6]) < 1e-5 and np.linalg.norm(qd[5]) < 1e-5
 
 
-def test_camera_project_ray_roundtrip_and_pick():
-    cam = Camera(position=(3.0, -10.0, 2.0), pitch=-10.8, yaw=-16.7, fov=45.0, up=(0.0, 0.0, 1.0))
-    W, H = 640.0, 360.0
-    rng = np.random.default_rng(3)
-    pts = rng.uniform(-2.0, 2.0, (50, 3)).astype(np.float32)
-    scr = cam.project(pts, W, H)
-    assert (scr[:, 2] > 0).all()
-    for p, (px, py, depth) in zip(pts, scr):
-        origin, direction = cam.ray(px, py, W, H)
-        closest = origin + direction * float(np.dot(p - origin, direction))
-        assert np.linalg.norm(closest - p) < 1e-4 * max(1.0, depth)
-    centre = cam.project(np.asarray([cam.target]), W, H)[0]
-    assert abs(centre[0] - W / 2) < 1e-3 and abs(centre[1] - H / 2) < 1e-3
-    above = cam.project(np.asarray([cam.target + cam.up * 0.5]), W, H)[0]
-    assert above[1] < centre[1]  # up on screen is a smaller row index
-    inv_mass = np.ones(len(pts), np.float32)
-    k = 7
-    assert pick_node(pts, inv_mass, cam, scr[k, 0] + 3.0, scr[k, 1] - 2.0, W, H) == k
-    inv_mass[k] = 0.0
-    picked = pick_node(pts, inv_mass, cam, scr[k, 0], scr[k, 1], W, H)
-    assert picked != k
-    assert pick_node(pts, inv_mass, cam, -100.0, -100.0, W, H) is None
-    hit = ray_plane((0.0, 0.0, 5.0), (0.0, 0.0, -1.0), (0.0, 0.0, 0.0), (0.0, 0.0, 1.0))
-    np.testing.assert_allclose(hit, (0.0, 0.0, 0.0), atol=1e-7)
-    assert ray_plane((0.0, 0.0, 5.0), (1.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)) is None
-
-
-class FakeEvent:
-    def __init__(self, kind, button="right", pos=(0.0, 0.0)):
-        self.kind, self.pos = kind, type("P", (), {"x": pos[0], "y": pos[1]})()
-        self.button = type("B", (), {"name": button})()
-
-    def is_button_down(self):
-        return self.kind == "down"
-
-    def is_button_up(self):
-        return self.kind == "up"
-
-    def is_move(self):
-        return self.kind == "move"
-
-    def is_scroll(self):
-        return False
-
-
-def test_drag_driver_picks_and_edits():
-    """The driver on a fake renderer (camera, live snapshot, no window): press picks the node under the cursor and
-    begins the drag through ``apply``, motion moves the target in the drag plane, release ends it."""
-    pos, edges, dirs = build_y()
-    scene = Scene("cuda:0", 1, gravity=(0.0, 0.0, 0.0))
-    body = add_centreline_tree(scene, "y", pos, edges, 0.05, root=0, pinned_nodes=[0], pinned_segments=[0, 12, 24], mass=1.0)
-    declare_rod_pbd(scene, "y")
-    declare_drag(scene, "y")
-    scene.allocate()
-    rod = RodPbd(scene, body="y")
-    drag = Drag(scene, body="y")
-    sim = Stepper.create(scene, [Particles(scene), rod, drag], dt=1.0 / 60.0, substeps=1, iterations=1)
-    cam = Camera(position=(0.0, -3.0, 0.5), pitch=-9.0, yaw=0.0, fov=45.0, up=(0.0, 0.0, 1.0))
-    renderer = type("R", (), {})()
-    renderer.camera, renderer.env, renderer.snap, renderer.live = cam, 0, None, Snapshot(sim)
-    renderer.stream, renderer.lock, renderer.window, renderer.width, renderer.height = None, contextlib.nullcontext(), None, 640, 360
-    renderer.mouse_handlers = []
-    applied = []
-    driver = DragDriver(sim, drag, renderer, lambda fn: (applied.append(fn), fn(sim)))
-    assert renderer.mouse_handlers == [driver.handle_mouse]
-    scr = cam.project(pos, 640, 360)
-    cursor = (scr[8, 0], scr[8, 1])
-    k = pick_node(pos, body.rest.inv_mass[0], cam, *cursor, 640, 360)  # the nearest to the camera within 18 px (omniendo's rule)
-    assert k is not None and np.hypot(scr[k, 0] - cursor[0], scr[k, 1] - cursor[1]) <= 18.0
-    assert driver.handle_mouse(FakeEvent("down", pos=cursor))  # consumed: not a camera pan
-    assert driver.node == k and drag.active.numpy()[0] == 1 and drag.node.numpy()[0] == k
-    assert not driver.handle_mouse(FakeEvent("down", button="left", pos=(0.0, 0.0)))
-    driver.handle_mouse(FakeEvent("move", pos=(scr[k, 0] + 40.0, scr[k, 1])))
-    target = drag.target.numpy()[0]
-    _, right, _, _ = cam.basis()
-    assert np.dot(target - pos[k], right) > 0.05 and abs(np.dot(target - pos[k], cam.basis()[3])) < 1e-4  # moved right, in the plane
-    assert driver.handle_mouse(FakeEvent("up"))
-    assert driver.env is None and drag.active.numpy()[0] == 0 and len(applied) == 3
-    assert not driver.handle_mouse(FakeEvent("down", pos=(5.0, 5.0)))  # nothing under the cursor: the camera pans
-    assert not driver.handle_mouse(FakeEvent("up")) and len(applied) == 3  # and gets the release too, so the pan ends
-
-
-# --- control layouts -----------------------------------------------------------------------------------------------
-
 from i4h_endoluminal.loaders.centreline import load_control_layout  # noqa: E402
+
+
 from i4h_endoluminal.systems.rods.control_layout import ControlLayout  # noqa: E402
 
 

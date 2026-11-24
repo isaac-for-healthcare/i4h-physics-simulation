@@ -3,7 +3,7 @@
 """The shipped cases retain their authored order and the solver's five hooks."""
 
 import pytest
-from i4h_isaaclab.composition import maps, read_case
+from i4h_host.composition import maps, read_case
 from i4h_physics.config import load_case
 
 

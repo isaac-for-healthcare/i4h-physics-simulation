@@ -34,7 +34,7 @@ def check_reference_identity(identity, reference, revision=None):
 
 
 def hosted_case(case, *, device, envs, eager, exports=False):
-    from i4h_isaaclab.composition import sim_settings
+    from i4h_host.composition import sim_settings
     from i4h_isaaclab.env import I4hEnv, I4hEnvCfg
 
     cfg = I4hEnvCfg(case=case, decimation=1, stagger_episodes=False)
@@ -64,7 +64,7 @@ def hosted_case(case, *, device, envs, eager, exports=False):
 
 
 def run_one(args):
-    import i4h_isaaclab.composition as composition
+    import i4h_host.composition as composition
 
     handles = []
     if args.host != "standalone":

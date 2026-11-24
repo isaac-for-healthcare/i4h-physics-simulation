@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 
 root = Path(sys.argv[1])
-packages = ("physics", "isaaclab", "standalone", "endoluminal", "surgical", "assessment")
+packages = ("physics", "isaaclab", "host", "endoluminal", "surgical", "assessment")
 small = {"i4h_endoluminal/data/vascular_templates.yaml", "i4h_endoluminal/data/instrument_regions.yaml"}
 for name in packages:
     package = f"i4h_{name}"

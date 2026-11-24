@@ -10,54 +10,49 @@ import ast
 import sys
 from pathlib import Path
 
-PACKAGES = ("physics", "surgical", "endoluminal", "assessment", "isaaclab", "standalone")
+PACKAGES = ("physics", "surgical", "endoluminal", "assessment", "isaaclab", "host")
 
 # reason -> {source file relative to the workspace: names reached there}
-ALLOWED = {
-    "Newton WORLD row count on the pinned and current-stack assessment revisions": {
-        "physics/src/i4h_physics/scene_storage.py": {"_attribute_frequency_count"},
-    },
-    "Newton internals at the pinned revision": {
-        "physics/src/i4h_physics/newton_compat.py": {"_add_custom_attribute_model_finalizer"},
-        "physics/src/i4h_physics/observables.py": {"_observable_fields"},
-        "physics/src/i4h_physics/storage.py": {"_add_custom_attribute_model_finalizer", "_attribute_frequency_count", "_normalize_attribute_reference"},
-        "isaaclab/src/i4h_isaaclab/newton_solver.py": {"_kinds"},
-    },
-    "Warp internals: array lifetime reference and dtype layout": {
-        "physics/src/i4h_physics/commands.py": {"_ref"},
-        "physics/src/i4h_physics/continuation.py": {"_ref"},
-        "physics/src/i4h_physics/rod_storage.py": {"_shape_"},
-        "physics/src/i4h_physics/storage.py": {"_ref", "_shape_", "_wp_scalar_type_"},
-        "surgical/src/i4h_surgical/instrument_storage.py": {"_shape_"},
-    },
-    "Isaac Lab internals at the pinned revisions": {
-        "isaaclab/src/i4h_isaaclab/env.py": {"_reset_idx"},
-        "isaaclab/src/i4h_isaaclab/versius/task.py": {"_reset_idx"},
-        "isaaclab/src/i4h_isaaclab/versius/qualification.py": {"_reset_idx"},
-        "isaaclab/src/i4h_isaaclab/lab30.py": {"_cfg", "_contacts", "_create_solver", "_initialize_contacts", "_invalidate_graph", "_needs_collision_pipeline",
-                                               "_prepare_builder_for_finalize", "_register_builder_attributes", "_registers_builder_attributes_from_solver",
-                                               "_solver", "_supports_contact_sensors", "_supports_rigid_body_force_input", "_use_single_state"},
-        "isaaclab/src/i4h_isaaclab/recording.py": {"_hdf5_data_group"},
-    },
-    "ctypes structure layout": {
-        "standalone/src/i4h_standalone/xr/session.py": {"_fields_"},
-    },
-    "i4h attribute stored on a host or Newton object": {
-        "physics/src/i4h_physics/authoring.py": {"_i4h_authoring"},
-        "isaaclab/src/i4h_isaaclab/lab30.py": {"__i4h_context"},
-        "isaaclab/src/i4h_isaaclab/newton_manager.py": {"__i4h_context"},
-    },
-    "own instance, set in the class's alternate constructor": {
-        "physics/src/i4h_physics/bindings.py": {"_core", "_output_arrays", "_prepare", "_prepared", "_runtime", "_standalone"},
-    },
-    "standalone renderer sharing inside its own package (out of C4.4 scope)": {
-        "standalone/src/i4h_standalone/render/gbuffer.py": {"_frame", "_render_state"},
-        "standalone/src/i4h_standalone/render/interop.py": {"_check", "_cu"},
-        "standalone/src/i4h_standalone/render/post.py": {"_default", "_texture"},
-        "standalone/src/i4h_standalone/render/smoke.py": {"_default", "_frame", "_render_state", "_texture"},
-        "standalone/src/i4h_standalone/render/xr.py": {"_ensure_targets", "_frame_uniforms"},
-    },
-}
+ALLOWED = {'Newton WORLD row count on the pinned and current-stack assessment revisions': {'physics/src/i4h_physics/scene_storage.py': {'_attribute_frequency_count'}},
+ 'Newton internals at the pinned revision': {'physics/src/i4h_physics/newton_compat.py': {'_add_custom_attribute_model_finalizer'},
+                                             'physics/src/i4h_physics/observables.py': {'_observable_fields'},
+                                             'physics/src/i4h_physics/storage.py': {'_add_custom_attribute_model_finalizer',
+                                                                                    '_attribute_frequency_count',
+                                                                                    '_normalize_attribute_reference'},
+                                             'isaaclab/src/i4h_isaaclab/newton_solver.py': {'_kinds'}},
+ 'Warp internals: array lifetime reference and dtype layout': {'physics/src/i4h_physics/commands.py': {'_ref'},
+                                                               'physics/src/i4h_physics/continuation.py': {'_ref'},
+                                                               'physics/src/i4h_physics/rod_storage.py': {'_shape_'},
+                                                               'physics/src/i4h_physics/storage.py': {'_ref',
+                                                                                                      '_shape_',
+                                                                                                      '_wp_scalar_type_'},
+                                                               'surgical/src/i4h_surgical/instrument_storage.py': {'_shape_'}},
+ 'Isaac Lab internals at the pinned revisions': {'isaaclab/src/i4h_isaaclab/env.py': {'_reset_idx'},
+                                                 'isaaclab/src/i4h_isaaclab/versius/task.py': {'_reset_idx'},
+                                                 'isaaclab/src/i4h_isaaclab/versius/qualification.py': {'_reset_idx'},
+                                                 'isaaclab/src/i4h_isaaclab/lab30.py': {'_cfg',
+                                                                                        '_contacts',
+                                                                                        '_create_solver',
+                                                                                        '_initialize_contacts',
+                                                                                        '_invalidate_graph',
+                                                                                        '_needs_collision_pipeline',
+                                                                                        '_prepare_builder_for_finalize',
+                                                                                        '_register_builder_attributes',
+                                                                                        '_registers_builder_attributes_from_solver',
+                                                                                        '_solver',
+                                                                                        '_supports_contact_sensors',
+                                                                                        '_supports_rigid_body_force_input',
+                                                                                        '_use_single_state'},
+                                                 'isaaclab/src/i4h_isaaclab/recording.py': {'_hdf5_data_group'}},
+ 'i4h attribute stored on a host or Newton object': {'physics/src/i4h_physics/authoring.py': {'_i4h_authoring'},
+                                                     'isaaclab/src/i4h_isaaclab/lab30.py': {'__i4h_context'},
+                                                     'isaaclab/src/i4h_isaaclab/newton_manager.py': {'__i4h_context'}},
+ "own instance, set in the class's alternate constructor": {'physics/src/i4h_physics/bindings.py': {'_core',
+                                                                                                    '_output_arrays',
+                                                                                                    '_prepare',
+                                                                                                    '_prepared',
+                                                                                                    '_runtime',
+                                                                                                    '_standalone'}}}
 
 
 def private(name):

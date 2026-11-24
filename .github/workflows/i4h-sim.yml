@@ -33,8 +33,8 @@ jobs:
           enable-cache: true
           cache-dependency-glob: numerical_sim/uv.lock
       - run: uv sync --locked --group dev
-      - run: uv run --locked python -c "import i4h_physics, i4h_assessment, i4h_endoluminal, i4h_surgical, i4h_isaaclab, i4h_standalone.app.cli; from i4h_surgical.config import read_case; read_case('two_worlds')"
-      - run: uv run --locked ruff check physics/src assessment/src endoluminal/src surgical/src isaaclab/src standalone/src --select F
+      - run: uv run --locked python -c "import i4h_physics, i4h_assessment, i4h_endoluminal, i4h_surgical, i4h_isaaclab, i4h_host.composition; from i4h_surgical.config import read_case; read_case('two_worlds')"
+      - run: uv run --locked ruff check physics/src assessment/src endoluminal/src surgical/src isaaclab/src host/src --select F
       - name: Verify production assets
         run: uv run --locked python scripts/fetch_assets.py --check
       - name: Run CPU package tests

@@ -32,9 +32,7 @@ def _flat(arr: wp.array, E: int) -> torch.Tensor:
     return flat
 
 
-def controls(sim) -> list:
-    """The control systems with a non-empty actions array, in system-list order."""
-    return [s for s in sim.systems if getattr(s, "is_control", False) and s.actions.size]
+from i4h_host.controls import controls
 
 
 def action_views(sim) -> list[torch.Tensor]:

@@ -7,7 +7,7 @@ import os
 
 import numpy as np
 import pytest
-from i4h_isaaclab.composition import data_dir, resolve_data_path
+from i4h_host.composition import data_dir, resolve_data_path
 from i4h_physics import Scene
 from i4h_surgical.loaders.tet_bundle import add_tet_bundle
 

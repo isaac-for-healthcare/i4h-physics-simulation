@@ -14,7 +14,7 @@ pytest.importorskip("isaaclab.envs")
 gym = pytest.importorskip("gymnasium")
 
 import i4h_isaaclab.tasks  # noqa: E402, F401  registers the ids
-from i4h_isaaclab.composition import read_case  # noqa: E402
+from i4h_host.composition import read_case  # noqa: E402
 from i4h_isaaclab.env import I4hEnv  # noqa: E402
 from i4h_isaaclab.manager import I4hManagerBasedRLEnv  # noqa: E402
 from isaaclab.managers import EventTermCfg  # noqa: E402

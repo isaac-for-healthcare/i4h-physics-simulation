@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import warp as wp
 from helpers import find, push_actions
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 from i4h_physics.observables import KINDS
 from i4h_physics.observables import ObservableKind as Kind
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact

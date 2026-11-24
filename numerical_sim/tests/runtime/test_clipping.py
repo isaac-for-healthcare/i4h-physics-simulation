@@ -3,22 +3,46 @@
 
 """M4 centrelines and clipping on the chole data: loader, tracker, attach on the fire edge, pinch that holds, masked reset."""
 
+
 import os
 
+
 import numpy as np
+
+
 import pytest
+
+
 import warp as wp
+
+
 from helpers import CHOLE, find
-from i4h_isaaclab.composition import load_case
+
+
+from i4h_host.composition import load_case
+
+
 from i4h_physics import Scene
+
+
 from i4h_surgical.loaders.tet_bundle import add_tet_bundle
+
+
 from i4h_surgical.systems.instruments.clipping import Clipping
+
+
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
+
+
 from i4h_surgical.systems.mechanics.centreline import Centreline
+
 
 pytestmark = pytest.mark.skipif(not os.environ.get("I4H_DATA") and (not CHOLE.is_dir()), reason=f"chole data not found at {CHOLE}")
 
+
 PARTS = {"liver": {"spring": 1.0, "volume": 1.0}, "fat": {"spring": 0.1, "volume": 0.1}, "gallbladder": {"spring": 0.8, "volume": 0.1}}
+
+
 LINES = [{"name": "cystic_artery", "path": "centrelines/cystic_artery.cntr", "part": "gallbladder"},
          {"name": "cystic_duct", "path": "centrelines/cystic_duct.cntr", "part": "gallbladder"}]
 
@@ -197,7 +221,7 @@ def test_cache_refresh_tracks_host_edits_without_restoring_history():
 
 def test_centreline_binding_uses_current_host_positions():
     import newton
-    from i4h_isaaclab.composition import maps, read_case
+    from i4h_host.composition import maps, read_case
     from i4h_physics import author_case
 
     cfg, loaders, systems = maps(read_case("chole_tet_med"))
@@ -245,44 +269,3 @@ def test_clip_attaches_before_the_first_substep():
     control.actions.assign(actions)
     sim.step()  # the press right after the reset counts
     assert clipping.count.numpy().tolist() == [1, 0]
-
-
-def test_clip_mesh_kernel_places_a_torus_on_the_node():
-    """``place_clip_mesh`` on the CPU: an active slot is a ring around its node in the plane normal to the vessel tangent,
-    an inactive slot collapses to the node."""
-    from i4h_standalone.render.clips import place_clip_mesh, torus
-
-    dev = wp.get_device("cpu")
-    centre, tube, faces = torus()
-    V = len(centre)
-    assert faces.min() == 0 and faces.max() == V - 1 and len(faces) == 2 * V
-    positions = wp.array(np.float32([[[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.2, 0.0, 0.0]]]), dtype=wp.vec3, device=dev)  # (1, 3) along +x
-    node = wp.array(np.int32([[1, -1]]), dtype=wp.int32, device=dev)
-    active = wp.array(np.int32([[1, 0]]), dtype=wp.int32, device=dev)
-    line = wp.zeros(3, dtype=wp.int32, device=dev)
-    out, normals = (wp.zeros(2 * V, dtype=wp.vec3, device=dev) for _ in range(2))
-    wp.launch(place_clip_mesh, dim=2 * V,
-              inputs=[wp.array(centre, dtype=wp.vec3, device=dev), wp.array(tube, dtype=wp.vec3, device=dev), node, active, positions, line, 0, 0.1, 0.03],
-              outputs=[out, normals], device=dev)
-    p, n = out.numpy().reshape(2, V, 3), normals.numpy().reshape(2, V, 3)
-    np.testing.assert_allclose(p[0].mean(axis=0), [0.1, 0.0, 0.0], atol=1e-6)
-    d = np.linalg.norm(p[0] - [0.1, 0.0, 0.0], axis=1)
-    assert d.min() >= 0.07 - 1e-6 and d.max() <= 0.13 + 1e-6
-    assert np.abs(p[0][:, 0] - 0.1).max() <= 0.03 + 1e-6  # the ring plane is perpendicular to the tangent (x)
-    assert np.allclose(np.linalg.norm(n[0], axis=1), 1.0, atol=1e-6)
-    assert np.allclose(p[1], [0.0, 0.0, 0.0])  # slot 1 inactive: collapsed onto node max(-1, 0)
-
-
-def test_snapshot_carries_clip_slots_and_centreline_positions():  # the module skips without chole
-    from i4h_standalone.render.snapshots import Snapshot, Snapshots
-
-    sim = load_case("chole_tet_med", envs=2)
-    clipping, centreline = find(sim, Clipping), find(sim, Centreline)
-    live = Snapshot(sim)
-    node, active = live.clip[clipping]
-    assert node.ptr == clipping.node.ptr and active.ptr == clipping.active.ptr and live.centreline[centreline].ptr == centreline.positions.ptr
-    assert live.arrays.index(node) < live.arrays.index(active) < live.arrays.index(live.centreline[centreline])
-    ring = Snapshots(sim)
-    slot = ring.slots[0]
-    assert len(slot.arrays) == len(live.arrays) and all(a.shape == b.shape and a.ptr != b.ptr for a, b in zip(slot.arrays, live.arrays))
-    assert slot.clip[clipping][0].shape == clipping.node.shape and slot.centreline[centreline].shape == centreline.positions.shape
