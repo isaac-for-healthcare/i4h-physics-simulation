@@ -34,8 +34,7 @@ def require_asset(path):
     """Validate an explicitly consumed asset; never discover a checkout or substitute data."""
     path = Path(path).expanduser()
     if not path.is_file():
-        raise FileNotFoundError(f"Expected file {path}. Set I4H_DATA or pass --data.\n"
-                                "Repository checkout example: uv run i4h-sim CASE --data ./data")
+        raise FileNotFoundError(f"Expected file {path}. Set I4H_DATA or pass data=... to the case loader.")
     return path
 
 
@@ -117,8 +116,7 @@ def load_scene(cfg: dict, device=None, envs=None, *, loaders=None) -> Scene:
             loaders[kind](scene, name, **asset)
         except FileNotFoundError as error:
             raise FileNotFoundError(
-                f"{error}\nSet I4H_DATA to the production asset directory, or pass --data.\n"
-                "Repository checkout example: uv run i4h-sim CASE --data ./data"
+                f"{error}\nSet I4H_DATA to the production asset directory, or pass data=... to the case loader."
             ) from error
     return scene
 

@@ -11,8 +11,8 @@ Six distributions share the Warp/Newton mechanics and one numerical workspace lo
 | i4h-isaaclab | i4h_isaaclab | Isaac Lab hosts, gym tasks, tiled camera |
 | i4h-host | i4h_host | Case composition, procedures, camera geometry, appearance, controls |
 
-For the standalone viewer, device backends, capture and XR, use the separate
-[i4h-standalone-simulator repository](https://github.com/isaac-for-healthcare/i4h-standalone-simulator).
+The standalone viewer, device backends, capture and XR moved to a separate application.
+See [package ownership and migration](docs/standalone-split.md).
 The optional `i4h-isaaclab-standalone` bridge supplies `i4h-lab-run` and `i4h-lab-teleop`.
 The numerical repository retains headless Lab training/evaluation and all task measurements.
 

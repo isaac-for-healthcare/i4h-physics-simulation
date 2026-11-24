@@ -32,16 +32,18 @@ app tests and scripts retain their available history. The extracted repository r
 rewritten commit mappings and test-level relocation mappings in `docs/history/`.
 Frozen qualification reports remain upstream and are not rewritten as current evidence.
 
-Final publication requires separately authorized operations:
+## Repository independence
 
-1. Review and commit the coordinated upstream changes, then make that exact commit remotely reachable.
-2. In the standalone repository run `python scripts/pin_upstream.py <40-character-commit>`.
-   It sets every upstream distribution to the same immutable Git subdirectory source,
-   then resolves `uv.lock`. On failure it restores prior metadata and lock.
-3. Run the locked standalone installation, build and installed-package checks outside
-   both checkouts. Validate the optional bridge in the qualified Lab environment.
-4. Review and commit the standalone changes. Push/tag operations remain separate.
+`i4h-standalone-simulator` owns the application and the optional bridge described above.
+Physics builds, installed-package checks and CI require no access to that repository.
+Negative import checks retain the application module names to reject reverse dependencies;
+they neither import nor install the application. Missing-asset errors describe `I4H_DATA`
+and the local `data=` case-loader argument.
 
-The pin script performs no commit, push or tag. Until step 2 succeeds, no final lockfile
-is claimed. The root project does not depend on the bridge; `--all-packages` opts into
-building both distributions, while ordinary `uv sync` installs standalone only.
+Frozen qualification reports retain their original bytes and test paths. The Markdown
+link checker resolves the two moved test links in `stage-c25.md` at the source baseline
+recorded above, rather than requiring those application tests in the current workspace.
+
+The application pins all six upstream distributions to published split commit
+`4532a216c25bd7e5fee49678b1c1359727fe523e` through Git subdirectory sources.
+The application owns its lockfile, setup instructions and validation evidence.

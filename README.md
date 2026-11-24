@@ -27,8 +27,9 @@ Available in-tree today:
 - YAML-authored cases: cholecystectomy (`chole_tet_med`, `chole_grasp`), `liver`, `tissue_contact` and the two-world demo `two_worlds`
 - Endoluminal catheter cases in an aorta (`aorta_static`, `aorta_shell`, `aorta_centreline` and their `_reach` variants), with an endoscope view from the catheter tip
 - Isaac Lab tasks `I4h-TwoWorlds-Direct`, `I4h-Aorta-Direct`, `I4h-ReachTarget-Direct`, `I4h-GraspTarget-Direct` and `I4h-Chole-Direct`
-- In the [standalone repository](https://github.com/isaac-for-healthcare/i4h-standalone-simulator): render backends `noop` (headless), `slang`, `gl` and `xr` (Meta Quest 3 through CloudXR; see the [XR guide](https://github.com/isaac-for-healthcare/i4h-standalone-simulator/blob/main/docs/xr.md))
-- Optional haptic devices (MiniMou, and Follou through its separately installed SDK), and controller vibration in XR
+
+Interactive viewers, device backends, capture and XR moved out of this repository.
+See [package ownership and migration](numerical_sim/docs/standalone-split.md).
 
 Not available yet:
 

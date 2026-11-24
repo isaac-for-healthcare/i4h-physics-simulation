@@ -62,13 +62,20 @@ def test_explicit_data_precedence_and_no_checkout_discovery(monkeypatch, tmp_pat
     assert resolve_data_path("${DATA}/mesh.vtu", tmp_path / "explicit") == str(tmp_path / "explicit/mesh.vtu")
 
 
-def test_missing_production_assets_explain_checkout_command(tmp_path):
+@pytest.mark.parametrize("consumer", ["case", "asset"])
+def test_missing_production_assets_explain_data_api(consumer, tmp_path):
+    from i4h_physics.config import require_asset
     from i4h_surgical import load_case
+
     with pytest.raises(FileNotFoundError) as error:
-        load_case("chole_tet_med", data=tmp_path, device="cpu")
-    assert str(tmp_path / "choly-mid") in str(error.value)
-    assert "I4H_DATA" in str(error.value)
-    assert "uv run i4h-sim CASE --data ./data" in str(error.value)
+        if consumer == "case":
+            load_case("chole_tet_med", data=tmp_path, device="cpu")
+        else:
+            require_asset(tmp_path / "missing.vtu")
+    expected = tmp_path / ("choly-mid" if consumer == "case" else "missing.vtu")
+    assert str(expected) in str(error.value)
+    assert "I4H_DATA" in str(error.value) and "data=" in str(error.value)
+    assert "i4h-sim" not in str(error.value)
 
 
 MODULE_PATH = re.compile(r"^i4h_\w+(\.\w+)*(:\w+)?$")  # "i4h_x.y" or a class path "i4h_x.y:Name"
