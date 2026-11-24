@@ -14,3 +14,7 @@ Production assets are supplied separately with `--data` or `I4H_DATA`; missing a
 fail explicitly. No production geometry or native device binaries are packaged.
 See the numerical workspace README and architecture document for setup and package boundaries.
 Licensed under Apache-2.0; see this package's LICENSE and NOTICE.
+
+## Catheter and guidewire validation
+
+[Bench and phantom results](CATH_GDWR_VALIDATION.md) · [Reproduce the measurements](validation/README.md)

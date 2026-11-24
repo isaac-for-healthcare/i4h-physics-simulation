@@ -1,0 +1,10 @@
+reference,sim_count,sim_outside_over_1mm,sim_max_outside_mm,ct_count,ct_outside_over_1mm,ct_max_outside_mm
+terumoST4F1,85,0,0.0,106,0,0.0
+terumoST4F2,111,0,0.0,139,0,0.0
+terumoST4F3,152,0,0.0,190,0,0.0
+terumoST5F1,85,0,0.0,106,0,0.0
+terumoST5F2,107,0,0.0,134,0,0.0
+terumoST5F3,152,0,0.0,190,0,0.0
+beacon1,59,0,0.0,74,0,0.0
+beacon2,112,0,0.0,141,0,0.0
+beacon3,151,0,0.0,189,0,0.0
