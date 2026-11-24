@@ -6,36 +6,16 @@
 
 import os
 
-
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 from helpers import CHOLE, find
-
-
 from i4h_host.composition import load_case
-
-
 from i4h_physics import Scene
-
-
 from i4h_surgical.loaders.tet_bundle import add_tet_bundle
-
-
 from i4h_surgical.systems.instruments.clipping import Clipping
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-
 from i4h_surgical.systems.mechanics.centreline import Centreline
-
 
 pytestmark = pytest.mark.skipif(not os.environ.get("I4H_DATA") and (not CHOLE.is_dir()), reason=f"chole data not found at {CHOLE}")
 

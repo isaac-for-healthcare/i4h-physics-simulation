@@ -6,21 +6,11 @@
 
 import math
 
-
 import numpy as np
-
-
 import pytest
-
-
-from helpers import needs_chole, needs_external_data, slang_tests
-
-
+from helpers import needs_chole
 from i4h_host.camera.camera import Camera
-
-
-from i4h_host.composition import data_dir, load_case, read_case
-
+from i4h_host.composition import data_dir, read_case
 
 try:
     import slangpy  # noqa: F401

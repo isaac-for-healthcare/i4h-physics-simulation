@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 import math
+
 import numpy as np
+
 
 def scripted_rates(envs: int, t: float, actions: np.ndarray) -> np.ndarray:
     """``(E, 3)`` rates into ``actions``: insertion ``(env + 1) / (2 E)``, rotation and bend as slow sinusoids."""

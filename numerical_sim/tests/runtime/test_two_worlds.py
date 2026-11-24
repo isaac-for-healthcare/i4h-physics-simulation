@@ -5,65 +5,25 @@
 
 
 import newton
-
-
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 from conftest import env_slice
-
-
 from helpers import find, needs_chole, push_actions, run, tet_volumes
-
-
 from i4h_host.composition import load_case, resolve_case
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.debug import alias_checks
-
-
 from i4h_physics.loaders import add_tet_grid
-
-
 from i4h_physics.scene import ACTIVE_INT
-
-
 from i4h_physics.systems.mechanics.bounds import Bounds
-
-
 from i4h_physics.systems.mechanics.particles import Particles
-
-
 from i4h_physics.systems.mechanics.tet import Tet
-
-
 from i4h_surgical.instrument_storage import declare_instruments
-
-
 from i4h_surgical.interaction_storage import declare_instrument_contact
-
-
 from i4h_surgical.loaders.instrument_usd import add_instrument
-
-
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-
 from i4h_surgical.systems.instruments.thermal import Thermal
-
-
 from i4h_surgical.systems.mechanics.surface import Surface
 
 

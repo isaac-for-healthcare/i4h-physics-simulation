@@ -33,9 +33,9 @@ import math
 
 import torch
 import warp as wp
+from i4h_host.composition import check_dt, read_case, sim_settings
 from i4h_isaaclab import views
 from i4h_isaaclab.component import I4hComponent, I4hComponentCfg
-from i4h_host.composition import check_dt, read_case, sim_settings
 from i4h_isaaclab.env import resolve_gravity, with_gravity
 from i4h_isaaclab.lab import require
 from i4h_isaaclab.terminal import ProcedureTorch

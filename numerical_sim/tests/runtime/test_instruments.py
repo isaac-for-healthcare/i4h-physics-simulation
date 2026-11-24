@@ -6,30 +6,14 @@
 
 import os
 
-
 import numpy as np
-
-
 import pytest
-
-
 from i4h_host.composition import data_dir
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.quat import quat_to_matrix
-
-
 from i4h_surgical.instrument_storage import declare_instruments
-
-
 from i4h_surgical.loaders.instrument_usd import add_instrument
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
 
 ASSETS = data_dir() / "instruments"
 

@@ -7,34 +7,15 @@ the neighbour blood, the centreline node cut in the same step, and the clip appl
 
 import os
 
-
 import numpy as np
-
-
 import pytest
-
-
 from helpers import find, live_surface_is_consistent
-
-
 from i4h_host.composition import data_dir, load_case
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.loaders import add_tet_grid
-
-
 from i4h_physics.systems.fluids.fluid import Fluid
-
-
 from i4h_physics.systems.mechanics.tet import Tet
-
-
 from i4h_surgical.instrument_storage import declare_instruments
-
-
 from i4h_surgical.loaders.instrument_usd import (
     CHAIN_CUT,
     CHAIN_FIXED,
@@ -44,22 +25,11 @@ from i4h_surgical.loaders.instrument_usd import (
     PIECE_COLORS,
     add_instrument,
 )
-
-
 from i4h_surgical.systems.fluids.bleeding import Bleeding
-
-
 from i4h_surgical.systems.instruments.cutting import Cutting
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-
 from i4h_surgical.systems.mechanics.centreline import Centreline
-
-
 from i4h_surgical.systems.mechanics.surface import Surface
-
 
 ASSETS = data_dir() / "instruments"
 
@@ -379,8 +349,6 @@ def test_scissors_cut_the_artery():
 
 
 from i4h_surgical.systems.instruments.clipping import Clipping  # noqa: E402
-
-
 from i4h_surgical.systems.instruments.grasp import Grasp  # noqa: E402
 
 

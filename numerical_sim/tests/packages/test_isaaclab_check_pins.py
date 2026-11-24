@@ -6,13 +6,8 @@ of its own: after the Newton 1.6.1 bump it still asserted 1.6.0 and failed on ev
 
 
 import re
-
-
 import tomllib
-
-
 from pathlib import Path
-
 
 ROOT = Path(__file__).parents[2]
 

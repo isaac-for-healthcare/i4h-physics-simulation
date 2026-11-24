@@ -7,32 +7,14 @@ layout to the array it is given (live or a snapshot copy) and rejects arrays of 
 
 
 import numpy as np
-
-
 import pytest
-
-
 from i4h_host.composition import load_case
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.fluid_storage import declare_fluid
-
-
 from i4h_physics.loaders import add_fluid
-
-
 from i4h_physics.systems.fluids.fluid import Fluid
-
-
 from i4h_physics.systems.mechanics.bounds import Bounds
-
-
 from i4h_surgical.interaction_storage import declare_emitter
-
-
 from i4h_surgical.systems.fluids.emitter import Emitter
 
 

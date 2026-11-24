@@ -1,6 +1,6 @@
-> Viewer and teleoperation commands require the separate `i4h-isaaclab-standalone` bridge. Headless training/evaluation remains available through upstream `scripts/isaaclab_run.py`.
-
 # Versius surgical tasks
+
+> Viewer and teleoperation commands require the separate `i4h-isaaclab-standalone` bridge. Headless training/evaluation remains available through upstream `scripts/isaaclab_run.py`.
 
 Versius uses canonical surgical cases, a native Isaac Lab articulation and the
 shared launchers and GL renderer. The robot controls a blunt sphere at the closed

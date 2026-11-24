@@ -21,6 +21,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 import warp as wp
+from i4h_host.controls import controls
 
 
 def _flat(arr: wp.array, E: int) -> torch.Tensor:
@@ -30,9 +31,6 @@ def _flat(arr: wp.array, E: int) -> torch.Tensor:
     if flat.data_ptr() != arr.ptr:
         raise RuntimeError(f"expected a zero-copy view of a {arr.shape} {arr.dtype.__name__} array")
     return flat
-
-
-from i4h_host.controls import controls
 
 
 def action_views(sim) -> list[torch.Tensor]:

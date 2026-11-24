@@ -8,8 +8,8 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from i4h_physics import Body, I4hSolver, PhysicsBinding, Scene, Stepper, System
 from i4h_host.composition import load_case
+from i4h_physics import Body, I4hSolver, PhysicsBinding, Scene, Stepper, System
 
 expected = Path(sys.argv[1]).resolve()
 assert find_spec("i4h_sim") is None

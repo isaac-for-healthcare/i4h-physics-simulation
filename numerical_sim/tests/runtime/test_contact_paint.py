@@ -5,23 +5,11 @@
 
 
 import numpy as np
-
-
 from helpers import find, push_actions, run
-
-
 from i4h_host.composition import load_case
-
-
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
-
-
 from i4h_surgical.systems.instruments.contact_paint import ContactPaint
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-
 from i4h_surgical.systems.mechanics.surface import Surface
 
 

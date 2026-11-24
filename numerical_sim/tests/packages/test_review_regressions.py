@@ -5,10 +5,7 @@
 
 
 import dataclasses
-
-
 from types import SimpleNamespace
-
 
 import pytest
 

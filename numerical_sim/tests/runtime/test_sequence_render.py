@@ -1,16 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from helpers import render_tests, slang_tests
-
-
+from helpers import slang_tests
 from test_procedure_sequence import sequence
 
 
 @slang_tests
 def test_tiled_sequence_has_no_target_markers():
-    from i4h_isaaclab.camera.tiled import TiledCamera
     from i4h_host.composition import build_procedure
+    from i4h_isaaclab.camera.tiled import TiledCamera
 
     sim, _, cfg = sequence(device="cuda:0", graph=True)
     cfg["procedure"]["steps"][1].update(target={"position": [1, 1, 1]}, radius=0.4)

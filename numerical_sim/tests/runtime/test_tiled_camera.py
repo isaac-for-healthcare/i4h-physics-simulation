@@ -7,37 +7,16 @@ ranges against the scene's own positions; env isolation and masked resets throug
 
 
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 from helpers import find, needs_chole, needs_vessels, push_actions, quiet, rest_actions, run, run_rates
-
-
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-
-
 from i4h_host.camera.camera import Camera
-
-
-from i4h_isaaclab.camera.tiled import TiledCamera
-
-
 from i4h_host.composition import load_case, read_case
-
-
+from i4h_isaaclab.camera.tiled import TiledCamera
 from i4h_physics.systems.fluids.fluid import Fluid
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-
 from i4h_surgical.systems.mechanics.surface import Surface
-
 
 PROBE_IN_VIEW = np.array([0.08, -0.10, 0.15], np.float32)  # between the two_worlds camera and the block
 

@@ -10,8 +10,8 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 import warp as wp
-from i4h_isaaclab import views
 from i4h_host.composition import load_case
+from i4h_isaaclab import views
 from i4h_physics.loaders.grid import add_tet_grid
 from i4h_physics.systems.base import System
 

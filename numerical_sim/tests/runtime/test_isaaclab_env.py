@@ -9,21 +9,11 @@ the sole Newton host path, on either qualified Lab release."""
 
 import json
 
-
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 import yaml
-
-
 from helpers import lab_runtime, needs_external_data
-
 
 torch = pytest.importorskip("torch")
 
@@ -35,29 +25,13 @@ gym = pytest.importorskip("gymnasium")
 
 
 from helpers import find, needs_chole, needs_vessels  # noqa: E402
-
-
 from i4h_host.composition import read_case  # noqa: E402
-
-
 from i4h_isaaclab.env import I4hEnv, I4hEnvCfg  # noqa: E402
-
-
 from i4h_physics.systems.mechanics.particles import Particles  # noqa: E402
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl  # noqa: E402
-
-
 from isaaclab.managers import EventTermCfg  # noqa: E402
-
-
 from isaaclab.scene import InteractiveSceneCfg  # noqa: E402
-
-
 from isaaclab.sim import SimulationContext  # noqa: E402
-
-
 from isaaclab.utils.configclass import configclass  # noqa: E402
 
 

@@ -2,23 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import copy
-
-
 import os
 
-
 import numpy as np
-
-
 import pytest
-
-
 from assessment_host import AssessmentHost
-
-
 from i4h_host.composition import build_procedure
-
-
 from test_procedures import rod_task
 
 

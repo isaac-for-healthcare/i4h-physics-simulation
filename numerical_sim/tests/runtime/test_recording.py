@@ -6,7 +6,6 @@
 
 import pytest
 
-
 pytest.importorskip("isaaclab.envs")
 
 
@@ -14,9 +13,7 @@ pytest.importorskip("h5py")
 
 
 from helpers import haptic_case  # noqa: E402
-
-
-from i4h_isaaclab.recording import Recorder, load_demo, replay_episode, replay_path  # noqa: E402
+from i4h_isaaclab.recording import Recorder  # noqa: E402
 
 
 def test_recorder_without_surgical_package(tmp_path, monkeypatch):

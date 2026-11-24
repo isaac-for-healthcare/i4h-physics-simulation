@@ -5,37 +5,16 @@
 
 
 import numpy as np
-
-
 import pytest
-
-
-from helpers import find, kill, needs_chole, needs_external_data, slang_tests
-
-
+from helpers import find, kill, needs_chole, needs_external_data
 from i4h_host.composition import load_case, read_case
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.loaders.tet_bundle import TET_EDGES, TET_FACES, PartMesh, pack_tet_body, parse_materials
-
-
 from i4h_physics.systems.contact.part_contact import PartContact
-
-
 from i4h_physics.systems.mechanics.bounds import Bounds
-
-
 from i4h_physics.systems.mechanics.particles import Particles
-
-
 from i4h_physics.systems.mechanics.tet import Tet
-
-
 from i4h_surgical.systems.mechanics.surface import Surface
-
 
 pytestmark = needs_external_data
 

@@ -6,49 +6,20 @@ case (insertion per env, containment, isolation, masked reset, graph replay, bot
 
 
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 from conftest import env_slice
-
-
 from helpers import find, free_rod, needs_vessels, run_rates, signed_phi
-
-
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-
-
 from i4h_host.composition import load_case, read_case
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.loaders import add_rod
-
-
 from i4h_physics.mesh_utils import boundary_loops, cap_loop, classify_boundary, open_end_caps
-
-
 from i4h_physics.scene import StaticMesh
-
-
 from i4h_physics.systems.contact.rod_containment import RodContainment
-
-
 from i4h_physics.systems.mechanics.particles import Particles
-
-
 from i4h_physics.systems.rods.rod_direct import RodDirect
-
-
 from i4h_physics.systems.rods.rod_pbd import RodPbd
-
 
 ROD = (RodDirect, RodPbd)
 

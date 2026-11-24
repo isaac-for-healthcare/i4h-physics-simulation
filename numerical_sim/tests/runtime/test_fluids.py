@@ -5,47 +5,19 @@
 
 
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 from helpers import find, needs_chole, quiet, rest_actions, run
-
-
 from i4h_host.composition import load_case, read_case
-
-
 from i4h_physics.scene import ACTIVE_INT
-
-
 from i4h_physics.systems.contact.fluid_contact import FluidContact
-
-
 from i4h_physics.systems.fluids.fluid import Fluid
-
-
 from i4h_physics.systems.mechanics.bounds import Bounds
-
-
 from i4h_physics.systems.mechanics.tet import Tet
-
-
 from i4h_surgical.systems.fluids.bleeding import Bleeding
-
-
 from i4h_surgical.systems.fluids.emitter import Emitter
-
-
 from i4h_surgical.systems.fluids.suction import Suction
-
-
 from i4h_surgical.systems.instruments.clipping import Clipping
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 
 

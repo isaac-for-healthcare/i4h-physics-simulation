@@ -5,29 +5,13 @@
 
 
 import numpy as np
-
-
 import pytest
-
-
-from helpers import find, live_surface_is_consistent, needs_chole, push_actions, run
-
-
+from helpers import find, live_surface_is_consistent, push_actions, run
 from i4h_host.composition import load_case
-
-
 from i4h_physics.systems.mechanics.tet import Tet
-
-
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
-
-
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-
 from i4h_surgical.systems.instruments.thermal import Thermal
-
-
 from i4h_surgical.systems.mechanics.surface import Surface
 
 

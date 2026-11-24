@@ -5,8 +5,6 @@
 
 
 import numpy as np
-
-
 from i4h_host.camera.camera import Camera, stable_frame
 
 

@@ -1,6 +1,6 @@
-> Standalone was extracted after this architecture was documented. See [current split ownership and symbol migration](standalone-split.md).
-
 # Architecture and package boundaries
+
+> Standalone was extracted after this architecture was documented. See [current split ownership and symbol migration](standalone-split.md).
 
 Physics and assessment are neutral packages. Domains depend on physics, and import
 neither hosts nor each other. Standalone owns device adapters, teleoperation, input

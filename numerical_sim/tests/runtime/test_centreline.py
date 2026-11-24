@@ -7,22 +7,11 @@ Y junction on rod_pbd from omniendo tests/test_pbd_branching.py), then lumen con
 
 import json
 
-
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 import yaml
-
-
 from helpers import find, run_rates
-
-
 from i4h_endoluminal.loaders.centreline import (
     add_centreline_tree,
     build_tree,
@@ -31,23 +20,11 @@ from i4h_endoluminal.loaders.centreline import (
     spline_topology,
     tree_frames,
 )
-
-
 from i4h_endoluminal.rod_storage import declare_control_layout, declare_drag
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.containment_storage import declare_graph_containment
-
-
 from i4h_physics.rod_storage import declare_rod_pbd
-
-
 from i4h_physics.systems.mechanics.particles import Particles
-
-
 from i4h_physics.systems.rods.rod_pbd import RodPbd
 
 
@@ -180,8 +157,6 @@ def test_y_masked_reset_and_isolation():
 
 
 from i4h_physics.scene import ACTIVE_INT, Part, ParticleRest  # noqa: E402
-
-
 from i4h_physics.systems.contact.graph_containment import (  # noqa: E402
     GraphContainment,
     clamp_deltas,
@@ -423,19 +398,10 @@ def test_lumen_open_root_requires_open_tree():
 
 
 from conftest import env_slice  # noqa: E402
-
-
 from helpers import needs_vessels  # noqa: E402
-
-
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl  # noqa: E402
-
-
 from i4h_host.composition import load_case  # noqa: E402
-
-
 from i4h_physics.systems.rods.rod_direct import RodDirect  # noqa: E402
-
 
 TREE_RATES = np.float32([[1.0, 0.3, 0.2], [0.75, -0.2, 0.4]])  # insertion, rotation, tip bend per env
 
@@ -619,8 +585,6 @@ def test_drag_motion_limit_and_zero_velocity(substeps):
 
 
 from i4h_endoluminal.loaders.centreline import load_control_layout  # noqa: E402
-
-
 from i4h_endoluminal.systems.rods.control_layout import ControlLayout  # noqa: E402
 
 

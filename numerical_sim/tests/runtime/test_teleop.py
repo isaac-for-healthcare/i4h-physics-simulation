@@ -8,7 +8,6 @@ the case's 0.5 N cap."""
 
 import pytest
 
-
 torch = pytest.importorskip("torch")
 
 
@@ -16,11 +15,7 @@ pytest.importorskip("isaaclab.envs")
 
 
 from i4h_isaaclab.env import I4hEnv, I4hEnvCfg  # noqa: E402
-
-
 from isaaclab.scene import InteractiveSceneCfg  # noqa: E402
-
-
 from isaaclab.sim import SimulationContext  # noqa: E402
 
 

@@ -6,56 +6,26 @@
 
 import copy
 
-
 import numpy as np
-
-
 import pytest
-
-
 import warp as wp
-
-
 from i4h_endoluminal.loaders.centreline import add_centreline_tree, build_tree
-
-
 from i4h_endoluminal.loaders.rod import add_rod
-
-
 from i4h_endoluminal.regions import instrument_regions, vessel_regions
-
-
 from i4h_endoluminal.rod_storage import declare_catheter_control, declare_control_layout
-
-
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-
-
 from i4h_physics import Scene, Stepper
-
-
 from i4h_physics.regions import RegionMembership
-
-
 from i4h_physics.rod_storage import (
     declare_rod_direct,
     declare_rod_direct_material,
     declare_rod_pbd,
     declare_rod_pbd_material,
 )
-
-
 from i4h_physics.systems.mechanics.particles import Particles
-
-
 from i4h_physics.systems.rods.material import RodDirectMaterial, RodPbdMaterial
-
-
 from i4h_physics.systems.rods.rod_direct import RodDirect
-
-
 from i4h_physics.systems.rods.rod_pbd import RodPbd
-
 
 INSTRUMENT = {'schema_version': 1, 'default': 'unassigned', 'regions': [
     {'name': 'shaft', 'interval': [0, .8]}, {'name': 'transition', 'interval': [.8, .9]}, {'name': 'tip', 'interval': [.9, 1]}]}

@@ -58,9 +58,9 @@ except ModuleNotFoundError as error:
     if error.name != "i4h_surgical":
         raise
     InstrumentControl = ()
-from i4h_isaaclab.camera import FLUID_COLOR, PART_COLORS, ROD_COLOR
 from i4h_host.camera.camera import Camera
 from i4h_host.camera.tip import resolve_tip
+from i4h_isaaclab.camera import FLUID_COLOR, PART_COLORS, ROD_COLOR
 from i4h_physics.loaders.static_mesh import smooth_normals
 from i4h_physics.quat import matrix_to_quat
 from i4h_physics.systems.mechanics.surface import Surface
