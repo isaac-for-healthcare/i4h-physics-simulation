@@ -144,11 +144,11 @@ class Mounts:
                 raise ValueError(f"mounts require the selected {name}")
         self.scene.storage.check()
 
-    def drive(self, state) -> None:
+    def drive(self, state, world_mask=None) -> None:
         """Step 3: each mount's pose in the component frame, ``T_e⁻¹ · body_q · offset``."""
         self.check(state=state)
         for g in self.groups:
-            wp.launch(drive_mounts, dim=(g.envs, g.count), inputs=[state.body_q, g.body, g.offset, g.target, self.env_xform],
+            wp.launch(drive_mounts, dim=(g.envs, g.count), inputs=[state.body_q, g.body, g.offset, g.target, self.env_xform, world_mask],
                       outputs=[g.control.mount_pose], device=g.force.device)
 
     def fill(self, substeps: int, dt: float) -> None:
@@ -293,9 +293,12 @@ def drive_mounts(
     offset: wp.array(dtype=wp.transform),
     target: wp.array(dtype=wp.int32),
     env_xform: wp.array(dtype=wp.transform),
+    world_mask: wp.array(dtype=wp.bool),
     mount_pose: wp.array2d(dtype=wp.transform),
 ):
     env, m = wp.tid()
+    if world_mask and not world_mask[env]:
+        return
     mount_pose[env, target[m]] = wp.transform_inverse(env_xform[env]) * (body_q[body[env, m]] * offset[m])
 
 

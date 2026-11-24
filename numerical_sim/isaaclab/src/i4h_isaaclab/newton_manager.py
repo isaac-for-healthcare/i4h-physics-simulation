@@ -74,6 +74,7 @@ class ConstructionContext:
         self.on_solver = on_solver
         self.authoring = self._author()
         self.binding = self.manager = self.backend = None
+        self._reset_articulations = None
         self.bind_callback = None  # the solver-init callback registered with a Lab main backend
         self.subscriptions = []
         self.closed = False
@@ -121,10 +122,18 @@ class ConstructionContext:
             core.configure(dt, settings["substeps"], settings["iterations"], settings["debug"])
             if isinstance(solver, CoupledSolver) and self.cfg.mounts:
                 solver.mounts = Mounts(model, scene, systems, self.cfg.mounts, self.cfg.coupling_mode == "two_way")
-            self.binding = PhysicsBinding.hosted(core, solver, self.prepare)
+            self._reset_articulations = (wp.zeros(model.articulation_count, dtype=wp.bool, device=model.device)
+                                         if isinstance(solver, CoupledSolver) and solver.mounts is not None else None)
+            self.binding = PhysicsBinding.hosted(core, solver, self.prepare,
+                                                 prepare_episode_reset=self.prepare_episode_reset)
         except BaseException:
             self.invalidate()
             raise
+
+    def prepare_episode_reset(self, world_mask):
+        if self._reset_articulations is not None:
+            from i4h_isaaclab.coupling import prepare_mounted_episode
+            prepare_mounted_episode(self.binding, world_mask, self._reset_articulations)
 
     def publish(self):
         """Native contacts exist; bind consumers and prepare before the host captures."""
@@ -191,6 +200,7 @@ class ConstructionContext:
             self.binding.after_step()
 
     def invalidate(self, event=None):
+        self._reset_articulations = None
         if self.binding is not None:
             self.binding.invalidate()
             self.binding = None

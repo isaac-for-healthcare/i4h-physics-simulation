@@ -128,21 +128,41 @@ def test_parity_tube_bend_keeps_ours_in_the_lumen():
 
 
 
-def test_physical_inertia_follows_each_envs_mass():
-    """Physical inertia is per environment: one geometry variant may carry different particle masses per env, and
-    each env's frames then rotate with its own nodes' inertia, like an independently built rod of that mass."""
+@pytest.mark.parametrize("captured", [False, True])
+@pytest.mark.parametrize("field,factor", [("inv_mass", 0.1), ("radius", 1.5)])
+def test_physical_inertia_follows_each_envs_parameters(captured, field, factor):
+    """Preparation refreshes per-env model inertia after mass or radius edits.
+
+    Both the changed environment and its peer match independent rods, including
+    graph recapture after an already prepared runtime's parameters change.
+    """
     batch = load_case(case("physical", envs=2))
+    batch.cuda_graph = captured
+    batch.prepare()
     body = batch.scene.body("catheter")
-    inv_mass = batch.scene.field("inv_mass", body)
-    rows = inv_mass.numpy()
-    rows[1] = rows[1] / 10.0  # env 1's nodes ten times heavier (the locked root stays at 0)
-    inv_mass.assign(rows)
-    batch.prepare()  # the physical inertia is recomputed from each env's rows
-    local = system(batch, "RodDirect").inertia_local.numpy().reshape(2, N, 3)
-    np.testing.assert_allclose(local[1, 1:], local[0, 1:] / 10.0, rtol=1e-5)
-    heavy = load_case(case("physical", mass=MASS * 10.0))
+    rod = system(batch, "RodDirect")
+    pointer = rod.inertia_local.ptr
+    parameter = batch.scene.field(field, body)
+    rows = parameter.numpy()
+    rows[1] *= factor
+    parameter.assign(rows)
+    batch.prepare()
+    assert rod.inertia_local.ptr == pointer
+    reference = load_case(case("physical"))
+    changed_cfg = case("physical", mass=MASS / factor if field == "inv_mass" else MASS)
+    if field == "radius":
+        changed_cfg["assets"]["catheter"]["radius"] *= factor
+    changed = load_case(changed_cfg)
+    for sim in (reference, changed):
+        sim.cuda_graph = captured
+        sim.prepare()
     for _ in range(120):
         batch.step()
-        heavy.step()
-    q = batch.scene.field("q", body).numpy()
-    np.testing.assert_allclose(q[1], heavy.scene.field("q", heavy.scene.body("catheter")).numpy()[0], atol=1e-5)
+        reference.step()
+        changed.step()
+    positions = batch.scene.field("q", body).numpy()
+    for env, sim in enumerate((reference, changed)):
+        np.testing.assert_allclose(positions[env], sim.scene.field("q", sim.scene.body("catheter")).numpy()[0], atol=1e-5)
+    local = rod.inertia_local.numpy().reshape(2, N, 3)
+    for env, sim in enumerate((reference, changed)):
+        np.testing.assert_allclose(local[env], system(sim, "RodDirect").inertia_local.numpy().reshape(N, 3), rtol=1e-5)

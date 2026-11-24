@@ -150,6 +150,7 @@ def test_defaults_declarations_aliases_and_unchanged_binding(device, captured, t
     Mounts(m, r.scene, r.systems, a.mounts, two_way)
     assert snapshot(m, state, control) == before
     r.step()
+    saved_mounts = []
     for group in r.mounts.groups[1:]:
         initial = np.tile(np.float32([[[.1, .2, .3]]]), (3, 1, 1))
         delta = group.control.mount_pose.numpy()[..., :3] - initial
@@ -158,8 +159,11 @@ def test_defaults_declarations_aliases_and_unchanged_binding(device, captured, t
         expected = initial + delta * np.minimum(1., limit / np.maximum(distance, 1.e-12))
         np.testing.assert_allclose(group.control.root.numpy(), expected, atol=1e-6)
         root, pose = group.control.root.numpy().copy(), group.control.mount_pose.numpy().copy()
-        r.coupled.restore_episode(state, control, wp.array([True, False, False, False], dtype=wp.bool, device=device))
-        np.testing.assert_array_equal(group.control.root.numpy(), root)
+        saved_mounts.append((group, root, pose))
+    r.coupled.restore_episode(state, control, wp.array([True, False, False, False], dtype=wp.bool, device=device))
+    for group, root, pose in saved_mounts:
+        np.testing.assert_array_equal(group.control.root.numpy()[0], pose[0, :, :3])
+        np.testing.assert_array_equal(group.control.root.numpy()[1:], root[1:])
         np.testing.assert_array_equal(group.control.mount_pose.numpy(), pose)
 
 

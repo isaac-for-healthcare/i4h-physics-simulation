@@ -200,14 +200,6 @@ class I4hCoupledNewtonSolver(I4hNewtonSolver):
 
     def reset(self, state, world_mask):
         self.rigid.reset(state, world_mask)
-        mounts = self.native.mounts
-        if mounts is not None:
-            # A host resets or randomizes its holders (joint state) before this reset: forward kinematics brings body_q
-            # up to date and the mounts are driven from it, so the instrument reset starts from the holder's new pose.
-            import newton
-
-            newton.eval_fk(self.native.model, state.joint_q, state.joint_qd, state)
-            mounts.drive(state)
         self.native.ours.reset(state, world_mask=world_mask, flags=0)
 
     def eval_fk(self, state, world_mask, fk_mask):

@@ -48,7 +48,7 @@ ALLOWED = {
         "isaaclab/src/i4h_isaaclab/newton_manager.py": {"__i4h_context"},
     },
     "own instance, set in the class's alternate constructor": {
-        "physics/src/i4h_physics/bindings.py": {"_core", "_output_arrays", "_prepare", "_prepared", "_runtime", "_standalone"},
+        "physics/src/i4h_physics/bindings.py": {"_core", "_output_arrays", "_prepare", "_prepare_episode_reset", "_prepared", "_runtime", "_standalone"},
     },
     "standalone renderer sharing inside its own package (out of C4.4 scope)": {
         "standalone/src/i4h_standalone/render/gbuffer.py": {"_frame", "_render_state"},

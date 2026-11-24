@@ -175,7 +175,9 @@ def test_manual_mount_defaults_and_reset_persistence():
     sim.reset([0])
     np.testing.assert_array_equal(cc.mounted.numpy(), [1])
     np.testing.assert_array_equal(cc.mount_pose.numpy(), pose)
-    np.testing.assert_array_equal(cc.root.numpy(), root)  # no additional catheter-root reset
+    np.testing.assert_array_equal(cc.root.numpy()[0], pose[0, :, :3])
+    np.testing.assert_array_equal(cc.root.numpy()[1], root[1])
     sim.reset([])
     sim.reset([0])
-    np.testing.assert_array_equal(cc.root.numpy(), root)
+    np.testing.assert_array_equal(cc.root.numpy()[0], pose[0, :, :3])
+    np.testing.assert_array_equal(cc.root.numpy()[1], root[1])
