@@ -511,7 +511,7 @@ def add_centreline_from_json(scene: Scene, name: str, path, *, scale, rotation, 
     ``control_layout`` system shapes the tree with them, one layout per env round-robin)."""
     from i4h_endoluminal.regions import RegionMembership, vessel_regions
     starts, ends, smin, emin, smax, emax, sources, known = load_centreline_json(path, with_sources=True)
-    names, mapping = vessel_regions(regions, known) if regions is not None else (("unassigned",), None)
+    names, mapping, moduli = vessel_regions(regions, known) if regions is not None else (("unassigned",), None, {})
     if radius_mode == "min":
         sr, er = smin, emin
     elif radius_mode == "max":
@@ -542,7 +542,7 @@ def add_centreline_from_json(scene: Scene, name: str, path, *, scale, rotation, 
     body.tree.material_radius = (radii_src * float(np.min(scale)))[None]
     if regions is not None:
         edge_regions.flags.writeable = False
-        body.regions = RegionMembership(names, edge_regions, edge_sources)
+        body.regions = RegionMembership(names, edge_regions, edge_sources, moduli)
     body.anatomy.layouts = [load_control_layout(p, len(positions), name) for p in (control_layouts or ())]  # layout l serves envs e % L == l
     return body
 

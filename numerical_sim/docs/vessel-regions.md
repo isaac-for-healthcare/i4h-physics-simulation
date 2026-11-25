@@ -27,7 +27,8 @@ branches:
   11: arch_outlets
 ```
 
-Version 1 allows only `schema_version`, `default`, and `branches`. Region names
+Version 1 allows only `schema_version`, `default`, `branches` and the optional
+`young_modulus_kpa` (below). Region names
 must be nonempty strings. `default` is optional and defaults to `unassigned`;
 `branches` defaults to an empty mapping. Keys match the source JSON's `branch_id`
 (or its list index when omitted), including their type: integer 0 differs from
@@ -42,10 +43,40 @@ values, multiplied by their solver settings (and the bend layout scale).
 Radius weighting is disabled in this case. All regional values start at 1.
 These are numerical PBD multipliers, not material moduli. Calibration is deferred.
 
+A sidecar may also give each region a wall Young's modulus in kPa. Patient bundles
+from i4h-digital-twin write one (`vessel_regions.yaml`) with literature defaults per
+segmented vessel; their region IDs are the centreline's branch IDs:
+
+```yaml
+schema_version: 1
+default: unassigned
+branches: {0: aorta, 1: iliac_artery_right, 2: iliac_artery_left}
+young_modulus_kpa: {aorta: 400.0, iliac_artery_right: 400.0, iliac_artery_left: 400.0}
+```
+
+Names must be regions of the same sidecar, and values positive and finite. The
+moduli only take effect when the `rod_pbd_material` sets
+`reference_young_modulus_kpa`: each region with a modulus then starts with bend and
+twist multipliers of its modulus over the reference, and stretch stays 1. Regions
+without a modulus, such as `unassigned`, keep 1. A ratio above the multiplier limit
+of 10 fails at declaration. Set the reference to the modulus the solver settings
+were tuned for, so that region keeps them:
+
+```yaml
+- type: rod_pbd_material
+  id: vessel_material
+  body: aorta
+  reference_young_modulus_kpa: 400
+```
+
+This linear mapping is a first-order default, not a calibration: it ignores wall
+thickness and radius (see `radius_weighting`).
+
 The standalone Slang workspace selects and highlights one region. Edits apply
 to all environments by default; disable that option to edit the displayed one.
 Episode reset preserves material edits. Restore all region defaults resets every
-region of the selected body to 1 in the selected environment scope.
+region of the selected body to its initial value (1, or the modulus ratio) in
+the selected environment scope.
 Save/Load and `--overrides FILE` use the existing `regions` override section:
 
 ```yaml
