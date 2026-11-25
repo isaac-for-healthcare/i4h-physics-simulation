@@ -27,15 +27,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from i4h_endoluminal.loaders.centreline import add_centreline_from_json, bind_skin
+from i4h_endoluminal.loaders.centreline import add_centreline_from_bundle, bind_skin
 from i4h_physics.loaders.static_mesh import smooth_normals, weld_map
 from i4h_physics.mesh_utils import rotation_matrix_degrees, select_pins, shell_topology, triangulate
 from i4h_physics.scene import ACTIVE_INT, Part, ParticleRest, Scene, ShellMesh, StaticMesh
 from i4h_physics.usd import usd
 
 
-def read_usd_mesh(path, prim: str) -> tuple[np.ndarray, np.ndarray]:
-    """``(points (n, 3) float32, triangles (f, 3) int32)`` of one mesh prim, in the prim's local space."""
+def read_usd_mesh(path, prim: str, prim_transform: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    """``(points (n, 3) float32, triangles (f, 3) int32)`` of one mesh prim, in the prim's local space, or with
+    ``prim_transform`` in the stage's space (the prim's local-to-world transform applied)."""
     Usd, UsdGeom = usd()
 
     path = Path(path).expanduser()
@@ -48,6 +49,9 @@ def read_usd_mesh(path, prim: str) -> tuple[np.ndarray, np.ndarray]:
         raise ValueError(f"vessel mesh {path}: prim {prim!r} is not a mesh; meshes: {meshes}")
     mesh = UsdGeom.Mesh(p)
     points = np.asarray(mesh.GetPointsAttr().Get(), np.float32).reshape(-1, 3)
+    if prim_transform:  # USD matrices act on row vectors: p' = p @ M[:3, :3] + M[3, :3]
+        m = np.asarray(UsdGeom.Xformable(p).ComputeLocalToWorldTransform(Usd.TimeCode.Default()), np.float64)
+        points = (points @ m[:3, :3] + m[3, :3]).astype(np.float32)
     indices = triangulate(np.asarray(mesh.GetFaceVertexIndicesAttr().Get(), np.int32),
                           np.asarray(mesh.GetFaceVertexCountsAttr().Get(), np.int32))
     return points, indices
@@ -85,10 +89,13 @@ def build_shell(name: str, points: np.ndarray, tris: np.ndarray, envs: int, dens
 
 
 def add_vessel_mesh(scene: Scene, name: str, path, prim: str, scale=1.0, translation=(0.0, 0.0, 0.0),
-                    rotation_euler_degrees=(0.0, 0.0, 0.0), visual=None, deformable=None, centreline=None):
+                    rotation_euler_degrees=(0.0, 0.0, 0.0), visual=None, deformable=None, centreline=None,
+                    prim_transform=False):
     """A ``StaticMesh`` (default) or, with ``deformable``, a shell ``Body`` carrying a ``ShellMesh``. With ``centreline``
-    the vessel's centreline tree becomes a body named ``name`` (the static mesh keeps the name in its own list)."""
-    points, indices = read_usd_mesh(path, prim)
+    the vessel's centreline tree becomes a body named ``name`` (the static mesh keeps the name in its own list).
+    ``prim_transform`` reads the mesh in the stage's space rather than the prim's (an i4h-digital-twin
+    ``patient_anatomy.usdc`` then matches its centreline arrays)."""
+    points, indices = read_usd_mesh(path, prim, bool(prim_transform))
     n = len(points)
     if indices.size == 0 or indices.min() < 0 or indices.max() >= n:
         raise ValueError(f"vessel mesh {name!r}: triangle index outside [0, {n})")
@@ -102,8 +109,8 @@ def add_vessel_mesh(scene: Scene, name: str, path, prim: str, scale=1.0, transla
             raise ValueError(f"vessel mesh {name!r}: a vessel is either deformable or has a centreline tree")
         c = dict(centreline)
         skinning = bool(c.pop("skinning", False))
-        tree = add_centreline_from_json(scene, name, c.pop("path"), scale=scale, rotation=rotation, translation=translation,
-                                        root_position=c.pop("root_position"), visual=visual, **c)  # unknown keys fail here
+        tree = add_centreline_from_bundle(scene, name, c.pop("path"), scale=scale, rotation=rotation, translation=translation,
+                                          root_position=c.pop("root_position"), visual=visual, **c)  # unknown keys fail here
         if skinning:  # the surface follows the tree (dual-quaternion skinning in the renderers)
             tree.skin = bind_skin(name, points, indices, tree.tree, scene.device, visual)
         else:
