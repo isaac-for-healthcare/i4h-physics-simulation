@@ -50,6 +50,7 @@ ALLOWED = {'Newton WORLD row count on the pinned and current-stack assessment re
  "own instance, set in the class's alternate constructor": {'physics/src/i4h_physics/bindings.py': {'_core',
                                                                                                     '_output_arrays',
                                                                                                     '_prepare',
+                                                                                                   '_prepare_episode_reset',
                                                                                                     '_prepared',
                                                                                                     '_runtime',
                                                                                                     '_standalone'}}}

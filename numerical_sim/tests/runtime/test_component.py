@@ -180,18 +180,21 @@ def test_configuration_preserves_host_settings():
     cfg = HostEnvCfg()
     cfg.sim.physics.use_cuda_graph = False
     cfg.sim.physics.num_substeps = 3
-    # Even unsupported settings must reach the adapter's explicit validation.
-    cfg.sim.physics.collision_cfg = {"unsupported": True}
     previous = cfg.sim.physics
-    with pytest.raises(ValueError, match="collision_cfg"):
-        component.configure(cfg.sim)
-    assert cfg.sim.physics is previous
-    cfg.sim.physics.collision_cfg = None
     component.configure(cfg.sim)
     for field in fields(previous):
         if field.name not in ("class_type", "solver_cfg", "num_substeps"):
             assert getattr(cfg.sim.physics, field.name) == getattr(previous, field.name)
     assert cfg.sim.physics.num_substeps == 1 and component.solver_cfg.rigid_substeps == 3
+    unsupported = HostEnvCfg()
+    unsupported.sim.physics.collision_cfg = {"unsupported": True}
+    rejected = unsupported.sim.physics
+    rejected_values = {field.name: getattr(rejected, field.name) for field in fields(rejected)}
+    with pytest.raises(ValueError, match="collision_cfg"):
+        I4hComponent(component_cfg()).configure(unsupported.sim)
+    assert unsupported.sim.physics is rejected
+    for name, value in rejected_values.items():
+        assert getattr(rejected, name) == value
 
 
 def test_component_from_parameters_beside_a_host_body(host):

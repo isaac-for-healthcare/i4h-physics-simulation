@@ -19,16 +19,23 @@ class PhysicsBinding:
         self._core = sim.solver
         self._runtime = sim.solver
         self._prepare = None
+        self._prepare_episode_reset = None
         self._prepared = None
         self.procedure = self.after_step = self.observables = self.contacts = None
         self._output_arrays = []
 
     @classmethod
-    def hosted(cls, core, runtime, prepare):
+    def hosted(cls, core, runtime, prepare, *, prepare_episode_reset=None):
+        """Bind host-owned containers; an optional hook prepares selected episode worlds.
+
+        The hook receives the device world mask after selection and before
+        numerical restoration. It runs neither for cache reset nor continuation.
+        """
         binding = cls.__new__(cls)
         binding.valid = True
         binding._standalone = None
         binding._core, binding._runtime, binding._prepare = core, runtime, prepare
+        binding._prepare_episode_reset = prepare_episode_reset
         binding._prepared = None
         binding.procedure = binding.after_step = binding.observables = binding.contacts = None
         binding._output_arrays = []
@@ -45,6 +52,7 @@ class PhysicsBinding:
         self._standalone = self._core = self._runtime = self._prepare = None
         self.procedure = self.after_step = self.observables = self.contacts = None
         self._output_arrays = []
+        self._prepare_episode_reset = None
         self._prepared = None
         if hasattr(self, "world_mask"):
             self.world_mask = self.env_mask = None
@@ -207,5 +215,7 @@ class PhysicsBinding:
         self.check_prepared()
         if not select_envs(self.env_mask, env_ids, mask, debug=self.debug):
             return False
+        if self._prepare_episode_reset is not None:
+            self._prepare_episode_reset(self.world_mask)
         self._runtime.restore_episode(self.state, self.control, self.world_mask)
         return True

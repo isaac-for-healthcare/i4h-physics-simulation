@@ -1171,7 +1171,7 @@ def test_mounted_probe_two_way_under_lab(make_env):
 
 @pytest.mark.parametrize("backend", ["newton"])
 def test_physics_reset_clears_the_selected_worlds_pending_reactions(make_env):
-    """A masked physics reset (the captured reset graph) clears the reset worlds' queued two_way reactions, so a new
+    """A masked hosted episode reset clears the reset worlds' queued two_way reactions, so a new
     episode does not push its holder with the last episode's contact; other worlds keep theirs."""
     pytest.importorskip("mujoco_warp")
     from isaaclab_newton.cloner import newton_builder_world_hook
@@ -1241,7 +1241,8 @@ def test_mount_owned_host_rebuild_commands_and_close(make_env):
 
 
 @pytest.mark.parametrize("backend", ["newton"])
-def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
+@pytest.mark.parametrize("captured", [False, True])
+def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env, captured):
     """A host resets or randomizes its holder (joint state) before the component's reset: the reset instrument
     starts at the holder's new pose (forward kinematics and the mount read by the hosted reset); a
     world that is not reset keeps its instrument."""
@@ -1250,12 +1251,18 @@ def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
     from isaaclab_newton.physics import MJWarpSolverCfg
 
     with newton_builder_world_hook(probe_holder):
-        env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg(), mounts={"probe": {"body": "holder"}})
+        sim_cfg = lab_sim((0.0, 0.0, -9.81))
+        sim_cfg.physics.use_cuda_graph = captured
+        env = make_env(stagger_episodes=False, sim=sim_cfg, rigid_solver_cfg=MJWarpSolverCfg(),
+                       mounts={"probe": {"body": "holder"}})
     env.reset()
     for _ in range(10):
         env.step(torch.zeros((2, 10), device=env.device))
     sim = env.unwrapped.simulator
-    assert sim.prepared and env.unwrapped.sim.backend_manager.backend.graphs
+    assert sim.prepared and sim.runtime is sim.coupled
+    assert sim.state is sim.solver.state
+    if captured:
+        assert lab_runtime().graph is not None
     ic = next(s for s in sim.systems if type(s).__name__ == "InstrumentControl")
     torch.cuda.synchronize()
     before = ic.root.numpy()[:, 0].copy()

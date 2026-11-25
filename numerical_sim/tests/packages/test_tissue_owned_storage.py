@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import warp as wp
 from interaction_helpers import MODES, authored, copy_container, first_difference, runtime, snapshot, system
+from ownership_helpers import assert_native_alias
 from tissue_helpers import CONTAINMENT, RESET, TISSUE, TissueEpisode, aorta, field, history, inject, poison, world_rows
 
 KINDS = {"thermal", "appearance", "fluid", "bleeding", "emitter", "smoke", "suction", "graph_containment"}
@@ -96,24 +97,27 @@ def test_history_is_newton_state_with_templates_and_independent_containers(devic
     before = snapshot(state, control)
     sim = runtime(cfg, a, m, state=state, control=control, prepare=False)
     after = snapshot(state, control)
-    declared = set()
+    declared, global_rows = set(), {}
+    records = {sid: r for sid, r in sim.scene.interaction_domains.items() if r["kind"] in KINDS}
+    declarations = {f.name: f for r in records.values() for f, _, _ in r["fields"].values()}
     for name, keys in names.items():
         for key in keys:
             attribute = NAMES[name, key]
             live, backing = field(sim, name, key), getattr(state.i4h, attribute)
-            assert live.ptr == backing.ptr and live.device == backing.device and live.is_contiguous
-            assert live.size * wp.types.type_size_in_bytes(live.dtype) == backing.size * wp.types.type_size_in_bytes(backing.dtype)
+            global_rows[attribute] = (backing, assert_native_alias(live, backing, declarations[attribute]))
             assert len({backing.ptr, getattr(m.i4h, attribute).ptr, getattr(other.i4h, attribute).ptr}) == 3
             assert after[0][f"i4h:{attribute}"] == before[0][f"i4h:{attribute}"], f"binding wrote {attribute}"
             np.testing.assert_array_equal(live.numpy(), RESET.get((name, key), 0), err_msg=attribute)
             declared.add(attribute)
-    records = {sid: r for sid, r in sim.scene.interaction_domains.items() if r["kind"] in KINDS}
     assert {f.name for r in records.values() for f, _, _ in r["fields"].values()} == declared
     poison(sim, names)
     for attribute in declared:  # live history never writes the template or another State
         template, untouched = getattr(m.i4h, attribute).numpy(), getattr(other.i4h, attribute).numpy()
         np.testing.assert_array_equal(template, untouched)
         assert getattr(state.i4h, attribute).numpy().tobytes() != template.tobytes()
+    for backing, before in global_rows.values():
+        if before is not None:
+            assert backing.numpy()[-1:].tobytes() == before
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda:0"])

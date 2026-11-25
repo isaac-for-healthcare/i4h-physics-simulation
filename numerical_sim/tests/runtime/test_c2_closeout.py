@@ -21,8 +21,17 @@ def physical_arrays(state):
 
 
 def byte_snapshot(arrays, worlds=None):
-    return {name: (value if worlds is None else value.reshape(3, -1)[worlds]).tobytes()
-            for name, value in arrays.items()}
+    result = {}
+    for name, value in arrays.items():
+        if worlds is not None:
+            if name in ("surface_overflow", "surface_deleted", "surface_dirty") and value.shape == (4,):
+                # Newer Newton adds a global WORLD row. Preserve it alongside
+                # the unselected worlds; it must remain byte-identical too.
+                value = value[[*worlds, 3]]
+            else:
+                value = value.reshape(3, -1)[worlds]
+        result[name] = value.tobytes()
+    return result
 
 
 def oriented(tri):

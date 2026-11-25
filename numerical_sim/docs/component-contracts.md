@@ -42,6 +42,7 @@ They come from the feasibility spike recorded at the end, and every test of thos
 **Reset.**
 
 - A masked reset resets our rows (positions, velocities, `q_prev`, flags, system products) and the host rigid solver's selected worlds in one call.
+- A hosted binding may supply `prepare_episode_reset(world_mask)`. After mask selection and before numerical restoration, the Lab host evaluates current holder joints and mount poses only for selected worlds. Write or randomize the holder joints before calling the component reset. Mounted catheters restore their rest geometry and frames at that current mount pose.
 - An empty selection changes nothing.
 - This is the episode reset. The cache reset (`I4hSolver.reset(flags=0)`, which Lab calls after state is written through its asset API) refreshes derived caches and keeps history.
 

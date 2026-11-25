@@ -287,11 +287,14 @@ def test_declaration_initializer_order_and_freeze():
     d.add(Field(world, 'history', Owner.STATE, wp.float32, (1,), 'world', 'default'), [2.])
     calls = []
     def first(model):
-        assert model.i4h.probe_history.numpy().tolist() == [2.]
-        model.i4h.probe_history.fill_(7.)
+        assert model.i4h.probe_history[:1].numpy().tolist() == [2.]
+        assert model.i4h.probe_history.shape in ((1,), (2,))
+        assert (model.i4h.probe_history.numpy()[1:] == 0).all()
+        model.i4h.probe_history[:1].fill_(7.)
         calls.append('first')
     def second(model):
-        assert model.i4h.probe_history.numpy().tolist() == [7.]
+        assert model.i4h.probe_history[:1].numpy().tolist() == [7.]
+        assert (model.i4h.probe_history.numpy()[1:] == 0).all()
         calls.append('second')
     d.initializer(first)
     d.initializer(second)
@@ -304,7 +307,8 @@ def test_declaration_initializer_order_and_freeze():
     d.author_rows(b)
     m = b.finalize(device='cpu')
     assert calls == ['first', 'second']
-    assert m.state().i4h.probe_history.numpy().tolist() == [7.]
+    values = m.state().i4h.probe_history.numpy()
+    assert values[:1].tolist() == [7.] and (values[1:] == 0).all()
 
 
 def test_direct_layout_freezes_at_declaration():

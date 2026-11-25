@@ -8,6 +8,19 @@ import warp as wp
 MODES = [("cpu", False), ("cuda:0", False), ("cuda:0", True)]
 
 
+def assert_native_alias(live, backing, declaration):
+    """An exact logical alias, allowing only Newton's trailing, unowned WORLD row.
+
+    Return that row's bytes so callers can prove their operations leave it untouched.
+    """
+    assert live.ptr == backing.ptr and live.device == backing.device and live.is_contiguous
+    global_row = (declaration.domain.frequency == newton.Model.AttributeFrequency.WORLD
+                  and backing.size == declaration.domain.count + 1)
+    row_bytes = wp.types.type_size_in_bytes(backing.dtype)
+    assert live.size * wp.types.type_size_in_bytes(live.dtype) == backing.size * row_bytes - (row_bytes if global_row else 0)
+    return backing.numpy()[-1:].tobytes() if global_row else None
+
+
 def arrays(container):
     """Every Warp array of a Newton Model, State or Control, including the i4h namespace."""
     found = {}

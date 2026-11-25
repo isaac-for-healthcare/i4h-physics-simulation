@@ -20,6 +20,7 @@ from interaction_helpers import (
     snapshot,
     system,
 )
+from ownership_helpers import assert_native_alias
 
 # What an episode reset clears; every other history array keeps its bytes (deliberately stale).
 RESET = {
@@ -208,7 +209,7 @@ def test_templates_identities_and_independent_containers(device, captured):
     records = scene.interaction_domains
     kinds = {"centreline", "instrument_contact", "hook", "grasp", "volumetric_grasp", "clipping"}
     assert {r["kind"] for r in records.values()} >= kinds  # tissue and fluid history has its own module
-    names = set()
+    names, global_rows = set(), {}
     for sid, record in records.items():
         if record["kind"] not in kinds:
             continue
@@ -217,8 +218,7 @@ def test_templates_identities_and_independent_containers(device, captured):
             backing, live = getattr(state.i4h, f.name), getattr(owner, key)
             assert f.owner.value == "state" and f.name not in names and live.shape == tuple(shape)
             names.add(f.name)
-            assert live.ptr == backing.ptr and live.device == backing.device and live.is_contiguous
-            assert live.size * wp.types.type_size_in_bytes(live.dtype) == backing.size * wp.types.type_size_in_bytes(backing.dtype)
+            global_rows[f.name] = (backing, assert_native_alias(live, backing, f))
             assert getattr(m.i4h, f.name).ptr != backing.ptr != getattr(m.state().i4h, f.name).ptr
         for label, d in record["domains"].items():
             if not d.custom:
@@ -245,6 +245,9 @@ def test_templates_identities_and_independent_containers(device, captured):
     untouched = snapshot(other)
     poison(sim)
     assert snapshot(m) == template and snapshot(other) == untouched
+    for backing, before in global_rows.values():
+        if before is not None:
+            assert backing.numpy()[-1:].tobytes() == before
 
 
 @pytest.mark.parametrize("device,captured", MODES)

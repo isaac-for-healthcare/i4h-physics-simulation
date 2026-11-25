@@ -3,6 +3,8 @@
 
 """Translate and validate Lab coupling configuration; numerical coupling lives in i4h_physics."""
 
+import newton
+import warp as wp
 from i4h_physics.coupling import COUPLING_MODES
 
 
@@ -21,3 +23,27 @@ def check_rigid_solver_cfg(rigid_cfg, coupling_mode: str) -> None:
 
     if getattr(rigid_cfg, "use_mujoco_cpu", False):
         raise ValueError("i4h coupling requires MuJoCo-Warp on the GPU; the global CPU reset is not world-mask safe")
+
+
+def prepare_mounted_episode(binding, world_mask, articulation_mask):
+    """Sample current host joints only in the selected episode worlds.
+
+    The host has already written reset/randomized joint coordinates. Cache reset
+    and continuation restoration must never call this operation.
+    """
+    model, state = binding.model, binding.state
+    wp.launch(select_articulations, dim=model.articulation_count,
+              inputs=[model.articulation_world, world_mask], outputs=[articulation_mask], device=model.device)
+    newton.eval_fk(model, state.joint_q, state.joint_qd, state, mask=articulation_mask)
+    binding.coupled.mounts.drive(state, world_mask)
+
+
+@wp.kernel
+def select_articulations(world: wp.array(dtype=wp.int32), world_mask: wp.array(dtype=wp.bool),
+                         selected: wp.array(dtype=wp.bool)):
+    i = wp.tid()
+    # Newton's final mask row selects shared articulations (world -1).
+    w = world[i]
+    if w < 0:
+        w = world_mask.shape[0] - 1
+    selected[i] = world_mask[w]

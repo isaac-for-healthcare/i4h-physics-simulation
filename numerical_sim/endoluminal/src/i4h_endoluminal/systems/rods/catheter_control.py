@@ -185,6 +185,17 @@ class CatheterControl(System):
         self.clear(mask, (self.targets, wp.vec3(0.0, 0.0, 0.0)))
         self.zero(mask, "impulse", "moment")
 
+    def restore_episode(self, scene, mask):
+        self.reset(scene, mask)
+        # Scene and rod episode rows have just been restored. Place their authored
+        # rest geometry in the current holder frame before the next physics step.
+        wp.launch(reset_mounted_rod, dim=(scene.envs, max(self.P, self.F)),
+                  inputs=[mask, self.mounted, self.mount_pose, self.rod.variant,
+                          self.track_start, self.base_orientation, self.P, self.F],
+                  outputs=[scene.field("q", self.body), scene.field("q_prev", self.body),
+                           scene.field("qd", self.body), self.rod.frame, self.rod.frame_pred, self.root],
+                  device=scene.device)
+
 
 # --- kernels -----------------------------------------------------------------------------------------
 
@@ -337,3 +348,29 @@ def root_hold(lambda_sum: wp.array(dtype=wp.float32), jacobian_rot: wp.array(dty
             value += jacobian_rot[edge * 36 + row * 6 + axis] * lambda_sum[base + row]
         turn[axis] = value
     moment[env, 0] = moment[env, 0] - turn
+
+
+@wp.kernel
+def reset_mounted_rod(
+    mask: wp.array(dtype=wp.bool), mounted: wp.array(dtype=wp.int32),
+    mount_pose: wp.array2d(dtype=wp.transform), variant: wp.array(dtype=wp.int32),
+    track_start: wp.array(dtype=wp.vec3), base_orientation: wp.array(dtype=wp.quat),
+    P: wp.int32, F: wp.int32,
+    q: wp.array2d(dtype=wp.vec3), q_prev: wp.array2d(dtype=wp.vec3), qd: wp.array2d(dtype=wp.vec3),
+    frame: wp.array(dtype=wp.quat), frame_pred: wp.array(dtype=wp.quat), root: wp.array2d(dtype=wp.vec3),
+):
+    env, i = wp.tid()
+    if not mask[env] or mounted[0] == 0:
+        return
+    v = variant[env]
+    transform = mount_pose[env, 0] * wp.transform_inverse(wp.transform(track_start[v], base_orientation[v]))
+    rotation = wp.transform_get_rotation(transform)
+    if i < P:
+        q[env, i] = wp.transform_point(transform, q[env, i])
+        q_prev[env, i] = wp.transform_point(transform, q_prev[env, i])
+        qd[env, i] = wp.quat_rotate(rotation, qd[env, i])
+    if i < F:
+        frame[env * F + i] = rotation * frame[env * F + i]
+        frame_pred[env * F + i] = rotation * frame_pred[env * F + i]
+    if i == 0:
+        root[env, 0] = wp.transform_get_translation(mount_pose[env, 0])

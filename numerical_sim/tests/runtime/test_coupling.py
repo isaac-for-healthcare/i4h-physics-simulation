@@ -383,7 +383,8 @@ def test_catheter_mujoco_warp_captured(mode):
     np.testing.assert_allclose(group.control.root.numpy(), group.control.mount_pose.numpy()[..., :3], atol=1e-6)
     assert bool(group.force.numpy().any()) == (mode == "two_way")
 
-def test_a_disabled_catheter_driver_stops_its_reaction():
+@pytest.mark.parametrize("captured", [False, True])
+def test_a_disabled_catheter_driver_stops_its_reaction(captured):
     """Disabling catheter_control (then prepare) clears its published reaction, and the coupling no longer fills or
     applies a stale one: the holder feels no force on the following steps."""
     systems, model, state, control, coupled = held_catheter("two_way")
@@ -402,3 +403,25 @@ def test_a_disabled_catheter_driver_stops_its_reaction():
         coupled.step(state, state, control, None, 1.0 / 60)
         wp.synchronize()
         assert not group.force.numpy().any() and not group.torque.numpy().any(), "no stale reaction is filled"
+
+    if captured:
+        with wp.ScopedCapture(device=model.device) as capture:
+            state.body_f.zero_()
+            coupled.step(state, state, control, None, 1.0 / 60)
+        wp.capture_launch(capture.graph)
+        assert not group.force.numpy().any() and not group.torque.numpy().any()
+        assert not state.body_f.numpy().any(), "disabled source contributes no force after recapture"
+    cc.enabled = True
+    for system in systems:
+        system.prepare(coupled.ours.scene)
+    if captured:
+        with wp.ScopedCapture(device=model.device) as capture:
+            state.body_f.zero_()
+            coupled.step(state, state, control, None, 1.0 / 60)
+        for _ in range(30):
+            wp.capture_launch(capture.graph)
+    else:
+        for _ in range(30):
+            state.body_f.zero_()
+            coupled.step(state, state, control, None, 1.0 / 60)
+    assert np.abs(group.force.numpy()).max() > 0.1, "re-enabled driver publishes its live reaction"
