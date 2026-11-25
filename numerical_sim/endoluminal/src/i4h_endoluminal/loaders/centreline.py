@@ -4,10 +4,8 @@
 """Anatomical centreline trees (omniendo ``vessels[].centerline`` with dynamics): a body of graph nodes with segment
 frames, bend pairs, lumen radii and spline topology, simulated by ``rod_pbd`` and used by ``lumen_containment``.
 
-Ported from omniendo: the Mosaic JSON reader ``xcath/config.py:1624-1692, 1764-1847`` (branches of samples with
-``position``, ``radius_min``, ``radius_max``; non-positive radii are sentinels repaired by ``np.interp``; the
-topology sidecar, the branch exclusions and the ``width`` fallback are not carried, both radii are required);
-``xcath/centerline_tree.py:202-326`` (``build_centerline_tree``: weld by a quantised key in source coordinates,
+Centrelines are read from the arrays an i4h-digital-twin patient bundle writes (``load_centreline_bundle``).
+Ported from omniendo: ``xcath/centerline_tree.py:202-326`` (``build_centerline_tree``: weld by a quantised key in source coordinates,
 stitch components nearer than ``stitch_threshold``, node radius = mean of its samples, render paths between
 non-degree-2 nodes, root = nearest node to a position), ``:43-95`` (``build_spline_edge_topology``),
 ``:139-160`` (``_components``); ``omniendo/xpbd_rod/pbd_cosserat.py:485-534`` (quaternion helpers), ``:563-616``
@@ -22,75 +20,57 @@ bend pairs starts at the tree's root (omniendo rooted it at its lowest-indexed f
 from __future__ import annotations
 
 import heapq
-import json
 import math
 from collections import defaultdict, deque
 from pathlib import Path
 
 import numpy as np
 import warp as wp
+import yaml
 from i4h_endoluminal.scene import GraphMetadata, SkinMesh
 from i4h_physics.scene import ACTIVE_INT, Body, Part, ParticleRest, RodGraph, Scene
 from i4h_physics.systems.rods.rod_pbd import qmul_np, rest_darboux_quats
 
-# --- Mosaic JSON (xcath/config.py:1624-1692, 1764-1847) ------------------------------------------------------
+# --- patient-twin centreline arrays (i4h-digital-twin bundles) -----------------------------------------------
 
 
-def load_centreline_json(path, with_sources=False):
-    """Per-segment ``(starts, ends, start_radius_min, end_radius_min, start_radius_max, end_radius_max)`` in the
-    file's coordinates (float64). Branches with fewer than two samples are skipped."""
-    path = Path(path).expanduser()
-    if not path.is_file():
-        raise FileNotFoundError(f"centreline not found: {path}")
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    branches = payload.get("branches") if isinstance(payload, dict) else None
-    if not isinstance(branches, list) or not branches:
-        raise ValueError(f"centreline {path}: expected a non-empty 'branches' list")
+def load_centreline_bundle(path):
+    """Per-segment ``(starts, ends, start_radii, end_radii, sources, sidecar)`` from an i4h-digital-twin centreline:
+    a directory (or its ``patient_twin.yaml``) holding ``centerline_points.npy`` (N, 3), ``centerline_edges.npy``
+    (E, 2) point-index pairs and ``centerline_radii.npy`` (N,), in the bundle's own frame and units. Optional
+    ``centerline_regions.npy`` (E,) gives each edge's region ID (the sources; 0 without it) and ``vessel_regions.yaml``
+    is the region sidecar (``sidecar``, else ``None``)."""
+    folder = Path(path).expanduser()
+    if folder.is_file():
+        folder = folder.parent
+    if not folder.is_dir():
+        raise FileNotFoundError(f"centreline not found: {folder}")
 
-    def sample_radii(samples, key, branch_index):
-        values = np.full(len(samples), np.nan)
-        present = False
-        for k, sample in enumerate(samples):
-            if key not in sample:
-                continue
-            present = True
-            value = float(sample[key])
-            if not math.isfinite(value):
-                raise ValueError(f"centreline {path}: branch {branch_index} sample {k} has an invalid {key}")
-            if value > 0.0:
-                values[k] = value
-        if not present or not np.any(np.isfinite(values)):
-            raise ValueError(f"centreline {path}: branch {branch_index} has no positive {key} (both radii are required)")
-        valid = np.flatnonzero(np.isfinite(values))
-        # Mosaic endpoint sentinels are non-positive: nearest-value repair at the ends, linear fill inside.
-        return np.interp(np.arange(len(values)), valid, values[valid])
+    def array(name, required=True):
+        file = folder / f"{name}.npy"
+        if not file.is_file():
+            if required:
+                raise FileNotFoundError(f"centreline {folder}: missing {file.name}")
+            return None
+        return np.load(file, allow_pickle=False)
 
-    starts, ends, r = [], [], [[] for _ in range(4)]
-    seen = set()
-    sources = []
-    for index, branch in enumerate(branches):
-        samples = branch.get("samples")
-        if not isinstance(samples, list):
-            raise ValueError(f"centreline {path}: branch {index} has no samples list")
-        branch_id = branch.get("branch_id", index)
-        if branch_id in seen:
-            raise ValueError(f"centreline {path}: duplicate branch_id {branch_id}")
-        seen.add(branch_id)
-        if len(samples) < 2:
-            continue
-        points = np.asarray([s["position"] for s in samples], dtype=np.float64)
-        if points.shape != (len(samples), 3) or not np.all(np.isfinite(points)):
-            raise ValueError(f"centreline {path}: branch {index} contains invalid positions")
-        rmin, rmax = sample_radii(samples, "radius_min", index), sample_radii(samples, "radius_max", index)
-        sources.extend([branch_id] * (len(points) - 1))
-        starts.extend(points[:-1])
-        ends.extend(points[1:])
-        for lst, values in zip(r, (rmin[:-1], rmin[1:], rmax[:-1], rmax[1:])):
-            lst.extend(values)
-    if not starts:
-        raise ValueError(f"centreline {path}: no branch has two samples")
-    result = (np.asarray(starts), np.asarray(ends), *(np.asarray(v) for v in r))
-    return (*result, sources, seen) if with_sources else result
+    points, edges, radii = array("centerline_points"), array("centerline_edges"), array("centerline_radii")
+    points, radii = np.asarray(points, np.float64), np.asarray(radii, np.float64)
+    if points.ndim != 2 or points.shape[1] != 3 or not np.isfinite(points).all():
+        raise ValueError(f"centreline {folder}: centerline_points must be finite (N, 3)")
+    if radii.shape != (len(points),) or not np.all(np.isfinite(radii) & (radii > 0)):
+        raise ValueError(f"centreline {folder}: centerline_radii needs one positive radius per point")
+    if edges.ndim != 2 or edges.shape[1:] != (2,) or not len(edges) or edges.dtype.kind not in "iu" \
+            or edges.min() < 0 or edges.max() >= len(points):
+        raise ValueError(f"centreline {folder}: centerline_edges must be (E, 2) point indices, E > 0")
+    regions = array("centerline_regions", required=False)
+    if regions is None:
+        regions = np.zeros(len(edges), np.int64)
+    elif regions.shape != (len(edges),) or regions.dtype.kind not in "iu":
+        raise ValueError(f"centreline {folder}: centerline_regions needs one integer region ID per edge")
+    sidecar = folder / "vessel_regions.yaml"
+    a, b = edges[:, 0], edges[:, 1]
+    return points[a], points[b], radii[a], radii[b], regions.tolist(), sidecar if sidecar.is_file() else None
 
 
 # --- graph (xcath/centerline_tree.py) ---------------------------------------------------------------------------
@@ -449,8 +429,6 @@ def load_control_layout(path, node_count: int, vessel: str) -> list[dict]:
     line_axis: local_z, control_spheres: [...]}``; every sphere needs id, active, pid (< node count), position,
     rotation (xyzw), radius, stiffness and falloff in [0, 1]; optional rest_bend (2), bend/stretch stiffness
     multipliers (>= 0, default 1); duplicate ids and unknown keys are errors. Returns the spheres as plain dicts."""
-    import yaml
-
     path = Path(path).expanduser()
     if not path.is_file():
         raise FileNotFoundError(f"control layout not found: {path}")
@@ -501,25 +479,25 @@ def load_control_layout(path, node_count: int, vessel: str) -> list[dict]:
     return spheres
 
 
-def add_centreline_from_json(scene: Scene, name: str, path, *, scale, rotation, translation, root_position, weld_epsilon=1.0e-5,
-                             stitch_threshold=0.03, radius_mode="mean", radius_scale=0.9, root_locked=True, endpoints_locked=True,
-                             open_root=True, mass=0.01, inertia=0.01, control_layouts=(), visual=None, regions=None) -> Body:
-    """The tree of a vessel asset: built in the file's coordinates (topology tolerances are scale-free, the root is
-    the node nearest ``root_position`` mapped back through the vessel transform), then posed like the mesh:
-    ``(p * scale) @ R.T + t``, radii scaled by ``min(scale) * radius_scale``. Pins: the root (and its segment) when
-    ``root_locked``, every degree-one node when ``endpoints_locked``. ``control_layouts`` are layout sidecar paths (the
-    ``control_layout`` system shapes the tree with them, one layout per env round-robin)."""
+def add_centreline_from_bundle(scene: Scene, name: str, path, *, scale, rotation, translation, root_position,
+                               weld_epsilon=1.0e-5, stitch_threshold=0.03, radius_scale=0.9, root_locked=True,
+                               endpoints_locked=True, open_root=True, mass=0.01, inertia=0.01, control_layouts=(), visual=None,
+                               regions=None) -> Body:
+    """The tree of a vessel asset from an i4h-digital-twin centreline (``load_centreline_bundle``): built in the
+    bundle's coordinates (topology tolerances are scale-free, the root is the node nearest ``root_position`` mapped back
+    through the vessel transform), then posed like the mesh: ``(p * scale) @ R.T + t``, radii scaled by
+    ``min(scale) * radius_scale``. ``regions`` defaults to the bundle's ``vessel_regions.yaml``; its branch IDs are the
+    bundle's region IDs. Pins: the root (and its segment) when ``root_locked``, every degree-one node when
+    ``endpoints_locked``. ``control_layouts`` are layout sidecar paths (the ``control_layout`` system shapes the tree
+    with them, one layout per env round-robin)."""
     from i4h_endoluminal.regions import RegionMembership, vessel_regions
-    starts, ends, smin, emin, smax, emax, sources, known = load_centreline_json(path, with_sources=True)
-    names, mapping = vessel_regions(regions, known) if regions is not None else (("unassigned",), None)
-    if radius_mode == "min":
-        sr, er = smin, emin
-    elif radius_mode == "max":
-        sr, er = smax, emax
-    elif radius_mode == "mean":
-        sr, er = 0.5 * (smin + smax), 0.5 * (emin + emax)
-    else:
-        raise ValueError(f"centreline {name!r}: radius_mode must be min, max or mean, got {radius_mode!r}")
+    starts, ends, sr, er, sources, sidecar = load_centreline_bundle(path)
+    known = set(sources)
+    if sidecar is not None:  # every bundle region is known, including vessels without centreline edges
+        bundled = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
+        known |= set(bundled.get("branches") or {}) if isinstance(bundled, dict) else set()
+        regions = bundled if regions is None else regions
+    names, mapping, moduli = vessel_regions(regions, known) if regions is not None else (("unassigned",), None, {})
     scale = np.asarray(scale, dtype=np.float64) * np.ones(3)
     rotation = np.asarray(rotation, dtype=np.float64)
     translation = np.asarray(translation, dtype=np.float64)
@@ -542,7 +520,7 @@ def add_centreline_from_json(scene: Scene, name: str, path, *, scale, rotation, 
     body.tree.material_radius = (radii_src * float(np.min(scale)))[None]
     if regions is not None:
         edge_regions.flags.writeable = False
-        body.regions = RegionMembership(names, edge_regions, edge_sources)
+        body.regions = RegionMembership(names, edge_regions, edge_sources, moduli)
     body.anatomy.layouts = [load_control_layout(p, len(positions), name) for p in (control_layouts or ())]  # layout l serves envs e % L == l
     return body
 

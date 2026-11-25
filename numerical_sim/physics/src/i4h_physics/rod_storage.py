@@ -383,13 +383,29 @@ def declare_rod_direct_material(scene, body, *, system_id="rod_direct_material")
     defer_declaration(scene, system_id, publish_material, dict(body=body, backend="direct", settings={}))
 
 
-def declare_rod_pbd_material(scene, body, *, system_id="rod_pbd_material", radius_weighting=False):
-    defer_declaration(
-        scene,
-        system_id,
-        publish_material,
-        dict(body=body, backend="pbd", settings=dict(radius_weighting=radius_weighting)),
-    )
+def declare_rod_pbd_material(scene, body, *, system_id="rod_pbd_material", radius_weighting=False,
+                             reference_young_modulus_kpa=None):
+    settings = dict(radius_weighting=radius_weighting, reference_young_modulus_kpa=reference_young_modulus_kpa)
+    defer_declaration(scene, system_id, publish_material, dict(body=body, backend="pbd", settings=settings))
+
+
+def region_defaults(membership, backend, reference_young_modulus_kpa=None):
+    """Initial and restored per-region multipliers. With a reference modulus, a PBD region with a
+    ``young_modulus_kpa`` starts bend and twist at its modulus over the reference; stretch stays 1."""
+    base = DIRECT_REGIONS if backend == "direct" else PBD_REGIONS
+    defaults = {key: np.full(len(membership.names), value, np.float32) for key, value in base.items()}
+    if reference_young_modulus_kpa is None:
+        return defaults
+    reference = float(reference_young_modulus_kpa)
+    if backend != "pbd" or not np.isfinite(reference) or reference <= 0:
+        raise ValueError("rod material: reference_young_modulus_kpa must be a positive PBD setting")
+    for index, name in enumerate(membership.names):
+        if name in membership.young_modulus_kpa:
+            ratio = membership.young_modulus_kpa[name] / reference
+            if ratio > 10:
+                raise ValueError(f"rod material: region {name!r} modulus ratio {ratio:g} exceeds the multiplier limit 10")
+            defaults["bend"][index] = defaults["twist"][index] = ratio
+    return defaults
 
 
 def publish_material(scene, declarations, system_id, *, body, backend, settings, solver_specs=None):
@@ -412,14 +428,14 @@ def publish_material(scene, declarations, system_id, *, body, backend, settings,
     r = Record(scene, declarations, system_id, body)
     r.backend, r.shared = backend, shared
     r.signature = body_signature(body, backend)
-    r.defaults = DIRECT_REGIONS.copy() if backend == "direct" else PBD_REGIONS.copy()
+    r.defaults = region_defaults(membership, backend, settings.get("reference_young_modulus_kpa"))
     r.add("edge", Owner.MODEL, wp.int32, membership.edge)
     for key, value in r.defaults.items():
         r.add(
             "region_" + key,
             Owner.MODEL,
             wp.float32,
-            np.full((scene.envs, len(membership.names)), value, np.float32),
+            np.tile(value, (scene.envs, 1)),
             runtime=True,
             group="regions_runtime",
         )

@@ -300,3 +300,6 @@ capacity and unselected worlds. Empty masks do nothing. Unrequested kinds have
 The coupled wrapper routes custom arrays to i4h and native `CONTACT_F` to
 MuJoCo-Warp, including subset selection. Pure i4h continues to reject native
 `CONTACT_F`. Surgical export must not be interpreted as native rigid contacts.
+
+See [vessel regions](vessel-regions.md) for the aorta branch mapping, sidecar schema
+and multiplier semantics. Territory calibration remains deferred.
