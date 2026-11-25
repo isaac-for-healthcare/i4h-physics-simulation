@@ -12,6 +12,9 @@ Preserve staged execution, case keys, task IDs, numerical contracts and asset by
 Do not weaken assertions or tolerances to pass a failure. Keep raw qualification
 results privately and summarize passed, failed, skipped and unavailable checks clearly.
 
+Application rendering, input, haptics, UI, recording and XR contribution guidance
+lives in the [standalone repository](https://github.com/isaac-for-healthcare/i4h-standalone-simulator).
+
 ## Implementation conventions
 
 - **Simplicity over generality.** No field registries, no access declarations, no
@@ -41,53 +44,9 @@ results privately and summarize passed, failed, skipped and unavailable checks c
   in `structural = (...)` and the runner rejects live writes to them. `prepare()` calls
   every system's `prepare(scene)` before the capture; a system whose buffers are sized
   by a structural value raises there instead of silently keeping the old size.
-- **Renderers are not systems.** They read a `Snapshot` between steps (`publish(snap)`
-  copies the drawn env into shared vertex buffers and runs the normal kernels on the
-  renderer's stream, bracketed by the snapshot's ready and release events; `draw()`
-  encodes and presents) and never run inside the graph. `publish()` with no argument
-  reads the live scene on the current stream (tests, Isaac Lab's GL view). The `render:`
-  key is read by the app only (`--render noop|slang|gl` overrides `render.backend`); Isaac
-  Lab and headless runs ignore it. Kernels ported from the renderer follow the same
-  inputs/outputs rule as the systems.
-  The post chain (`render/post.py`) runs every pass every frame and a toggle only changes a
-  uniform (the pass list is fixed for the surface's life); `read_frame()` is the display frame,
-  `read_hdr()` the linear composite. Dataset capture reads through shared buffers and pinned
-  host copies on the render stream, never `to_numpy` on a device texture per frame.
-- **One thread issues unqualified Warp calls.** Warp's current stream is process-global,
-  not thread-local. The physics thread keeps it (systems, `Stepper`, drivers are
-  unchanged); the render thread passes `stream=` on every copy and launch and, while
-  the worker runs, never calls `.numpy()`, `ScopedStream`, or allocates and frees Warp
-  arrays outside the ring lock (allocations are `cudaMallocAsync` on the current stream
-  and would join a capture). A cross-stream copy must be contiguous, or Warp
-  synchronises the two streams.
-- **Instruments are kinematic and batched.** `instruments:` entries (kind grasper,
-  scissors, clip_applier, hook, suction or sphere) become one `instrument_control` system:
-  actions `(E, n, 10)` = `[position, quaternion xyzw, grip, energy, fire]` per env and
-  instrument (grip closes the jaw, energy is the cautery level, fire is the discrete
-  trigger: a clip applier applies a clip; scissors cut while their jaw closes), poses and
-  collision spheres per env, capsule primitives shared (a scissors' cutting chain has none).
-  Contact, grasp, volumetric grasp, hook, thermal, cutting, clipping and contact paint read
-  its products through `refs`. The `inputs:` key and `--input scripted|keyboard|devices|noop`
-  belong to the app's `InstrumentDriver` (keyboard: Tab cycles the tools, Space grip, Shift
-  energy, F fire, M/V/B paint; a hook's handle or Space energises it, since it has no jaw;
-  in `devices` mode `inputs.pickup` lets a device put its tool down or take the nearest with a
-  key, `input:` being the initial holding); Isaac Lab writes the actions array itself.
-- **Standalone adapters carry UI.** `app/panel_adapters.py` supplies `Knob` rows over systems' live arrays and
-  structural int/bool fields that are safe to change through `prepare()` (never a field
-  whose `prepare` raises); ranges are hand-written on the adapter. The app's `Panels`
-  (`app/ui.py`) binds them to slangpy's retained widgets: callbacks only record pending
-  changes, `update()` applies them on the render thread before `acquire()`, every simulator
-  write goes through the worker queue (live arrays assigned from host mirrors read once
-  before the worker starts; structural edits batched into one `prepare()`). `render/*` owns
-  the ImGui context and event gating only; it never imports `app/*`.
-- **One thread does all of a device's I/O.** Haptics has two halves: the `tool_force` system publishes the
-  per-tool reaction (the exact mass-weighted displacement each source applied, through the per-instrument `delta_k`
-  channel and the surgical `mechanics.tool_delta.apply_average_tools` kernel); the app's servo thread (`app/haptics.py`, the app-only `haptics:` key, like
-  `render:`) owns the live devices, sends the conditioned force and publishes the pose sample the physics thread's
-  `InputManager.poll()` returns. The physics thread stages the drawn env's force row into pinned slots with an
-  asynchronous copy and an event; the servo queries the event under the ring lock and makes no other Warp call. An
-  instrument-box handle is a property of a pose device (`settings.handle: {box, channel}`, `input/avatar.py`): the box
-  itself has no pose and binds no tool; it supplies grip and pedals and receives the tool's `jaw_load` as the handle force.
+- **Renderers are not systems.** Hosts read completed physics data between steps;
+  rendering and device I/O stay outside CUDA capture. See the standalone repository
+  for its threading, stream and presentation conventions.
 - **Isaac Lab drives the loop.** The simulator owns no loop, thread or window.
   `Stepper.step()` advances one standalone physics sample; in Isaac Lab the native manager
   advances physics and owns decimation. `reset(env_ids)` resets selected envs; per-env inputs
@@ -123,7 +82,8 @@ results privately and summarize passed, failed, skipped and unavailable checks c
   checking finite values, env isolation on `envs: 2`, graph replay equal to
   uncaptured stepping, and the Isaac Lab stub loop. Float atomics make runs differ at
   the 1e-7 level, so comparisons across two runs use a tolerance well below what an
-  indexing leak would produce; checks within one run (masked reset) stay bitwise. Preserve raw qualification evidence and frozen manifests required by the migration plan. Commit, push and tag only when requested.
+  indexing leak would produce; checks within one run (masked reset) stay bitwise. Preserve raw qualification evidence. Historical manifests and reports are linked from
+  [the documentation index](DOCUMENTATION.md#historical-reports-and-audit-tools). Commit, push and tag only when requested.
 - Keep haptics (`follou`), Slang (`slangpy`), OVRTX and Isaac Lab imports lazy so
   headless runs need only `warp`, `newton` and `numpy`.
 - No hard-coded developer paths in package sources. Case YAMLs may use `${DATA}` which

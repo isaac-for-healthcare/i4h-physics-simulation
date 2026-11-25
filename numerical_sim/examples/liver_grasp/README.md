@@ -1,5 +1,11 @@
 # Experimental state-based liver grasp policy
 
+These commands describe the retained experiment and require its separately kept
+datasets, snapshots and checkpoints. Interactive playback also requires the
+[standalone application](https://github.com/isaac-for-healthcare/i4h-standalone-simulator)
+installed in the selected interpreter; it is no longer part of this checkout.
+See the historical result summary below for the failed gates and mechanical limits.
+
 Run from `numerical_sim/` in the `i4h-liver-grasp` worktree. Training uses the current
 numerical mechanics, not an Isaac Lab application. The adapter implements the
 RSL-RL 5.5.1 `VecEnv`/`TensorDict` interface. Existing simulation environments and
@@ -93,7 +99,7 @@ Final evaluation records attachment and inversion diagnostics after every 60 Hz 
 Equivalent explicit `uv` commands, from `numerical_sim/`:
 
 ```bash
-export PYTHONPATH="$PWD/physics/src:$PWD/surgical/src:$PWD/standalone/src:$PWD/isaaclab/src:$PWD/assessment/src:$PWD/endoluminal/src"
+export PYTHONPATH="$PWD/physics/src:$PWD/surgical/src:$PWD/host/src:$PWD/isaaclab/src:$PWD/assessment/src:$PWD/endoluminal/src"
 
 # Continue PPO with archived history, optimizer and RNG restoration.
 uv run --no-project --python examples/liver_grasp/.venv-train/bin/python \
@@ -104,3 +110,31 @@ uv run --no-project --python examples/liver_grasp/.venv-train/bin/python \
   python examples/liver_grasp/train.py play --worlds 1 --minutes 60 \
   --checkpoint artifacts/liver-policy-20261119/best_policy.pt
 ```
+
+## Historical experiment results and limits
+
+These are separate historical campaigns, not current-source qualification.
+The initial [frozen grasp campaign](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/liver-grasp-results.md)
+failed reusable acquisition: all 48 attempts (eight targets, authored and ±5 mm X
+starts, eager/captured) acquired zero particles. Restored one-step comparisons
+passed the 10 µm gate, while full approach trajectories differed by up to
+43.69 µm. Release and retention metrics were unavailable because acquisition
+failed. Settling already had 89 inverted tetrahedra; attempts had 88–90, minimum
+settled signed-volume ratio −16.0953 and up to 110.50 mm attachment drift.
+
+The later [policy experiment](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/liver-policy-results.md)
+used identical hashed starts for 100 reserved episodes: controller 100/100,
+BC 94/100, best PPO 0/100 and latest PPO 0/100 full-cycle successes. Its 1,000
+successful demonstrations were split 800/200 by whole episode. This result does
+not repair the earlier failed campaign or establish force calibration. Inversions
+and soft-attachment drift remain mechanical limitations; complete-cycle scoring
+still includes acquisition, retention, destination hold, release and relaxation.
+
+The [liver consolidation](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/liver-consolidation-results.md)
+reported 55 focused passes, two PPO-module passes in a separate environment,
+and 86 boundary/lifecycle passes with three skips. Its broader suite was
+interrupted; this is not full-suite qualification or demonstrated Workflows
+full-cycle PPO training. Datasets, recordings and checkpoints referenced by the
+historical commands are separate local artifacts, not distributed package data.
+See the maintained [grasp contract](../../surgical/liver-grasp-contract.md) and
+[component restrictions](../../physics/component-contracts.md) before reuse.

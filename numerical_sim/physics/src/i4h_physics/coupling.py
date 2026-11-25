@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""I4h physics beside the host's rigid solver in one Newton model (docs/component-contracts.md).
+"""I4h physics beside the host's rigid solver in one Newton model (physics/component-contracts.md).
 
 ``CoupledSolver`` is what Isaac Lab's NewtonManager steps when ``I4hSolverCfg.rigid_solver_cfg`` is set. One physics
 step (contract section 3):
