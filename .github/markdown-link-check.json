@@ -5,6 +5,9 @@
             "pattern": "https://github.com/isaac-for-healthcare/i4h-physics-simulation"
         },
         {
+            "pattern": "^https://github\\.com/isaac-for-healthcare/i4h-standalone-simulator/pull/1$"
+        },
+        {
             "pattern": "http://0.0.0.0:8000"
         },
         {

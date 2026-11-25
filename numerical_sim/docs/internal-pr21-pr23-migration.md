@@ -90,6 +90,9 @@ relative to the standalone repository. Every internal hunk is listed below.
 The clipping correction is commit `752f96f`; the source preflight and missing
 capped-vessel continuation regression are commit `94b76b2`. The standalone worker correction is commit `fee9a88`, published in
 [standalone PR 1](https://github.com/isaac-for-healthcare/i4h-standalone-simulator/pull/1).
+The standalone repository has internal visibility; its PR was verified with
+authenticated GitHub access. Anonymous Markdown link checking excludes that exact
+PR URL because GitHub returns 404 without repository access.
 This audit records the final validation outcomes.
 Internal PR closure follows publication and passing replacement behavior; broader
 failures remain recorded and do not establish release qualification.
