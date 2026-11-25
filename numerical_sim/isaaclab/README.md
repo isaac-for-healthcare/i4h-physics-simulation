@@ -30,8 +30,7 @@ Patched 3.0 additionally needs the explicit
 [cloner compatibility delta](../docs/newton18-lab30-cloner.patch): Newton uses public
 `surface_label` / `volume_label` and their corresponding private particle starts.
 The supplied checkout remains unchanged; qualification uses an isolated worktree
-based on e53cd288 with that patch. See [adapter evidence](../docs/stage-b-host.md)
-and [Stage B status](../docs/stage-b.md) for current checks and remaining gates.
+based on e53cd288 with that patch.
 Inside Lab use its `usd-exchange` provider; do not install a competing `usd-core`
 package over its `pxr` module.
 

@@ -115,8 +115,7 @@ its seed, action sequence, step counts and tolerance unchanged. Its failure path
 now saves complete tensors and names the differing products, so another failure
 cannot be reduced to a truncated pytest tensor representation.
 
-See [Stage B closure](stage-b.md) for final package/runtime, host, numerical and
-memory outcomes. Exclusive timing and cadence remain separate gates. The timing
+Exclusive timing and cadence remain separate gates. The timing
 runner accepts `--replacement-env-root` so the replacement and cadence use the
 corrected environments while pre-change keeps the original binary; it records
 the selected roots and each measured worker's native Warp hash.
