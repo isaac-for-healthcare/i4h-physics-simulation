@@ -22,11 +22,12 @@ from i4h_physics.systems.base import System
 
 @dataclass(eq=False)
 class Particles(System):
+    damping: float = 0.97  # live, per env
+    max_velocity: float = 1000.0  # live, per env; bounds the predicted velocity and the substep displacement
+
     body: object = None  # None retains the whole main block; otherwise one body
     gravity_scale: float = 1.0  # live per env, e.g. a neutrally buoyant wall
     damping_at_finalize: bool = False  # apply damping to the projected velocity
-    damping: float = 0.97  # live, per env
-    max_velocity: float = 1000.0  # live, per env; bounds the predicted velocity and the substep displacement
 
     structural = System.structural + ("body", "damping_at_finalize")
 

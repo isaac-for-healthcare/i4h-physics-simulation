@@ -91,11 +91,11 @@ class RodPbd(System):
     bend: float = 1.0  # live, per env: bend multiplier (kbt.x = kbt.y)
     twist: float = 1.0  # live, per env: twist multiplier (kbt.z)
     angular_damping: float = 0.0  # live, per env: omega *= (1 - d) at finalize (omniendo ang_damping)
+    sweeps: int = 1  # structural: Jacobi sweeps per runner iteration (omniendo centreline ``iterations``)
     scheme: str = "jacobi"  # structural: colored reproduces the reference wall's Gauss-Seidel ordering
     limit_motion: bool = False  # structural: apply max_delta after each constraint sweep
     pre_sweeps: int = 0  # structural: initial constraint solve after prediction, before the main iteration loop
     max_delta: float = 1.0e9  # live: bound translation against substep-start positions after each sweep
-    sweeps: int = 1  # structural: Jacobi sweeps per runner iteration (omniendo centreline ``iterations``)
 
     structural = System.structural + ("sweeps", "pre_sweeps", "limit_motion", "scheme")
 

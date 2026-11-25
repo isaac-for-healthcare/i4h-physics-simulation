@@ -54,8 +54,6 @@ class GraphContainment(System):
     centreline: str  # tree body (vessel_mesh with a centreline block)
     max_distance: float = 0.09  # live, per env: activation shell (omniendo containment.max_distance)
     skin: float = 0.04  # live, per env: candidate skin (omniendo centerline.candidate_skin)
-    interior_deadband: float = 1.0  # live per env: fraction of free lumen radius without interior pull
-    interior_stiffness: float = 0.0  # live per env: wire-only pull; linear containment only
     target_response: float = 0.5  # live, per env: fraction of the gap the tree takes when two-way
     source_max_delta: float = 0.01  # live, per env: catheter motion clamp per substep
     target_max_delta: float = 0.01  # live, per env: tree motion clamp per substep
@@ -67,6 +65,9 @@ class GraphContainment(System):
     newton_iterations: int = 4  # structural: Newton steps per spline seed
     two_way: bool = True  # structural: push the tree
     open_root: bool = True  # structural: no cap at the root (samples upstream of the root are free)
+
+    interior_deadband: float = 1.0  # live per env: fraction of free lumen radius without interior pull
+    interior_stiffness: float = 0.0  # live per env: wire-only pull; linear containment only
 
     structural = System.structural + ("iterations", "capacity", "candidates", "spline", "tangent_scale", "newton_iterations",
                                       "two_way", "open_root")
