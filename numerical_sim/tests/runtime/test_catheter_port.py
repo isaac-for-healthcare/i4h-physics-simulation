@@ -94,16 +94,26 @@ def test_parity_compare_of_identical_runs_passes():
     sys.modules[spec.name] = parity  # dataclasses resolve their module
     spec.loader.exec_module(parity)
     rod = parity.Rod(segments=12, length=0.04)
-    data = {"rod": json.dumps(dataclasses.asdict(rod))}
+    data = {"rod": json.dumps(dataclasses.asdict(rod)), "schema": 2, "complete": True,
+            "source": json.dumps({"revision": parity.REFERENCE_REVISION, "status": ""})}
     rng = np.random.default_rng(0)
-    for name in ("sag", "insertion", "tip_bend", "twist"):
+    for name, (_, steps, command) in parity.scenarios(rod).items():
+        samples = range(parity.STRIDE - 1, steps, parity.STRIDE)
+        T = len(samples)
         for suffix in ("", "@half"):
             x = np.linspace(0.0, 0.04, 13)
-            frames = np.stack([np.stack([x, 0.001 * np.sin(x * t), 0.5 + 0.001 * np.cos(x * t)], 1) for t in range(1, 21)])
+            frames = np.stack([np.stack([x, 0.001 * np.sin(x * t), 0.5 + 0.001 * np.cos(x * t)], 1) for t in range(1, T + 1)])
             data[f"{name}{suffix}/positions"] = frames + rng.normal(0, 1e-9, frames.shape)
-            data[f"{name}{suffix}/reaction"] = np.tile([0.0, 0.0, -0.02], (20, 1))
-    rows = parity.compare(data, dict(data))
-    assert all(r["pass"] is not False for r in rows) and sum(r["pass"] is True for r in rows) == 14
+            data[f"{name}{suffix}/reaction"] = np.tile([0.0, 0.0, -0.02, 0.0, 0.001, 0.0], (T, 1))
+            for field, shape in (("orientations", (T, 13, 4)), ("velocities", (T, 13, 3)),
+                                  ("angular_velocities", (T, 13, 3))):
+                data[f"{name}{suffix}/{field}"] = np.zeros(shape)
+            data[f"{name}{suffix}/commands"] = np.asarray([command(k) for k in samples])
+            data[f"{name}{suffix}/time"] = np.asarray([(k + 1) * rod.dt for k in samples])
+            wall = parity.tube(name)
+            data[f"{name}{suffix}/vessel_displacement"] = np.zeros((T, 0 if wall is None else len(wall), 3))
+    rows = parity.compare({**data, "engine": "reference"}, {**data, "engine": "ours"})
+    assert all(r["pass"] is not False for r in rows) and sum(r["pass"] is True for r in rows) == 20
 
 
 def test_parity_tube_bend_keeps_ours_in_the_lumen():
@@ -118,8 +128,8 @@ def test_parity_tube_bend_keeps_ours_in_the_lumen():
     lumen = parity.tube("tube_bend")
     assert np.allclose(lumen[-1], [0.5, 0.35, 0.5]) and parity.tube("sag") is None
     gravity, _, command = parity.scenarios(rod)["tube_bend"]
-    frames, _ = parity.run_ours(rod, gravity, 360, command, lumen=lumen)
-    q = frames[-1]
+    trace = parity.run_ours(rod, gravity, 360, command, lumen=lumen)
+    q = trace["positions"][-1]
     seg = lumen[1:] - lumen[:-1]
     t = np.clip(((q[:, None] - lumen[None, :-1]) * seg[None]).sum(-1) / (seg**2).sum(-1)[None], 0.0, 1.0)
     gap = np.linalg.norm(q[:, None] - (lumen[None, :-1] + t[..., None] * seg[None]), axis=-1).min(axis=1)

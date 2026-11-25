@@ -685,3 +685,41 @@ def test_control_layout_loader(tmp_path):
         load_control_layout(layout, 100, "colon")
     with pytest.raises(ValueError, match="vessel"):
         load_control_layout(layout, 128, "aorta")
+
+
+def test_interior_pull_moves_only_the_source_and_reports_no_contact():
+    scene, source, target = lumen_scene(((0.5, 0.10, 0.0),), VESSEL2, ((0, 1),), (0.2, 0.2),
+                                         tree_inv_mass=(1.0, 1.0), envs=2)
+    lc = GraphContainment(scene, body="c", centreline="v", iterations=1, spline=False, two_way=True,
+                          open_root=False, candidates=False, source_max_delta=10.0, target_max_delta=10.0,
+                          interior_deadband=0.5, interior_stiffness=0.25)
+    wp.copy(scene.q_prev, scene.q)
+    original = scene.field("q", target).numpy().copy()
+    lc.iteration(scene, 1 / 120, 0, 1)
+    # Free radius 0.15, deadband 0.075: only the excess 0.025 is pulled.
+    np.testing.assert_allclose(scene.field("q", source).numpy()[:, 0, 1], 0.1 - 0.025 * 0.25, atol=1e-7)
+    np.testing.assert_array_equal(scene.field("q", target).numpy(), original)
+    np.testing.assert_array_equal(lc.contact_count.numpy(), np.zeros(2))
+    np.testing.assert_array_equal(lc.contact_depth.numpy(), np.zeros(2))
+
+
+@pytest.mark.parametrize('envs', [1, 2, 16])
+def test_colored_wall_capture_isolation_and_reset(envs):
+    outputs = []
+    for captured in (False, True):
+        sim, scene, body, rod, _ = y_sim(envs=envs, gravity=(0, 0, -1), sweeps=4,
+                                        scheme='colored', pre_sweeps=4, limit_motion=True, max_delta=.005)
+        sim.cuda_graph = captured
+        sim.prepare()
+        pinned = scene.field('q', body).numpy()[:, 0].copy()
+        for _ in range(12):
+            sim.step()
+        points = scene.field('q', body).numpy()
+        assert np.isfinite(points).all()
+        np.testing.assert_array_equal(points[:, 0], pinned)
+        np.testing.assert_allclose(points, np.repeat(points[:1], envs, axis=0), atol=1e-6)
+        outputs.append(points.copy())
+        sim.reset([0])
+        if envs > 1:
+            np.testing.assert_array_equal(scene.field('q', body).numpy()[1:], points[1:])
+    np.testing.assert_allclose(outputs[0], outputs[1], atol=1e-6)

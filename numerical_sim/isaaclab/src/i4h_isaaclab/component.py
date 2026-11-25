@@ -343,6 +343,25 @@ class I4hComponent:
         self._order("in")
         self._live().physics.restore(src_state, src_control, env_ids, mask=mask)
 
+    def capture_continuation(self, env_ids=None):
+        """Portable selected-world State/Control arrays, including particle histories and pending reactions.
+
+        Each first-axis row is an independent episode. Host assets, task history,
+        renderer state and source/configuration identity remain the host's contract.
+        """
+        self.sync_views()
+        return self.physics.solver.continuation.export_worlds(env_ids)
+
+    def validate_continuation(self, bundle, env_ids=None):
+        """Validate all numerical fields before the host begins restoration."""
+        return self.physics.solver.continuation.validate_worlds(bundle, env_ids)
+
+    def restore_continuation(self, bundle, env_ids=None):
+        """Restore portable rows after host assets and caches, without initializing history."""
+        self.order_inputs()
+        self.physics.solver.continuation.import_worlds(bundle, env_ids)
+        self.sync_views()
+
     def initialize_particle_history(self, env_ids=None, *, mask=None) -> None:
         """After host position edits, initialize selected history on Warp's stream.
 
