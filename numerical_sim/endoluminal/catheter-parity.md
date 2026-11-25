@@ -5,7 +5,7 @@
 - the workflow's own (`catheter_vasculature_solver.CathRodSolver`);
 - `i4h_endoluminal`'s (`rod_direct` + `catheter_control`).
 
-The bounds are docs/component-contracts.md section 4. Numerical qualification is run by the owner; the numbers below are a development run, recorded to explain the decision.
+The bounds are [component contracts, section 4](../physics/component-contracts.md#4-parity-tolerances-catheter-f5). Numerical qualification is run by the owner; the numbers below are a development run, recorded to explain the decision.
 
 ## Reference
 

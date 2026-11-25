@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""F2: i4h physics stepped beside a host rigid solver in one Newton model (docs/component-contracts.md). Needs
+"""F2: i4h physics stepped beside a host rigid solver in one Newton model (physics/component-contracts.md). Needs
 MuJoCo-Warp (the Isaac Lab venv) and CUDA."""
 
 import copy

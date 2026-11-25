@@ -10,7 +10,7 @@ carries its own terms:
   attributions.
 - numerical_sim production assets: original meshes, textures, centrelines and
   USD files in numerical_sim/data/ are licensed under Apache-2.0 and recorded in
-  numerical_sim/docs/asset-manifest.json. The converted dVRK instrument USDs in
+  numerical_sim/data/asset-manifest.json. The converted dVRK instrument USDs in
   numerical_sim/data/instruments/dvrk/ derive from dvrk_model and use the MIT
   License, Copyright (c) 2024 da Vinci Research Kit; retain that directory's
   LICENSE.

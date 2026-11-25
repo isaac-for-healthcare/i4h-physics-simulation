@@ -7,7 +7,7 @@ No Arena imports, training, Workflows recorder integration or production workflo
 engine are added. Numerical traces are not Workflows-compatible demonstrations.
 
 The approved acceptance specification is
-[liver-grasp-workflows-integration-plan.md](liver-grasp-workflows-integration-plan.md).
+[liver-grasp-workflows-integration-plan.md](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/liver-grasp-workflows-integration-plan.md).
 The numerical worktree starts at immutable baseline
 `d1fc95c99d59be793da1f938e8c58458a538b168`. The sibling upgrade checkout, its
 runtime, dependency pins, staged Versius boundary and baseline remain separate.

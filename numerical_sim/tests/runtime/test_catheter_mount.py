@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """F2c: a catheter driver held by a host body (``catheter_control.mount``) and its reaction products
-(docs/component-contracts.md section 3), on a short synthetic rod_direct catheter."""
+(physics/component-contracts.md section 3), on a short synthetic rod_direct catheter."""
 
 import numpy as np
 import pytest

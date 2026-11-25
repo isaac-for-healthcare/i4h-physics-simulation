@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Copy or verify the production assets listed in ``docs/asset-manifest.json``, checking each file's SHA-256 and size.
+"""Copy or verify the production assets listed in ``data/asset-manifest.json``, checking each file's SHA-256 and size.
 
 The assets are included in Git. ``--source`` optionally points to a local folder holding the data tree, or an asset
 catalog base URL such as
@@ -25,7 +25,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]  # numerical_sim/
-MANIFEST = ROOT / "docs" / "asset-manifest.json"
+MANIFEST = ROOT / "data" / "asset-manifest.json"
 PREFIX = "numerical_sim/data/"  # manifest paths of the data tree; package data entries are not fetched
 
 
