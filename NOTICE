@@ -11,7 +11,7 @@ carries its own terms:
 - numerical_sim production assets: original meshes, textures, centrelines and
   USD files in numerical_sim/data/ are licensed under Apache-2.0 and recorded in
   numerical_sim/docs/asset-manifest.json.
-- neural_sim/cosmos_h_dreams: the Cosmos submodule keeps its own license.
+- neural_sim/cosmos3_h_dreams: the Cosmos3-H-Dreams submodule keeps its own license.
 - physics_simulation/: the separately maintained catheter solver, under the
   root LICENSE. Portions carry their upstream copyright and license headers.
 - Vendor device wrappers and native SDK libraries are not part of this
