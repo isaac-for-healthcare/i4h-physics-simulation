@@ -9,7 +9,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12,<3.13"
-# Host-specific exact source pins are in qualification/c30-{main,lab30}.json.
+# Historical host qualification records are linked from DOCUMENTATION.md.
 # C3.0 is a candidate until its recorded qualification gates are accepted.
 dependencies = ["i4h-host==0.9.0", "i4h-physics[coupled]==0.9.0", "torch>=2.10", "pillow>=10.0"]
 

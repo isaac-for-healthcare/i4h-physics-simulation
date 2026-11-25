@@ -1,11 +1,11 @@
 # ReachTarget training example
 
 Run from `numerical_sim/` with the interpreter from a separate Isaac Lab environment at the
-qualified revision (`i4h_isaaclab.lab.QUALIFIED`), Warp 1.17.0 and Newton
-1.6.1. Install the six built i4h member wheels into that environment without their
+target revision (`i4h_isaaclab.lab.QUALIFIED`), Warp 1.17.0 and Newton
+`7f0c13af` (1.9.0.dev0), as pinned by the numerical workspace. Install the six built i4h member wheels into that environment without their
 optional USD extras; Lab supplies `pxr`. Supply the original external asset directory
 through `I4H_DATA`. The ordinary numerical workspace does not install Isaac Lab or
-RSL-RL. See the [compatibility contract](../isaaclab/README.md#isaac-lab-compatibility).
+RSL-RL. See the [compatibility contract](README.md#isaac-lab-compatibility).
 
 ```bash
 LAB_PY=/absolute/path/to/qualified-lab-venv/bin/python
@@ -18,6 +18,9 @@ The task is `aorta_static_reach`. The command performs 50 PPO learning iteration
 with 16 rollout steps per environment per iteration, then the helper's existing
 additional checked iteration verifies finite actions, observations, rewards and losses.
 It does not change the seed or settings based on observed reward.
+
+The results below are historical measurements on an older stack; they do not
+verify the current pins or current source.
 
 On 2026-10-15, on Isaac Lab 6864dd1, the v0.9.0 package code completed this command on an NVIDIA
 GB300 (aarch64) and exited **0**. The separate Lab environment used Torch

@@ -12,9 +12,6 @@
         },
         {
             "pattern": "https://doi.org"
-        },
-        {
-            "pattern": "^\\.\\./\\.tmp_tests/stage-c[^/]+/"
         }
     ],
     "timeout": "20s",
@@ -25,15 +22,5 @@
         200,
         202,
         403
-    ],
-    "replacementPatterns": [
-        {
-            "pattern": "^\\.\\./tests/runtime/test_surface_state_consumers\\.py$",
-            "replacement": "https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/37f03006e68b6e6a1a1ac4d07c952d82ab468f56/numerical_sim/tests/runtime/test_surface_state_consumers.py"
-        },
-        {
-            "pattern": "^\\.\\./tests/runtime/test_app_loop\\.py$",
-            "replacement": "https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/37f03006e68b6e6a1a1ac4d07c952d82ab468f56/numerical_sim/tests/runtime/test_app_loop.py"
-        }
     ]
 }

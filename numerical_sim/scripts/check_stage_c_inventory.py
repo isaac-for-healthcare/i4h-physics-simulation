@@ -48,9 +48,10 @@ def verify(root, inventory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--inventory", type=Path)
+    parser.add_argument("--inventory", type=Path, required=True,
+                        help="reviewed inventory from a matching source checkout")
     args = parser.parse_args()
-    path = args.inventory or args.root / "docs/stage-c-inventory.json"
+    path = args.inventory
     inventory = json.loads(path.read_text())
     errors, sites, files = verify(args.root, inventory)
     if errors:

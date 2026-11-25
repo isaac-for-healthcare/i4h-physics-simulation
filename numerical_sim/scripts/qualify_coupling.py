@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Coupled-scene qualification (F2, docs/component-contracts.md section 3): i4h physics held by MuJoCo-Warp bodies.
+"""Coupled-scene qualification (F2, physics/component-contracts.md section 3): i4h physics held by MuJoCo-Warp bodies.
 
 Run with the qualified Isaac Lab venv's python (i4h_isaaclab.lab.QUALIFIED) (MuJoCo-Warp, CUDA)::
 

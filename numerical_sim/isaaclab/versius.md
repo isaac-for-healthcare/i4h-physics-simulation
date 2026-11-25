@@ -10,7 +10,7 @@ remain in `examples/versius/`; new results belong in a separate output directory
 
 ## Environment and assets
 
-Use an isolated Python 3.12 environment with the qualified patched Warp binary,
+Use an isolated Python 3.12 environment with stock pinned Warp 1.17.0,
 RSL-RL 5.5.1 and the qualified current Newton/Lab sources. Root pins and retained
 qualification environments are unchanged. Environment setup copies installed
 third-party dependencies; it does not resolve, upgrade or modify its seed:
@@ -24,7 +24,7 @@ export I4H_DATA=/path/to/production/data
 export I4H_VERSIUS_USD=/path/to/prepared/versius_poke.usda
 ```
 
-The seed must already include the patched Warp build and the desired GL/UI/PPO
+The seed must already include the pinned Warp build and the desired GL/UI/PPO
 dependencies. Setup refuses to overwrite an existing environment. External
 source locations are explicit and written into that environment's `.pth` file.
 Do not run a workspace dependency sync against this source-overlay environment.
@@ -105,7 +105,7 @@ SDK temporarily without changing the environment:
 ```bash
 FOLLOU_LIB_PATH=/path/to/native/library \
 uv run --no-project --python "$PY" --with /path/to/follou-sdk \
-  python i4h-lab-teleop --task I4h-Versius-Poke-Chole-1x-v0 \
+  i4h-lab-teleop --task I4h-Versius-Poke-Chole-1x-v0 \
   --input follou --render gl --steps 0
 ```
 
@@ -133,4 +133,7 @@ reads the framebuffer for ffmpeg. These transfers are not claimed to be removed.
 Viewer loop timings synchronize the GPU at phase boundaries to include completed
 work. Loop timings exclude real-time pacing and report physics/control work, viewer
 work and total wall time after warmup; the headless policy loop also reports
-CUDA event timings. See the consolidation results for measured performance.
+CUDA event timings. See the [historical result summary](../examples/versius/README.md)
+for measured performance. Those runs used a locally patched Warp binary; they do
+not qualify stock-Warp HashGrid capture or the current source. Preserve known
+capture failures when qualifying a new stack.
