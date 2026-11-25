@@ -11,7 +11,7 @@ import warp as wp
 from i4h_physics.storage import Domain, Field, Owner, defer_declaration, scene_record
 
 DIRECT_LIVE = ("young", "torsion", "bend", "twist", "angular_damping")
-PBD_LIVE = ("stretch", "bend", "twist", "angular_damping")
+PBD_LIVE = ("stretch", "bend", "twist", "angular_damping", "max_delta")
 DIRECT_REGIONS = dict(
     young_multiplier=1.0,
     torsion_multiplier=1.0,
@@ -34,7 +34,15 @@ def geometry(body, backend):
         frames, inv_mass = m.frames, m.inv_mass_q
         if backend == "pbd":
             frames, inv_mass = frames[:, :-1].copy(), inv_mass[:, :-1].copy()
-        rd = m.rest_darboux if backend == "direct" else np.stack([rest_darboux_quats(f, pair) for f in frames])
+        rd = m.rest_darboux
+        if backend == "pbd":
+            # Chain Darboux stores the vector part of the short relative quaternion.
+            # Startup frames are placement only; material curvature is independent.
+            vectors = m.rest_darboux[:, :len(pair)]
+            norm2 = np.sum(vectors.astype(np.float64) ** 2, axis=-1)
+            if not np.isfinite(norm2).all() or np.any(norm2 > 1.0):
+                raise ValueError("rod rest_curvature must have vector norm <= 1")
+            rd = np.concatenate((vectors, np.sqrt(np.maximum(0.0, 1.0 - norm2))[..., None]), axis=-1).astype(np.float32)
     elif body.tree is not None and backend == "pbd":
         m = body.tree
         if m.frames.shape[0] != 1:
@@ -298,6 +306,11 @@ def publish_rod(scene, declarations, system_id, *, body, backend, settings, expe
         declarations.initializer(partial(initialize_inertia, scene_ref=ref(scene), record=r))
     else:
         r.add("unit_twist", Owner.MODEL, wp.float32, np.ones((E, shared.K), np.float32), runtime=True)
+        from i4h_physics.systems.rods.rod_pbd import greedy_colors
+        geo = geometry(body, backend)
+        segments, pairs = geo["seg"][1][0], geo["pair"][1][0]
+        r.add("stretch_colors", Owner.MODEL, wp.int32, greedy_colors(segments), nodes=nodes)
+        r.add("bend_colors", Owner.MODEL, wp.int32, greedy_colors(pairs), nodes=segments[pairs[:, 0], 0], group="bend_colors")
     shared.solver = system_id
     declarations.register_package(records=((scene, "rod_domains", {system_id: r}),))
     return r

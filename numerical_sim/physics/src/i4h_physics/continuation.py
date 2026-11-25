@@ -142,3 +142,66 @@ class Continuation:
                 continue
             src, dst = (bound_words, other_words) if save else (other_words, bound_words)
             wp.launch(copy_rows, dim=world.shape[0], inputs=[world, self._all if mask is None else mask, src.shape[1], src], outputs=[dst], device=dev)
+
+    def portable_layout(self):
+        """Named arrays and world rows, independent of batching and host padding."""
+        result = {}
+        for owner, key, world, _, array, _ in self.entries:
+            name = key if isinstance(key, str) else self.storage.declarations.name(key)
+            name = f"{owner.value}_{name}"
+            if name in result:
+                raise ValueError(f"duplicate continuation field {name}")
+            result[name] = (array, world.numpy())
+        return result
+
+    def export_worlds(self, env_ids=None):
+        """Export episode rows; shared rows repeat, foreign rows and padding are omitted.
+
+        Source and configuration identity must be supplied and validated by the host.
+        """
+        ids = np.arange(self.scene.envs) if env_ids is None else np.asarray(env_ids, dtype=np.int64)
+        if ids.ndim != 1 or np.any(ids < 0) or np.any(ids >= self.scene.envs) or len(np.unique(ids)) != len(ids):
+            raise ValueError("invalid continuation world selection")
+        result = {}
+        for name, (array, worlds) in self.portable_layout().items():
+            data = array.numpy()
+            rows = [data[(worlds == world) | (worlds == -1)] for world in ids]
+            if rows and any(row.shape != rows[0].shape for row in rows):
+                raise ValueError(f"nonuniform continuation rows: {name}")
+            result[name] = np.stack(rows) if rows else np.empty((0, 0, *data.shape[1:]), data.dtype)
+        return result
+
+    def validate_worlds(self, bundle, env_ids=None):
+        """Validate every field before writes, including shared-row peer isolation."""
+        ids = np.arange(self.scene.envs) if env_ids is None else np.asarray(env_ids, dtype=np.int64)
+        if ids.ndim != 1 or np.any(ids < 0) or np.any(ids >= self.scene.envs) or len(np.unique(ids)) != len(ids):
+            raise ValueError("invalid continuation world selection")
+        layout = self.portable_layout()
+        if set(bundle) != set(layout):
+            raise ValueError("continuation fields differ")
+        writes = []
+        for name, (array, worlds) in layout.items():
+            data, source = array.numpy().copy(), np.asarray(bundle[name])
+            rows = [np.flatnonzero((worlds == world) | (worlds == -1)) for world in ids]
+            count = len(rows[0]) if rows else 0
+            if source.shape != (len(ids), count, *data.shape[1:]) or source.dtype != data.dtype:
+                raise ValueError(f"continuation shape/dtype mismatch: {name}")
+            shared = np.flatnonzero(worlds == -1)
+            shared_value = None
+            for index, selected in enumerate(rows):
+                values = source[index]
+                if len(shared):
+                    value = values[np.isin(selected, shared)]
+                    if shared_value is not None and value.tobytes() != shared_value.tobytes():
+                        raise ValueError(f"conflicting shared continuation rows: {name}")
+                    if len(ids) != self.scene.envs and value.tobytes() != data[shared].tobytes():
+                        raise ValueError(f"shared continuation would change unselected peers: {name}")
+                    shared_value = value
+                data[selected] = values
+            writes.append((array, data))
+        return writes
+
+    def import_worlds(self, bundle, env_ids=None):
+        """Restore episode rows without reset, history initialization or cache mutation."""
+        for array, data in self.validate_worlds(bundle, env_ids):
+            array.assign(data)

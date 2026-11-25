@@ -13,10 +13,9 @@ same kernels. Positions live in ``scene.q`` (``p``) with ``scene.q_prev`` as ``x
 finalizes them (``predict_positions`` and ``finalize_positions`` are not ported), this system owns the segment
 frames, their predicted copies and body-space angular velocities. Plain PBD: ``stretch``, ``bend`` and ``twist``
 are multipliers, not compliances; ``stretch_scale (E, S)`` and ``bend_scale (E, K)`` are per-element live
-multipliers (omniendo's ``stretch_multiplier`` and the control layouts' bend multipliers), ones by default. The
-colored Gauss-Seidel path is not ported: its per-colour launches have ragged dims that do not batch over envs, the
-Jacobi path is four launches of fixed dims; ``sweeps`` repeats them within one runner iteration (omniendo's
-``iterations`` of the centreline solve).
+multipliers (omniendo's ``stretch_multiplier`` and the control layouts' bend multipliers), ones by default. The default Jacobi path keeps fixed launch dimensions. The opt-in ``scheme: colored``
+uses fixed-capacity color tables and (env, item) launches to preserve the legacy wall's Gauss-Seidel ordering.
+``sweeps`` repeats the solve within one runner iteration; ``pre_sweeps`` runs it after prediction.
 
 Inactive nodes (``scene.flags``) hold their position and frame; a segment or pair touching one is skipped (and
 its angular velocity is zeroed at finalize, as for a locked segment). One mesh variant only. Products read by
@@ -32,7 +31,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import warp as wp
-from i4h_physics.checks import check_int
+from i4h_physics.checks import check_bool, check_int
 from i4h_physics.scene import ACTIVE, restore_variant_rows
 from i4h_physics.systems.base import System
 
@@ -70,6 +69,21 @@ def chain_topology(P: int) -> tuple[np.ndarray, np.ndarray]:
     return seg, pair
 
 
+def greedy_colors(pairs):
+    """Legacy pbd_cosserat.py:487-531: lowest available color in authored item order."""
+    colors = np.full(len(pairs), -1, np.int32)
+    used = {}
+    for index, (a, b) in enumerate(pairs):
+        unavailable = used.get(int(a), set()) | used.get(int(b), set())
+        color = 0
+        while color in unavailable:
+            color += 1
+        colors[index] = color
+        used.setdefault(int(a), set()).add(color)
+        used.setdefault(int(b), set()).add(color)
+    return colors
+
+
 @dataclass(eq=False)
 class RodPbd(System):
     body: str  # rod or centreline-tree asset id in YAML; the Body instance after construction
@@ -77,9 +91,13 @@ class RodPbd(System):
     bend: float = 1.0  # live, per env: bend multiplier (kbt.x = kbt.y)
     twist: float = 1.0  # live, per env: twist multiplier (kbt.z)
     angular_damping: float = 0.0  # live, per env: omega *= (1 - d) at finalize (omniendo ang_damping)
+    scheme: str = "jacobi"  # structural: colored reproduces the reference wall's Gauss-Seidel ordering
+    limit_motion: bool = False  # structural: apply max_delta after each constraint sweep
+    pre_sweeps: int = 0  # structural: initial constraint solve after prediction, before the main iteration loop
+    max_delta: float = 1.0e9  # live: bound translation against substep-start positions after each sweep
     sweeps: int = 1  # structural: Jacobi sweeps per runner iteration (omniendo centreline ``iterations``)
 
-    structural = System.structural + ("sweeps",)
+    structural = System.structural + ("sweeps", "pre_sweeps", "limit_motion", "scheme")
 
     @classmethod
     def declare_storage(cls, authoring, declarations, spec, records):
@@ -93,6 +111,10 @@ class RodPbd(System):
         E, dev = scene.envs, scene.device
         P = b.count
         self.sweeps = check_int("rod_pbd.sweeps", self.sweeps, 1)
+        self.pre_sweeps = check_int("rod_pbd.pre_sweeps", self.pre_sweeps, 0)
+        self.limit_motion = check_bool("rod_pbd.limit_motion", self.limit_motion)
+        if self.scheme not in ("jacobi", "colored"):
+            raise ValueError("rod_pbd.scheme must be jacobi or colored")
         if b.rod is not None:
             m = b.rod
             if m.frames.shape[0] != 1:
@@ -130,6 +152,8 @@ class RodPbd(System):
         bind_rod(self, "pbd")
         self.frame_pred = wp.clone(self.frame)
         self.register_live(*PBD_LIVE)
+        self.stretch_color_count = int(greedy_colors(seg).max(initial=-1)) + 1
+        self.bend_color_count = int(greedy_colors(pair).max(initial=-1)) + 1
         self.effective_stretch, self.effective_bend = self.stretch_scale, self.bend_scale
         self.effective_twist = self.unit_twist
         for key in ("effective_stretch", "effective_bend", "effective_twist"):
@@ -145,6 +169,11 @@ class RodPbd(System):
         from i4h_physics.rod_storage import route_alias
         scene.storage.check()
         super().prepare(scene)
+        self.pre_sweeps = check_int("rod_pbd.pre_sweeps", self.pre_sweeps, 0)
+        self.sweeps = check_int("rod_pbd.sweeps", self.sweeps, 1)
+        self.limit_motion = check_bool("rod_pbd.limit_motion", self.limit_motion)
+        if self.scheme not in ("jacobi", "colored"):
+            raise ValueError("rod_pbd.scheme must be jacobi or colored")
         material = self.body.rod_material
         self.regional = material is not None and material.active
         route_alias(scene, self, "effective_stretch", material.stretch if self.regional else self.stretch_scale)
@@ -157,18 +186,38 @@ class RodPbd(System):
         wp.launch(predict_orientations, dim=(E, S),
                   inputs=[self.frame, self.omega, self.inv_mass_q, self.variant, self.seg, scene.field("flags", self.body), S, dt],
                   outputs=[self.frame_pred], device=dev)
+        self.project(scene, self.pre_sweeps)
 
     def iteration(self, scene, dt, k, iterations):
+        self.project(scene, self.sweeps)
+
+    def project(self, scene, sweeps):
         b, E, dev, P, S, K = self.body, scene.envs, scene.device, self.P, self.S, self.K
-        for _ in range(self.sweeps):
-            wp.launch(cosserat_jacobi, dim=(E, S + K),
-                      inputs=[scene.field("q", b), self.frame_pred, scene.field("inv_mass", b), scene.field("flags", b), self.inv_mass_q,
-                              self.rest_len, self.rest_darboux, self.bend_offset, self.effective_bend, self.effective_twist, self.variant, self.seg, self.pair,
-                              self.stretch, self.effective_stretch, self.bend, self.twist, P, S],
-                      outputs=[self.pos_corr, self.pos_count, self.ori_corr, self.ori_count], device=dev)
-            wp.launch(apply_corrections, dim=(E, max(P, S)),
-                      inputs=[scene.field("inv_mass", b), scene.field("flags", b), self.inv_mass_q, self.variant, self.seg, P, S],
-                      outputs=[scene.field("q", b), self.pos_corr, self.pos_count, self.frame_pred, self.ori_corr, self.ori_count], device=dev)
+        for _ in range(sweeps):
+            if self.scheme == "colored":
+                for color in range(self.stretch_color_count):
+                    wp.launch(colored_stretch, dim=(E, S),
+                              inputs=[self.stretch_colors, color, scene.field("inv_mass", b), scene.field("flags", b),
+                                      self.inv_mass_q, self.rest_len, self.effective_stretch, self.stretch, self.variant, self.seg, S],
+                              outputs=[scene.field("q", b), self.frame_pred], device=dev)
+                for color in range(self.bend_color_count):
+                    wp.launch(colored_bend, dim=(E, K),
+                              inputs=[self.bend_colors, color, self.inv_mass_q, scene.field("flags", b), self.variant,
+                                      self.seg, self.pair, self.rest_darboux, self.bend_offset, self.effective_bend,
+                                      self.effective_twist, self.bend, self.twist, S], outputs=[self.frame_pred], device=dev)
+            else:
+                wp.launch(cosserat_jacobi, dim=(E, S + K),
+                          inputs=[scene.field("q", b), self.frame_pred, scene.field("inv_mass", b), scene.field("flags", b), self.inv_mass_q,
+                                  self.rest_len, self.rest_darboux, self.bend_offset, self.effective_bend, self.effective_twist, self.variant, self.seg, self.pair,
+                                  self.stretch, self.effective_stretch, self.bend, self.twist, P, S],
+                          outputs=[self.pos_corr, self.pos_count, self.ori_corr, self.ori_count], device=dev)
+                wp.launch(apply_corrections, dim=(E, max(P, S)),
+                          inputs=[scene.field("inv_mass", b), scene.field("flags", b), self.inv_mass_q, self.variant, self.seg, P, S],
+                          outputs=[scene.field("q", b), self.pos_corr, self.pos_count, self.frame_pred, self.ori_corr, self.ori_count], device=dev)
+            if self.limit_motion:
+                wp.launch(clamp_translation, dim=(E, P),
+                          inputs=[scene.field("q_prev", b), scene.field("inv_mass", b), self.max_delta],
+                          outputs=[scene.field("q", b)], device=dev)
 
     def substep_end(self, scene, dt):
         E, dev, S = scene.envs, scene.device, self.S
@@ -189,6 +238,21 @@ class RodPbd(System):
         if K:
             self.clear(mask, (self.bend_offset, wp.vec3(0.0, 0.0, 0.0)))
             self.clear(mask, (self.bend_scale, wp.float32(1.0)))
+
+
+@wp.kernel
+def clamp_translation(
+    previous: wp.array2d(dtype=wp.vec3),
+    inv_mass: wp.array2d(dtype=wp.float32),
+    limit: wp.array(dtype=wp.float32),
+    q: wp.array2d(dtype=wp.vec3),
+):
+    env, node = wp.tid()
+    if inv_mass[env, node] > 0.0:
+        delta = q[env, node] - previous[env, node]
+        length = wp.length(delta)
+        if length > limit[env] and length > 1.0e-12:
+            q[env, node] = previous[env, node] + delta * (limit[env] / length)
 
 
 # --- kernels -----------------------------------------------------------------------------------------
@@ -488,3 +552,106 @@ def finalize_orientations(
         q[i] = u[i]
     else:
         omega[i] = wp.vec3(0.0, 0.0, 0.0)
+
+
+# Ported from legacy 5005619 vessel_deformation/pbd_cosserat.py:95-189.
+# Each color has disjoint nodes/segments. Launches keep (env, capacity) indexing.
+@wp.kernel
+def colored_stretch(
+    colors: wp.array(dtype=wp.int32),
+    color: wp.int32,
+    inv_mass: wp.array2d(dtype=wp.float32),
+    flags: wp.array2d(dtype=wp.int32),
+    inv_mass_q: wp.array2d(dtype=wp.float32),
+    rest_len: wp.array2d(dtype=wp.float32),
+    scale: wp.array2d(dtype=wp.float32),
+    stretch: wp.array(dtype=wp.float32),
+    variant: wp.array(dtype=wp.int32),
+    seg: wp.array2d(dtype=wp.vec2i),
+    S: wp.int32,
+    p: wp.array2d(dtype=wp.vec3),
+    u: wp.array(dtype=wp.quat),
+):
+    env, e = wp.tid()
+    if colors[e] != color:
+        return
+    v = variant[env]
+    ends = seg[v, e]
+    if not segment_active(flags, env, ends):
+        return
+    i0, i1 = ends[0], ends[1]
+    w0, w1 = inv_mass[env, i0], inv_mass[env, i1]
+    wq = inv_mass_q[v, e]
+    length = rest_len[v, e]
+    index = env * S + e
+    q0 = u[index]
+    d3 = wp.quat_rotate(q0, E3)
+    gamma = (p[env, i1] - p[env, i0]) / length - d3
+    denominator = (w0 + w1) / length + wq * 4.0 * length + 1.0e-6
+    gamma = (gamma / denominator) * stretch[env] * scale[env, e]
+    if w0 > 0.0:
+        p[env, i0] = p[env, i0] + w0 * gamma
+    if w1 > 0.0:
+        p[env, i1] = p[env, i1] - w1 * gamma
+    if wq > 0.0:
+        qe3 = wp.quat(-q0[1], q0[0], -q0[3], q0[2])
+        correction = qmul(wp.quat(gamma[0], gamma[1], gamma[2], 0.0), qe3)
+        weight = 2.0 * wq * length
+        n = wp.normalize(wp.vec4(q0[0] + weight * correction[0], q0[1] + weight * correction[1],
+                                 q0[2] + weight * correction[2], q0[3] + weight * correction[3]))
+        u[index] = wp.quat(n[0], n[1], n[2], n[3])
+
+
+@wp.kernel
+def colored_bend(
+    colors: wp.array(dtype=wp.int32),
+    color: wp.int32,
+    inv_mass_q: wp.array2d(dtype=wp.float32),
+    flags: wp.array2d(dtype=wp.int32),
+    variant: wp.array(dtype=wp.int32),
+    seg: wp.array2d(dtype=wp.vec2i),
+    pair: wp.array2d(dtype=wp.vec2i),
+    rest: wp.array2d(dtype=wp.quat),
+    offset: wp.array2d(dtype=wp.vec3),
+    bend_scale: wp.array2d(dtype=wp.float32),
+    twist_scale: wp.array2d(dtype=wp.float32),
+    bend: wp.array(dtype=wp.float32),
+    twist: wp.array(dtype=wp.float32),
+    S: wp.int32,
+    u: wp.array(dtype=wp.quat),
+):
+    env, k = wp.tid()
+    if colors[k] != color:
+        return
+    v = variant[env]
+    ends = pair[v, k]
+    a, b = ends[0], ends[1]
+    if not segment_active(flags, env, seg[v, a]) or not segment_active(flags, env, seg[v, b]):
+        return
+    ia, ib = env * S + a, env * S + b
+    q0, q1 = u[ia], u[ib]
+    w0, w1 = inv_mass_q[v, a], inv_mass_q[v, b]
+    if w0 <= 0.0 and w1 <= 0.0:
+        return
+    omega = qmul(qconj(q0), q1)
+    rd = rest[v, k]
+    change = offset[env, k]
+    if wp.length_sq(change) > 0.0:
+        xyz = wp.vec3(rd[0], rd[1], rd[2]) + change
+        rd = wp.quat(xyz[0], xyz[1], xyz[2], wp.sqrt(wp.max(1.0 - wp.length_sq(xyz), 0.0)))
+    minus = wp.vec4(omega[0] - rd[0], omega[1] - rd[1], omega[2] - rd[2], omega[3] - rd[3])
+    plus = wp.vec4(omega[0] + rd[0], omega[1] + rd[1], omega[2] + rd[2], omega[3] + rd[3])
+    d = minus
+    if wp.dot(minus, minus) > wp.dot(plus, plus):
+        d = plus
+    kb = bend[env] * bend_scale[env, k]
+    kt = twist[env] * twist_scale[env, k]
+    denominator = w0 + w1 + 1.0e-6
+    strain = wp.quat(d[0] * kb / denominator, d[1] * kb / denominator, d[2] * kt / denominator, 0.0)
+    c0, c1 = qmul(q1, strain), qmul(q0, strain)
+    if w0 > 0.0:
+        n = wp.normalize(wp.vec4(q0[0] + w0 * c0[0], q0[1] + w0 * c0[1], q0[2] + w0 * c0[2], q0[3] + w0 * c0[3]))
+        u[ia] = wp.quat(n[0], n[1], n[2], n[3])
+    if w1 > 0.0:
+        n = wp.normalize(wp.vec4(q1[0] - w1 * c1[0], q1[1] - w1 * c1[1], q1[2] - w1 * c1[2], q1[3] - w1 * c1[3]))
+        u[ib] = wp.quat(n[0], n[1], n[2], n[3])
