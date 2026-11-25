@@ -28,18 +28,21 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
 
     Substep algorithm::
 
+        0. Save the rod's state            (drive_coupling_iterations > 1)
+        repeat drive_coupling_iterations times, restoring the rod after the first:
         1. Clear rigid / particle force accumulators
-        2. Apply the lagged catheter reaction  (two_way only)
-        3. Run Newton collision pipeline (shared contacts)
+        2. Apply the current reaction guess   (two_way only)
+        3. Run Newton collision pipeline (first iteration; shared contacts)
         4. Step MJWarp rigid solver     (state_0 → state_1)
-        5. Hold the rod root on the drive mount  (drive_root_sync only)
+        5. Hold the rod root on the drive mount, or make it the holder's proxy
+           (drive_root_sync only)
         6. Step the catheter particles   (state_0 → state_1)
-        7. Harvest the catheter reaction      (two_way only)
+        7. Harvest the reaction and relax the guess toward it  (two_way only)
 
     Steps 2, 5 and 7 follow the ``LAGGED`` proxy mode of Newton's own
-    coupled-solver framework with a single pass per substep, so relaxation
-    filters the reaction across substeps rather than converging an iteration;
-    see
+    coupled-solver framework, with ``drive_coupling_iterations`` as its
+    ``Config.iterations``. With one iteration, relaxation filters the reaction
+    across substeps; with several, it converges the substep's iteration; see
     :mod:`~catheter_vasculature_solver.isaaclab_integration.proxy_coupling` for
     where this follows it and where it departs.
 
@@ -53,6 +56,8 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
     _rod_solver: Any = None
     _coupler: Any = None
     _follower: Any = None
+    _coupling_iterations: int = 1
+    _rod_snapshot: Any = None
     _coupling_mode: str = "one_way"
     _coupled_cfg: CoupledMJWarpXPBDRodSolverCfg | None = None
     _rod_solver_cfg: XPBDRodSolverCfg | None = None
@@ -209,6 +214,9 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
             mount_local=[tuple(solver_cfg.drive_mount_local)] * num_envs,
             body_com=model.body_com,
             relaxation=float(solver_cfg.drive_reaction_relaxation),
+            relaxation_mode=str(getattr(solver_cfg, "drive_relaxation_mode", "fixed")),
+            relaxation_min=float(getattr(solver_cfg, "drive_relaxation_min", 0.05)),
+            relaxation_max=float(getattr(solver_cfg, "drive_relaxation_max", 1.0)),
             device=getattr(model, "device", None),
         )
 
@@ -239,13 +247,41 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
 
         from .proxy_coupling import DriveRootFollower
 
+        proxy_mass = bool(getattr(solver_cfg, "drive_proxy_mass", False))
         return DriveRootFollower(
             num_envs=num_envs,
             root_stride=int(particle_range.count) // num_envs,
             drive_bodies=drive_bodies,
             mount_local=[tuple(solver_cfg.drive_mount_local)] * num_envs,
+            proxy_mass=proxy_mass,
+            body_com=model.body_com if proxy_mass else None,
+            body_inv_mass=model.body_inv_mass if proxy_mass else None,
+            mass_scale=float(getattr(solver_cfg, "drive_proxy_mass_scale", 1.0)),
             device=getattr(model, "device", None),
         )
+
+    @classmethod
+    def _check_coupling_cfg(cls, solver_cfg: CoupledMJWarpXPBDRodSolverCfg) -> int:
+        """Reject coupling options that cannot work together; return the iteration count."""
+        iterations = int(getattr(solver_cfg, "drive_coupling_iterations", 1))
+        two_way = str(solver_cfg.coupling_mode) == "two_way"
+        if iterations < 1:
+            raise ValueError(f"drive_coupling_iterations must be at least 1, got {iterations}")
+        if iterations > 1 and not two_way:
+            raise ValueError(
+                f"drive_coupling_iterations={iterations} needs coupling_mode='two_way': iterating "
+                "refines the catheter's reaction on its holder, which one-way coupling never applies."
+            )
+        if getattr(solver_cfg, "drive_proxy_mass", False):
+            if not getattr(solver_cfg, "drive_root_sync", False) or not two_way:
+                raise ValueError("drive_proxy_mass needs drive_root_sync=True and coupling_mode='two_way'.")
+            if iterations < 2:
+                raise ValueError(
+                    "drive_proxy_mass needs drive_coupling_iterations >= 2. The proxy is rewound out "
+                    "of a reaction the rigid solve has already applied, which is only consistent once "
+                    "the substep is re-solved with the result; a single pass diverges."
+                )
+        return iterations
 
     @classmethod
     def _build_solver(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg) -> None:
@@ -253,6 +289,7 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         cls._coupled_cfg = solver_cfg
         cls._rod_solver_cfg = solver_cfg.rod_solver_cfg
         cls._coupling_mode = str(solver_cfg.coupling_mode)
+        cls._coupling_iterations = cls._check_coupling_cfg(solver_cfg)
 
         cls._rigid_solver = cls._build_rigid_solver(model, solver_cfg.rigid_solver_cfg)
         cls._rod_solver = NewtonXPBDRodManager.build_nested_solver(model, solver_cfg.rod_solver_cfg)
@@ -331,7 +368,7 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
 
     @classmethod
     def _step_solver(cls, state_0, state_1, control, contacts, substep_dt: float) -> None:
-        """One coupled substep: contacts, then rigid, then rod."""
+        """One coupled substep: contacts, then rigid and rod, iterated on the reaction."""
         rigid = cls._rigid_solver or getattr(NewtonManager, "_rigid_solver", None)
         rod = cls._rod_solver or getattr(NewtonManager, "_rod_solver", None)
         if rigid is None or rod is None:
@@ -339,26 +376,47 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
                 "NewtonCoupledMJWarpXPBDRodManager sub-solvers are not built. "
                 "Ensure _build_solver ran during NewtonManager.initialize()."
             )
-
-        cls._clear_force_buffers(state_0)
-        # Feedback from the previous substep has to land after the clear and
-        # before the rigid solve, or it would be zeroed before anything read it.
-        cls._apply_soft_to_rigid_reactions(contacts, state_0)
-        contacts = cls._run_collision_pipeline(state_0, state_1, control) or contacts
-
-        rigid.step(state_0, state_1, control, contacts, substep_dt)
-
-        follower = cls._follower or getattr(NewtonManager, "_follower", None)
-        if follower is not None:
-            follower.sync(state_0, state_1, rod.rod)
-        # MJWarp writes bodies and joints but leaves output particles untouched.
-        # Read the current particles, then publish only the rod's particle slice
-        # into the output, preserving the rigid solver's body and joint results.
-        rod.step(state_0, state_1, control, contacts, substep_dt)
-
         coupler = cls._coupler or getattr(NewtonManager, "_coupler", None)
+        follower = cls._follower or getattr(NewtonManager, "_follower", None)
+        iterations = int(cls._coupling_iterations) if coupler is not None else 1
+
+        # Each iteration re-solves the substep from its start. The rigid solve
+        # only reads state_0, so re-running it is enough; the rod keeps state of
+        # its own beyond the particles and has to be put back.
+        snapshot = None
+        if iterations > 1:
+            snapshot = cls._rod_snapshot
+            if snapshot is None or snapshot.root is not rod:
+                from .rod_snapshot import RodStateSnapshot
+
+                snapshot = cls._rod_snapshot = RodStateSnapshot(rod)
+            snapshot.save()
         if coupler is not None:
-            coupler.harvest(state_1, rod.rod)
+            coupler.begin_substep()
+
+        for iteration in range(iterations):
+            if iteration:
+                snapshot.restore()
+            cls._clear_force_buffers(state_0)
+            # The reaction has to land after the clear and before the rigid
+            # solve, or it would be zeroed before anything read it.
+            cls._apply_soft_to_rigid_reactions(contacts, state_0)
+            if iteration == 0:
+                contacts = cls._run_collision_pipeline(state_0, state_1, control) or contacts
+
+            rigid.step(state_0, state_1, control, contacts, substep_dt)
+
+            if follower is not None:
+                follower.sync(
+                    state_0, state_1, rod.rod, coupler.coupling_forces if coupler is not None else None, substep_dt,
+                )
+            # MJWarp writes bodies and joints but leaves output particles untouched.
+            # Read the current particles, then publish only the rod's particle slice
+            # into the output, preserving the rigid solver's body and joint results.
+            rod.step(state_0, state_1, control, contacts, substep_dt)
+
+            if coupler is not None:
+                coupler.harvest(state_1, rod.rod)
 
     @classmethod
     def _log_solver_debug(cls) -> None:
@@ -430,6 +488,8 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         cls._rod_solver = None
         cls._coupler = None
         cls._follower = None
+        cls._coupling_iterations = 1
+        cls._rod_snapshot = None
         cls._coupled_cfg = None
         cls._rod_solver_cfg = None
         cls._drive_body_label = None

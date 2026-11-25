@@ -165,7 +165,7 @@ def test_coupled_step_holds_the_root_on_this_substeps_body_pose(rod_managers, mo
     state_0, state_1 = states
 
     def rigid_step(state_in, state_out, control, contacts, dt):
-        poses = state_in.body_q.numpy()
+        poses = state_in.body_q.numpy().copy()
         poses[:, 0] += 0.002
         poses[1, 1] -= 0.001
         state_out.body_q.assign(wp.array(poses, dtype=wp.transform, device=DEVICE))
@@ -189,7 +189,9 @@ class SpringHeldRod:
 
     Stands in for a stiff catheter wedged against the vessel: the reaction on
     the holder grows with how far the root is pushed past ``wall``. It honours
-    the parts of the rod solver's interface the follower and coupler use.
+    the parts of the rod solver's interface the follower and coupler use. As a
+    proxy, the root moves under the spring over one substep with the proxy's
+    mass, solved implicitly as the rod's own constraint solve would.
     """
 
     def __init__(self, stiffness: float, wall: float = 0.0) -> None:
@@ -202,23 +204,44 @@ class SpringHeldRod:
     def set_root_pose_gpu(self, positions, orientations=None) -> None:
         self.root_x = float(positions.numpy()[0][0])
 
+    def set_root_proxy_gpu(self, positions, velocities, inv_masses, orientations) -> None:
+        start = float(positions.numpy()[0][0])
+        velocity = float(velocities.numpy()[0][0])
+        stiffness = DT * DT * float(inv_masses.numpy()[0]) * self.k
+        self.root_x = (start + DT * velocity + stiffness * self.wall) / (1.0 + stiffness)
+
     def proximal_wrench(self, out=None):
         force = -self.k * (self.root_x - self.wall)
         out.assign(wp.array([[force, 0.0, 0.0, 0.0, 0.0, 0.0]], dtype=wp.spatial_vector, device=DEVICE))
         return out
 
 
-def run_closed_loop(stiffness_ratio: float, substeps: int = 2000, mass: float = 1.0, push: float = 1.0):
+def run_closed_loop(
+    stiffness_ratio: float,
+    substeps: int = 2000,
+    *,
+    iterations: int = 1,
+    relaxation_mode: str = "fixed",
+    proxy: bool = False,
+    mass: float = 1.0,
+    push: float = 1.0,
+):
     """Drive a free body into a spring-held rod; return the reaction history.
 
     ``stiffness_ratio`` is ``k·dt²/M``. The rigid side is a semi-implicit Euler
-    step of a body pushed by ``push`` plus the lagged reaction the coupler injects.
+    step of a body pushed by ``push`` plus the reaction the coupler injects,
+    re-run from the substep's start on each coupling iteration as the manager
+    re-runs MJWarp. Stops early once the reaction has clearly blown up.
     """
     rod = SpringHeldRod(stiffness_ratio * mass / DT**2)
     coupler = DriveReactionCoupler(
-        body_count=1, num_envs=1, root_offset=0, root_stride=1, drive_bodies=[0], relaxation=1.0, device=DEVICE,
+        body_count=1, num_envs=1, root_offset=0, root_stride=1, drive_bodies=[0], relaxation=1.0,
+        relaxation_mode=relaxation_mode, device=DEVICE,
     )
-    follower = DriveRootFollower(num_envs=1, root_stride=1, drive_bodies=[0], device=DEVICE)
+    follower = DriveRootFollower(
+        num_envs=1, root_stride=1, drive_bodies=[0], proxy_mass=proxy,
+        body_inv_mass=wp.array([1.0 / mass], dtype=wp.float32, device=DEVICE) if proxy else None, device=DEVICE,
+    )
 
     def state(x):
         return SimpleNamespace(
@@ -230,27 +253,109 @@ def run_closed_loop(stiffness_ratio: float, substeps: int = 2000, mass: float = 
     x = v = 0.0
     history = []
     for _ in range(substeps):
-        begin = state(x)
-        coupler.apply(begin)
-        force = push + float(begin.body_f.numpy()[0][0])
-        v += DT * force / mass
-        x += DT * v
-        end = state(x)
-        follower.sync(begin, end, rod)
-        coupler.harvest(end, rod)
+        x_begin, v_begin = x, v
+        coupler.begin_substep()
+        for _ in range(iterations):
+            begin = state(x_begin)
+            coupler.apply(begin)
+            force = push + float(begin.body_f.numpy()[0][0])
+            v = v_begin + DT * force / mass
+            x = x_begin + DT * v
+            end = state(x)
+            follower.sync(begin, end, rod, coupler.coupling_forces, DT)
+            coupler.harvest(end, rod)
         history.append(float(coupler.coupling_forces.numpy()[0][0]))
+        if not np.isfinite(history[-1]) or abs(history[-1]) > 1e9:
+            break
     return np.asarray(history)
 
 
+def bounded(history, substeps: int) -> bool:
+    return len(history) == substeps and np.isfinite(history).all() and np.abs(history[-50:]).max() < 4.0
+
+
 @pytest.mark.parametrize("stiffness_ratio", [0.1, 1.0, 3.0])
-def test_closed_loop_stays_bounded_below_the_symplectic_limit(stiffness_ratio) -> None:
-    """Including where an unrewound reaction was expected to alternate and blow up."""
-    history = run_closed_loop(stiffness_ratio)
-    assert np.all(np.isfinite(history))
-    assert np.abs(history[-200:]).max() < 4.0
+def test_single_pass_stays_bounded_below_the_symplectic_limit(stiffness_ratio) -> None:
+    assert bounded(run_closed_loop(stiffness_ratio), 2000)
 
 
-def test_closed_loop_diverges_past_the_symplectic_limit() -> None:
-    """``k·dt²/M > 4`` is where relaxation or more substeps are needed."""
-    history = run_closed_loop(5.0, substeps=200)
-    assert not np.isfinite(history).all() or np.abs(history[-20:]).max() > 1e6
+def test_single_pass_diverges_past_the_symplectic_limit() -> None:
+    """``k·dt²/M > 4`` is where iterations, relaxation or more substeps are needed."""
+    assert not bounded(run_closed_loop(5.0, substeps=200), 200)
+
+
+def test_aitken_iterations_carry_a_pinned_root_past_the_single_pass_limit() -> None:
+    assert bounded(run_closed_loop(10.0, substeps=300, iterations=6, relaxation_mode="aitken"), 300)
+
+
+def test_proxy_root_converges_in_two_iterations_at_any_stiffness() -> None:
+    """Newton's scheme: the rewound proxy makes the rod's answer independent of the guess."""
+    assert bounded(run_closed_loop(100.0, substeps=300, iterations=2, proxy=True), 300)
+
+
+def test_a_single_rewound_proxy_pass_diverges() -> None:
+    """Why the manager rejects drive_proxy_mass with one coupling iteration."""
+    assert not bounded(run_closed_loop(0.5, substeps=2000, proxy=True), 2000)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "match"),
+    [
+        ({"drive_coupling_iterations": 0}, "at least 1"),
+        ({"coupling_mode": "one_way", "drive_coupling_iterations": 2}, "two_way"),
+        ({"drive_proxy_mass": True, "drive_coupling_iterations": 2}, "drive_root_sync"),
+        ({"drive_proxy_mass": True, "drive_root_sync": True}, ">= 2"),
+    ],
+)
+def test_incompatible_coupling_options_are_rejected(rod_managers, overrides, match) -> None:
+    options = {"coupling_mode": "two_way", **overrides}
+    with pytest.raises(ValueError, match=match):
+        rod_managers.coupled._check_coupling_cfg(rod_managers.coupled_cfg(**options))
+
+
+def test_coupling_iterations_re_solve_the_substep_instead_of_advancing_it(rod_managers, monkeypatch) -> None:
+    """With a rigid side that ignores the force, every iteration must reproduce the first."""
+
+    def run(iterations):
+        rod = make_rod(num_envs=2)
+        bridge = RodParticleBridge(rod, RodParticleRange(0, rod.num_points * 2, 2))
+
+        def advance(state_in, state_out, control, contacts, dt):
+            bridge.read_from(state_in)
+            bridge.advance(dt)
+            bridge.write_to(state_out)
+
+        def rigid_step(state_in, state_out, control, contacts, dt):
+            poses = state_in.body_q.numpy().copy()
+            poses[:, 0] += 0.002
+            state_out.body_q.assign(wp.array(poses, dtype=wp.transform, device=DEVICE))
+
+        states = [SimpleNamespace(
+            particle_q=wp.clone(rod.position_array),
+            particle_qd=wp.clone(rod.velocity_array),
+            body_q=body_states([((0, 0, 0), IDENTITY)] * 2),
+            body_f=wp.zeros(2, dtype=wp.spatial_vector, device=DEVICE),
+        ) for _ in range(2)]
+        coupler = DriveReactionCoupler(
+            body_count=2, num_envs=2, root_offset=0, root_stride=rod.num_points, drive_bodies=[0, 1],
+            relaxation_mode="aitken", device=DEVICE,
+        )
+        follower = DriveRootFollower(num_envs=2, root_stride=rod.num_points, drive_bodies=[0, 1], device=DEVICE)
+        solver = SimpleNamespace(rod=rod, step=advance)
+        monkeypatch.setattr(rod_managers.coupled, "_rigid_solver", SimpleNamespace(step=rigid_step))
+        monkeypatch.setattr(rod_managers.coupled, "_rod_solver", solver)
+        monkeypatch.setattr(rod_managers.coupled, "_coupler", coupler)
+        monkeypatch.setattr(rod_managers.coupled, "_follower", follower)
+        monkeypatch.setattr(rod_managers.coupled, "_coupling_iterations", iterations)
+        monkeypatch.setattr(rod_managers.coupled, "_rod_snapshot", None)
+        monkeypatch.setattr(rod_managers.base, "_collision_pipeline", None, raising=False)
+        monkeypatch.setattr(rod_managers.base, "_contacts", None, raising=False)
+        state_0, state_1 = states
+        for _ in range(4):
+            rod_managers.coupled._step_solver(state_0, state_1, None, None, DT)
+            state_0, state_1 = state_1, state_0
+        return state_0.particle_q.numpy(), rod.orientation_array.numpy()
+
+    once, iterated = run(1), run(3)
+    np.testing.assert_array_equal(once[0], iterated[0])
+    np.testing.assert_array_equal(once[1], iterated[1])

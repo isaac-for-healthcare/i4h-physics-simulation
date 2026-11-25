@@ -11,21 +11,22 @@ harvest the destination's reaction, then blend that reaction against the
 previous iterate before feeding it back. This module carries that recipe onto
 the Newton revision this package pins, which predates the framework.
 
-:class:`DriveRootFollower` is the pose synchronisation: it puts the rod's root
-on the drive mount inside every substep. :class:`DriveReactionCoupler` is the
-harvest and the blend. Three parts of the upstream recipe are not carried over:
+:class:`DriveRootFollower` is the pose synchronisation and, with
+``proxy_mass``, the proxy and its rewind: it puts the rod's root on the drive
+mount inside every substep, pinned or carrying the holder's inertia.
+:class:`DriveReactionCoupler` is the harvest and the relaxation, fixed or
+Aitken. The coupled manager supplies the iterations, re-solving each substep
+from a saved rod state. Where this departs from upstream:
 
-* There is no rewind. Upstream re-steps the source from the start of the step
-  on each iteration, so removing the previous iterate's feedback leaves the
-  destination solving from the free motion. With a single pass the rigid solver
-  keeps the lagged reaction in the body's state, and rewinding it out of the
-  pose the rod sees makes the coupling unstable; see :class:`DriveRootFollower`.
-* The proxy has no inertia. The root keeps zero inverse mass, so the rod sees
-  its holder as infinitely heavy within a substep. A finite root mass would
-  also expose the root to the vessel containment, track guidance and wall
-  friction kernels, which identify the root by its zero inverse mass.
-* Each substep makes one pass, so ``relaxation`` filters the reaction across
-  substeps rather than relaxing an iteration, and there is no Aitken update.
+* A proxy root is rewound and given inertia only in translation; its
+  orientation stays kinematic on the solved pose.
+* The proxy's mass is the drive link's own times ``mass_scale``, not an
+  articulated effective mass. Iterating to convergence makes the result
+  independent of it, because the rigid solve is re-run with each guess and so
+  supplies the holder's true response, articulation and drive gains included.
+* The proxy needs two or more iterations. Rewinding a reaction the rigid solve
+  has already applied is only consistent when the substep is re-solved, and a
+  single rewound pass diverges.
 
 What is harvested differs from upstream. Upstream reads a proxy *body*'s
 momentum change, which works because their sub-solvers move the proxy during
@@ -247,6 +248,49 @@ def _harvest_env_reactions(
 
 
 @wp.kernel
+def _harvest_env_reactions_aitken(
+    proximal_wrench: wp.array(dtype=wp.spatial_vector),
+    body_com: wp.array(dtype=wp.vec3),
+    mount_local: wp.array(dtype=wp.vec3),
+    body_q: wp.array(dtype=wp.transform),
+    drive_body: wp.array(dtype=wp.int32),
+    iteration: int,
+    initial: float,
+    lower: float,
+    upper: float,
+    env_forces: wp.array(dtype=wp.spatial_vector),
+    env_previous: wp.array(dtype=wp.spatial_vector),
+    env_residual: wp.array(dtype=wp.spatial_vector),
+    env_omega: wp.array(dtype=wp.float32),
+):
+    """Aitken's Δ² update of each rod's share, as ``proxy_relaxation='aitken'`` upstream.
+
+    The residual is what the rod reported minus what the body was given. The
+    weight starts at ``initial`` on the first iteration of a substep and is then
+    the secant estimate ``-ω·rₖ₋₁·(rₖ - rₖ₋₁) / |rₖ - rₖ₋₁|²``, clamped.
+    """
+    env = wp.tid()
+    body = drive_body[env]
+    if body < 0:
+        return
+    arm = wp.transform_vector(body_q[body], mount_local[env] - body_com[body])
+    residual = _drive_reaction_wrench(proximal_wrench[env], arm) - env_forces[env]
+    omega = initial
+    if iteration > 0:
+        previous = env_residual[env]
+        change = residual - previous
+        denominator = wp.dot(change, change)
+        omega = env_omega[env]
+        if denominator > 1.0e-30:
+            omega = -omega * wp.dot(previous, change) / denominator
+    omega = wp.clamp(omega, lower, upper)
+    env_previous[env] = env_forces[env]
+    env_forces[env] = env_forces[env] + omega * residual
+    env_residual[env] = residual
+    env_omega[env] = omega
+
+
+@wp.kernel
 def _accumulate_env_reactions(
     drive_body: wp.array(dtype=wp.int32),
     env_forces: wp.array(dtype=wp.spatial_vector),
@@ -328,20 +372,20 @@ class DriveReactionCoupler:
     including when several rods share a holder. One instance spans every env,
     because Newton keeps all bodies and particles in single flat arrays.
 
-    The call order over a substep mirrors upstream's ``LAGGED`` proxy mode with
-    one pass::
+    The call order over a substep mirrors upstream's ``LAGGED`` proxy mode::
 
-        apply(state_0)                  # feedback harvested one substep ago
-        ... rigid solve ...
-        follower.sync(...)              # root onto the solved mount, if following
-        ... rod solve ...
-        harvest(state, rod)             # reaction the rod just transmitted
+        begin_substep()
+        for each coupling iteration:
+            apply(state_0)              # current guess; last substep's on the first pass
+            ... rigid solve ...
+            follower.sync(...)          # root onto the mount, if following
+            ... rod solve ...
+            harvest(state, rod)         # relax the guess toward what the rod reported
 
-    There is no pre-step snapshot, unlike upstream: the reaction comes from the
-    rod's constraint state after its solve rather than from a velocity
-    difference across it, and the rod supplies its own substep scaling.
-    Because there is one pass per substep, ``relaxation`` below 1 low-pass
-    filters the reaction across substeps; it does not relax an iteration.
+    The reaction comes from the rod's constraint state after its solve rather
+    than from a velocity difference across it, and the rod supplies its own
+    substep scaling. With one pass per substep, ``relaxation`` below 1 low-pass
+    filters the reaction across substeps; with several it relaxes the iteration.
 
     Args:
         body_count: Number of bodies in the Newton model.
@@ -354,7 +398,13 @@ class DriveReactionCoupler:
             transmitted even when the mount coincides with the center of mass.
         body_com: Per-body local centers of mass from the Newton model.
             Defaults to zero for models whose body origin is their COM.
-        relaxation: Blend weight against the previous iterate.
+        relaxation: Blend weight against the previous iterate; with
+            ``relaxation_mode='aitken'``, the weight of each substep's first
+            iteration.
+        relaxation_mode: ``"fixed"``, or ``"aitken"`` to adapt the weight
+            between iterations of a substep, as upstream's ``proxy_relaxation``.
+        relaxation_min: Lower clamp on the Aitken weight.
+        relaxation_max: Upper clamp on the Aitken weight.
         device: Warp device for the persistent buffers.
     """
 
@@ -369,8 +419,17 @@ class DriveReactionCoupler:
         mount_local=None,
         body_com=None,
         relaxation: float = 1.0,
+        relaxation_mode: str = "fixed",
+        relaxation_min: float = 0.05,
+        relaxation_max: float = 1.0,
         device=None,
     ) -> None:
+        if relaxation_mode not in ("fixed", "aitken"):
+            raise ValueError(f"relaxation_mode must be 'fixed' or 'aitken', got {relaxation_mode!r}")
+        if not 0.0 < relaxation_min <= relaxation_max:
+            raise ValueError(
+                f"need 0 < relaxation_min <= relaxation_max, got {relaxation_min} and {relaxation_max}"
+            )
         if body_count <= 0:
             raise ValueError(f"body_count must be positive, got {body_count}")
         if num_envs <= 0:
@@ -397,6 +456,10 @@ class DriveReactionCoupler:
         self.root_offset = int(root_offset)
         self.root_stride = int(root_stride)
         self.relaxation = float(relaxation)
+        self.relaxation_mode = relaxation_mode
+        self.relaxation_min = float(relaxation_min)
+        self.relaxation_max = float(relaxation_max)
+        self._iteration = 0
         self._device = device
 
         mounts = [(0.0, 0.0, 0.0)] * num_envs if mount_local is None else [tuple(m) for m in mount_local]
@@ -412,6 +475,8 @@ class DriveReactionCoupler:
         self._previous = wp.zeros(self.body_count, dtype=wp.spatial_vector, device=device)
         self._env_forces = wp.zeros(self.num_envs, dtype=wp.spatial_vector, device=device)
         self._env_previous = wp.zeros(self.num_envs, dtype=wp.spatial_vector, device=device)
+        self._env_residual = wp.zeros(self.num_envs, dtype=wp.spatial_vector, device=device)
+        self._env_omega = wp.zeros(self.num_envs, dtype=wp.float32, device=device)
         self._reset_env_ids = wp.empty(self.num_envs, dtype=wp.int32, device=device)
         self._reset_env_ids_host = wp.empty(
             self.num_envs, dtype=wp.int32, device="cpu", pinned=wp.get_device(device).is_cuda,
@@ -512,8 +577,12 @@ class DriveReactionCoupler:
             device=self._device,
         )
 
+    def begin_substep(self) -> None:
+        """Start a substep's coupling iterations; Aitken restarts from ``relaxation``."""
+        self._iteration = 0
+
     def harvest(self, state, rod_solver) -> None:
-        """Harvest the rod's proximal reaction and blend it with the previous iterate."""
+        """Harvest the rod's proximal reaction and relax the applied guess toward it."""
         particle_q = getattr(state, "particle_q", None)
         body_q = getattr(state, "body_q", None)
         if particle_q is None or body_q is None:
@@ -524,21 +593,32 @@ class DriveReactionCoupler:
 
         rod_solver.proximal_wrench(out=self._proximal_wrench)
 
-        wp.launch(
-            _harvest_env_reactions,
-            dim=self.num_envs,
-            inputs=[
-                self._proximal_wrench,
-                self._body_com,
-                self._mount_local,
-                body_q,
-                self._drive_bodies,
-                self.relaxation,
-                self._env_forces,
-                self._env_previous,
-            ],
-            device=self._device,
-        )
+        common = [self._proximal_wrench, self._body_com, self._mount_local, body_q, self._drive_bodies]
+        if self.relaxation_mode == "aitken":
+            wp.launch(
+                _harvest_env_reactions_aitken,
+                dim=self.num_envs,
+                inputs=[
+                    *common,
+                    self._iteration,
+                    self.relaxation,
+                    self.relaxation_min,
+                    self.relaxation_max,
+                    self._env_forces,
+                    self._env_previous,
+                    self._env_residual,
+                    self._env_omega,
+                ],
+                device=self._device,
+            )
+        else:
+            wp.launch(
+                _harvest_env_reactions,
+                dim=self.num_envs,
+                inputs=[*common, self.relaxation, self._env_forces, self._env_previous],
+                device=self._device,
+            )
+        self._iteration += 1
         self._publish_env_reactions()
 
 
@@ -581,6 +661,56 @@ def _follow_drive_mount_kernel(
 
 
 @wp.kernel
+def _proxy_drive_mount_kernel(
+    body_q: wp.array(dtype=wp.transform),
+    body_q_begin: wp.array(dtype=wp.transform),
+    body_com: wp.array(dtype=wp.vec3),
+    body_inv_mass: wp.array(dtype=wp.float32),
+    coupling_forces: wp.array(dtype=wp.spatial_vector),
+    drive_body: wp.array(dtype=wp.int32),
+    mount_local: wp.array(dtype=wp.vec3),
+    rod_orientations: wp.array(dtype=wp.quat),
+    root_stride: int,
+    dt: float,
+    inv_mass_scale: float,
+    bound: wp.array(dtype=wp.int32),
+    root_rotation_local: wp.array(dtype=wp.quat),
+    out_positions: wp.array(dtype=wp.vec3),
+    out_velocities: wp.array(dtype=wp.vec3),
+    out_inv_masses: wp.array(dtype=wp.float32),
+    out_orientations: wp.array(dtype=wp.quat),
+):
+    """Start each root at the mount's begin pose, moving with the holder's free velocity.
+
+    The free motion is the rigid solve's with the guessed reaction rewound out,
+    ``dt²·F/M`` off the center of mass, so the rod meets the holder as it would
+    move unloaded and pushes back on it through the proxy's own inertia. The
+    rotation is not rewound: the root's orientation stays on the solved pose.
+    """
+    env = wp.tid()
+    body = drive_body[env]
+    root = env * root_stride
+    begin = body_q_begin[body]
+    end = body_q[body]
+    rotation = wp.transform_get_rotation(end)
+
+    if bound[env] == 0:
+        root_rotation_local[env] = wp.quat_inverse(wp.transform_get_rotation(begin)) * rod_orientations[root]
+        bound[env] = 1
+
+    inv_mass = body_inv_mass[body] * inv_mass_scale
+    com_local = body_com[body]
+    com = wp.transform_point(end, com_local) - wp.spatial_top(coupling_forces[body]) * (inv_mass * dt * dt)
+    free = wp.transform(com - wp.quat_rotate(rotation, com_local), rotation)
+    start = wp.transform_point(begin, mount_local[env])
+
+    out_positions[env] = start
+    out_velocities[env] = (wp.transform_point(free, mount_local[env]) - start) / dt
+    out_inv_masses[env] = inv_mass
+    out_orientations[env] = wp.normalize(rotation * root_rotation_local[env])
+
+
+@wp.kernel
 def _unbind_envs_kernel(env_ids: wp.array(dtype=wp.int32), bound: wp.array(dtype=wp.int32)):
     bound[env_ids[wp.tid()]] = 0
 
@@ -598,13 +728,19 @@ class DriveRootFollower:
     coupler uses for the moment arm, so the force and the lever it acts through
     describe one mount.
 
-    The root goes where the rigid solve put the body, lagged reaction included,
-    and is not rewound to the body's free pose. The rigid solver keeps that
-    reaction in the body's velocity, so a root placed as though it had not been
-    applied lets the rod respond to the holder's position one substep late. In a
-    holder-against-spring model that extra delay diverges from
-    ``k·dt²/M ≈ 0.1``, while the root on the solved pose is a staggered
-    symplectic Euler step, stable up to ``k·dt²/M < 4``.
+    By default the root is held kinematically where the rigid solve put the
+    body. With one pass per substep that is a staggered symplectic Euler step,
+    stable while ``k·dt²/M < 4`` for rod stiffness ``k`` against holder mass
+    ``M``; coupling iterations extend it further.
+
+    With ``proxy_mass`` the root stands in for the holder instead, as Newton's
+    proxies do: it starts on the mount's begin pose, moves with the holder's
+    free velocity (the guessed reaction rewound out) and carries the holder's
+    inverse mass, so the rod's own solve settles the holder's response to it.
+    Rewinding a reaction the rigid solver has kept is only consistent when the
+    substep is re-solved with the result, so this needs two or more coupling
+    iterations; with them it converges in two at any stiffness. Only the
+    translation is a proxy; orientation stays kinematic on the solved pose.
 
     The follower owns the root while it is active. A rate or pose command latched
     on the rod by anything else would silently lose to it, so :meth:`sync` refuses
@@ -616,6 +752,12 @@ class DriveRootFollower:
         drive_bodies: Per-env body index holding each rod; all non-negative.
         mount_local: Per-env grip point in the drive body's frame. Defaults to
             the body origin.
+        proxy_mass: Give the root the holder's inertia instead of pinning it.
+        body_com: Per-body local centers of mass, for the proxy's rewind.
+        body_inv_mass: Per-body inverse masses; required with ``proxy_mass``.
+        mass_scale: Multiplies the holder mass the proxy carries, like
+            ``mass_scale`` on Newton's proxies. Raise it for a link that resists
+            with more than its own mass, as under stiff joint drives.
         device: Warp device for the persistent buffers.
     """
 
@@ -626,8 +768,17 @@ class DriveRootFollower:
         root_stride: int,
         drive_bodies,
         mount_local=None,
+        proxy_mass: bool = False,
+        body_com=None,
+        body_inv_mass=None,
+        mass_scale: float = 1.0,
         device=None,
     ) -> None:
+        mass_scale = float(mass_scale)
+        if not 0.0 < mass_scale < float("inf"):
+            raise ValueError(f"mass_scale must be finite and positive, got {mass_scale}")
+        if proxy_mass and body_inv_mass is None:
+            raise ValueError("proxy_mass needs body_inv_mass: the proxy carries the holder's mass")
         if num_envs <= 0:
             raise ValueError(f"num_envs must be positive, got {num_envs}")
         if root_stride <= 0:
@@ -650,6 +801,8 @@ class DriveRootFollower:
 
         self.num_envs = int(num_envs)
         self.root_stride = int(root_stride)
+        self.proxy_mass = bool(proxy_mass)
+        self.mass_scale = mass_scale
         self._device = device
 
         self._drive_bodies = wp.array(drive, dtype=wp.int32, device=device)
@@ -658,6 +811,13 @@ class DriveRootFollower:
         self._root_rotation_local = wp.zeros(self.num_envs, dtype=wp.quat, device=device)
         self._root_positions = wp.zeros(self.num_envs, dtype=wp.vec3, device=device)
         self._root_orientations = wp.zeros(self.num_envs, dtype=wp.quat, device=device)
+        if self.proxy_mass:
+            body_count = max(drive) + 1
+            self._body_com = body_com if body_com is not None else wp.zeros(body_count, dtype=wp.vec3, device=device)
+            self._body_inv_mass = body_inv_mass
+            self._root_velocities = wp.zeros(self.num_envs, dtype=wp.vec3, device=device)
+            self._root_inv_masses = wp.zeros(self.num_envs, dtype=wp.float32, device=device)
+            self._no_feedback = wp.zeros(body_count, dtype=wp.spatial_vector, device=device)
         self._reset_env_ids = wp.empty(self.num_envs, dtype=wp.int32, device=device)
         self._reset_env_ids_host = wp.empty(
             self.num_envs, dtype=wp.int32, device="cpu", pinned=wp.get_device(device).is_cuda,
@@ -673,7 +833,7 @@ class DriveRootFollower:
         """Per-env root orientations (xyzw) placed by the most recent :meth:`sync`."""
         return self._root_orientations
 
-    def sync(self, state_in, state_out, rod_solver) -> None:
+    def sync(self, state_in, state_out, rod_solver, coupling_forces=None, dt: float = 0.0) -> None:
         """Latch each root onto its mount for the rod step that follows.
 
         Call after the rigid solve and before the rod solve of the same substep.
@@ -684,6 +844,9 @@ class DriveRootFollower:
             state_out: State the rigid solve wrote; the body pose the root follows.
             rod_solver: The :class:`~catheter_vasculature_solver.XPBDRodSolver`
                 about to step.
+            coupling_forces: Per-body wrench the rigid solve was given, which a
+                proxy rewinds; ``None`` when there was none.
+            dt: Substep length, which a proxy needs for its velocity.
 
         Raises:
             RuntimeError: If the rod already has a command latched, which this
@@ -695,6 +858,37 @@ class DriveRootFollower:
                 "pose command is already latched on the rod and would be silently overridden. "
                 "Command the drive body instead, or turn drive_root_sync off."
             )
+        if self.proxy_mass:
+            if not dt > 0.0:
+                raise ValueError(f"a proxy root needs the substep length, got dt={dt}")
+            wp.launch(
+                _proxy_drive_mount_kernel,
+                dim=self.num_envs,
+                inputs=[
+                    state_out.body_q,
+                    state_in.body_q,
+                    self._body_com,
+                    self._body_inv_mass,
+                    self._no_feedback if coupling_forces is None else coupling_forces,
+                    self._drive_bodies,
+                    self._mount_local,
+                    rod_solver.orientation_array,
+                    self.root_stride,
+                    float(dt),
+                    1.0 / self.mass_scale,
+                    self._bound,
+                    self._root_rotation_local,
+                    self._root_positions,
+                    self._root_velocities,
+                    self._root_inv_masses,
+                    self._root_orientations,
+                ],
+                device=self._device,
+            )
+            rod_solver.set_root_proxy_gpu(
+                self._root_positions, self._root_velocities, self._root_inv_masses, self._root_orientations,
+            )
+            return
         wp.launch(
             _follow_drive_mount_kernel,
             dim=self.num_envs,

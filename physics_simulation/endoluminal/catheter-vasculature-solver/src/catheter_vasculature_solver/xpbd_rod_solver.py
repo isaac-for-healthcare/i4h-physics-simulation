@@ -1688,6 +1688,54 @@ def _xr_set_root_pose_kernel(
 
 
 @wp.kernel
+def _xr_set_root_proxy_kernel(
+    pos: wp.array(dtype=wp.vec3),
+    vel: wp.array(dtype=wp.vec3),
+    inv_mass: wp.array(dtype=wp.float32),
+    forces: wp.array(dtype=wp.vec3),
+    ori: wp.array(dtype=wp.quat),
+    pred_ori: wp.array(dtype=wp.quat),
+    prev_ori: wp.array(dtype=wp.quat),
+    gravity: wp.array(dtype=wp.vec3),
+    target_pos: wp.array(dtype=wp.vec3),
+    target_vel: wp.array(dtype=wp.vec3),
+    target_inv_mass: wp.array(dtype=wp.float32),
+    target_ori: wp.array(dtype=wp.quat),
+    active: wp.array(dtype=wp.int32),
+    velocity_scale: float,
+    points_per_rod: int,
+    n_envs: int,
+):
+    """Turn each rod's root into a proxy of the body holding it.
+
+    The root takes the holder's position, velocity and inverse mass, so the
+    rod's constraints move it as they would move the holder. Its weight is
+    cancelled through the external force, ``-g / w``: the holder's rigid solve
+    already carries gravity, and the proxy falling on its own would load the
+    rod with the holder's weight a second time. ``velocity_scale`` undoes the
+    solver's velocity damping, which would otherwise make the proxy fall behind
+    the holder's free motion. Orientation stays kinematic.
+    """
+    e = wp.tid()
+    if e >= n_envs or active[e] == 0:
+        return
+
+    r = e * points_per_rod
+    w = target_inv_mass[e]
+    pos[r] = target_pos[e]
+    vel[r] = target_vel[e] * velocity_scale
+    inv_mass[r] = w
+    if w > 0.0:
+        forces[r] = -gravity[e] / w
+    else:
+        forces[r] = wp.vec3(0.0, 0.0, 0.0)
+    q = target_ori[e]
+    ori[r] = q
+    pred_ori[r] = q
+    prev_ori[r] = q
+
+
+@wp.kernel
 def _xr_proximal_push_kernel(
     pos: wp.array(dtype=wp.vec3),
     ori: wp.array(dtype=wp.quat),
@@ -2495,6 +2543,8 @@ class _Workspace:
         self.torques = wp.zeros(np_, dtype=wp.vec3, device=d)
 
         self.inv_masses = wp.zeros(np_, dtype=wp.float32, device=d)
+        # Set to a pre-proxy copy of inv_masses while a proxy root is active.
+        self.hook_inv_masses = None
         self.quat_inv_masses = wp.zeros(np_, dtype=wp.float32, device=d)
 
         self.rest_lengths = wp.zeros(ne, dtype=wp.float32, device=d)
@@ -2592,6 +2642,8 @@ class _BatchedWorkspace:
         self.torques = wp.zeros(np_total, dtype=wp.vec3, device=d)
 
         self.inv_masses = wp.zeros(np_total, dtype=wp.float32, device=d)
+        # Set to a pre-proxy copy of inv_masses while a proxy root is active.
+        self.hook_inv_masses = None
         self.quat_inv_masses = wp.zeros(np_total, dtype=wp.float32, device=d)
 
         # Per-edge arrays
@@ -3883,10 +3935,14 @@ class XPBDRodSolver:
             return
         self._pending_control = None
         kind, push, rotate, dt = pending
+        if kind != "proxy":
+            self._release_root_proxy(self._bws if self._bws is not None else self._ws)
         if kind == "scalar":
             self._apply_proximal_control_scalar(push, rotate, dt)
         elif kind == "pose":
             self._apply_root_pose(push, rotate, dt)
+        elif kind == "proxy":
+            self._apply_root_proxy(push, rotate)
         else:
             self._apply_proximal_control_batched(push, rotate, dt)
 
@@ -4059,6 +4115,100 @@ class XPBDRodSolver:
         # timestep this path has no use for.
         self._pending_control_mask.fill_(1)
         self._pending_control = ("pose", pos_arr, (ori_arr, orient_roots), 0.0)
+
+    def set_root_proxy_gpu(self, positions, velocities, inv_masses, orientations) -> None:
+        """Let each rod's root stand in for the body holding it, for the next :meth:`step`.
+
+        Where :meth:`set_root_pose_gpu` pins the root, this gives it the
+        holder's inverse mass and velocity, so the rod pushes the root back with
+        the holder's inertia instead of meeting an infinitely heavy mount. Its
+        weight is cancelled because the holder's own solve carries gravity, and
+        its orientation is placed kinematically.
+
+        Vessel containment, track guidance and wall friction still treat the
+        root as held: they read :attr:`hook_inv_masses`, which keeps the root
+        at zero inverse mass. Latched like the other root commands, and undone
+        by the next :meth:`set_root_pose_gpu`.
+
+        Args:
+            positions: ``(num_envs, 3)`` root positions at the start of the step.
+            velocities: ``(num_envs, 3)`` root velocities over the step.
+            inv_masses: ``(num_envs,)`` proxy inverse masses; zero pins the root.
+            orientations: ``(num_envs, 4)`` xyzw root orientations.
+        """
+        n = self._num_envs
+        pos_arr = self._coerce_per_env_vec3_array(positions, n, "positions")
+        vel_arr = self._coerce_per_env_vec3_array(velocities, n, "velocities")
+        ori_arr = self._coerce_per_env_quat_array(orientations, n, "orientations")
+        if isinstance(inv_masses, wp.array) and inv_masses.dtype == wp.float32 and inv_masses.shape[0] == n:
+            mass_arr = inv_masses
+        else:
+            host = to_host(inv_masses, np.float32).reshape(-1)
+            if host.shape[0] != n:
+                raise ValueError(f"inv_masses must hold {n} entries, got {host.shape[0]}")
+            mass_arr = wp.array(host, dtype=wp.float32, device=self._device)
+        self._pending_control_mask.fill_(1)
+        self._pending_control = ("proxy", (pos_arr, vel_arr, mass_arr), ori_arr, 0.0)
+
+    @property
+    def hook_inv_masses(self) -> "wp.array":
+        """Per-particle inverse masses as containment, guidance and friction should see them.
+
+        The same array as the solver's own until a proxy root is set; from then
+        on, a copy taken beforehand, so a proxy root stays held for the hooks.
+        """
+        return self._hook_masses(self._bws if self._bws is not None else self._ws)
+
+    @staticmethod
+    def _hook_masses(ws) -> "wp.array":
+        frozen = getattr(ws, "hook_inv_masses", None)
+        return frozen if frozen is not None else ws.inv_masses
+
+    def _apply_root_proxy(self, targets, ori_arr) -> None:
+        """Make the roots proxies. See :meth:`set_root_proxy_gpu`."""
+        pos_arr, vel_arr, mass_arr = targets
+        ws = self._bws if self._bws is not None else self._ws
+        if getattr(ws, "hook_inv_masses", None) is None:
+            ws.hook_inv_masses = wp.clone(ws.inv_masses)
+        points_per_rod = int(getattr(ws, "num_points_per_rod", self._num_points))
+        gravity = ws.gravity
+        if not isinstance(gravity, wp.array):
+            gravity = wp.array([gravity], dtype=wp.vec3, device=self._device)
+        substeps = max(1, int(self._num_substeps))
+        retained = sum((1.0 - self._linear_damping) ** k for k in range(1, substeps + 1))
+        velocity_scale = substeps / retained if retained > 0.0 else 1.0
+        wp.launch(
+            _xr_set_root_proxy_kernel,
+            dim=self._num_envs,
+            inputs=[
+                ws.positions,
+                ws.velocities,
+                ws.inv_masses,
+                ws.forces,
+                ws.orientations,
+                ws.predicted_orientations,
+                ws.prev_orientations,
+                gravity,
+                pos_arr,
+                vel_arr,
+                mass_arr,
+                ori_arr,
+                self._pending_control_mask,
+                float(velocity_scale),
+                points_per_rod,
+                int(self._num_envs),
+            ],
+            device=self._device,
+        )
+
+    def _release_root_proxy(self, ws) -> None:
+        """Pin the roots again after a proxy, before any other root command runs."""
+        frozen = getattr(ws, "hook_inv_masses", None)
+        if frozen is None:
+            return
+        wp.copy(ws.inv_masses, frozen)
+        ws.forces.zero_()
+        ws.hook_inv_masses = None
 
     def _apply_root_pose(self, pos_arr, orientation, _dt: float) -> None:
         """Place the roots. See :meth:`set_root_pose_gpu`."""

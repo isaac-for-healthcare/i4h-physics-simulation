@@ -1917,12 +1917,12 @@ class CathRodSolver(XPBDRodSolver):
 
     def _project_track_guidance(self, ws: _Workspace, dev: str) -> None:
         """Project non-tip particles onto the insertion axis or path."""
-        self._launch_track_guidance(ws.predicted_positions, ws.inv_masses, int(ws.num_points),
+        self._launch_track_guidance(ws.predicted_positions, self._hook_masses(ws), int(ws.num_points),
                                     int(ws.num_points), dev)
 
     def _project_track_guidance_batched(self, bws, dev: str) -> None:
         """Track guidance for every env in one launch, each on its own track."""
-        self._launch_track_guidance(bws.predicted_positions, bws.inv_masses, int(bws.np_total),
+        self._launch_track_guidance(bws.predicted_positions, self._hook_masses(bws), int(bws.np_total),
                                     int(bws.num_points_per_rod), dev)
 
     def _launch_track_guidance(self, predicted_positions, inv_masses, total_points: int,
@@ -1999,7 +1999,7 @@ class CathRodSolver(XPBDRodSolver):
         mesh_args = [
             self.collision_mesh.id,
             smooth_normals,
-            ws.inv_masses,
+            self._hook_masses(ws),
             float(self.mesh_edge_collision_radius),
             float(self.mesh_edge_collision_query_radius),
             float(self.sign_scale),
@@ -2009,7 +2009,7 @@ class CathRodSolver(XPBDRodSolver):
         sdf_args = [
             self.collision_mesh.id,
             smooth_normals,
-            ws.inv_masses,
+            self._hook_masses(ws),
             float(self.sign_scale),
             bool(use_smooth),
             float(self.target_phi),
@@ -2051,7 +2051,7 @@ class CathRodSolver(XPBDRodSolver):
                 wp.launch(
                     _apply_mesh_edge_collision_corrections_kernel,
                     dim=n_points,
-                    inputs=[ws.predicted_positions, ws.inv_masses, corrections],
+                    inputs=[ws.predicted_positions, self._hook_masses(ws), corrections],
                     device=dev,
                 )
                 # Final SDF clamp guarantees particle-level lumen containment
@@ -2106,7 +2106,7 @@ class CathRodSolver(XPBDRodSolver):
                 ws.velocities,
                 self.collision_mesh.id,
                 smooth_normals,
-                ws.inv_masses,
+                self._hook_masses(ws),
                 float(self.sign_scale),
                 bool(use_smooth),
                 float(self.target_phi),
@@ -2331,7 +2331,7 @@ class CathRodSolver(XPBDRodSolver):
         self._project_containment_and_cleanup(
             containment,
             ws.predicted_positions,
-            ws.inv_masses,
+            self._hook_masses(ws),
             ws.rest_lengths,
             num_envs=1,
             points_per_env=int(ws.num_points),
@@ -2367,7 +2367,7 @@ class CathRodSolver(XPBDRodSolver):
         self._project_containment_and_cleanup(
             containment,
             bws.predicted_positions,
-            bws.inv_masses,
+            self._hook_masses(bws),
             bws.rest_lengths,
             num_envs=int(bws.num_envs),
             points_per_env=int(bws.num_points_per_rod),
@@ -2382,7 +2382,7 @@ class CathRodSolver(XPBDRodSolver):
             return
         runtime.project_containment(
             ws.predicted_positions,
-            ws.inv_masses,
+            self._hook_masses(ws),
             ws.num_points,
             ws.num_edges,
         )
@@ -2394,7 +2394,7 @@ class CathRodSolver(XPBDRodSolver):
             return
         runtime.project_containment(
             bws.predicted_positions,
-            bws.inv_masses,
+            self._hook_masses(bws),
             bws.np_total,
             bws.ne_total,
         )
