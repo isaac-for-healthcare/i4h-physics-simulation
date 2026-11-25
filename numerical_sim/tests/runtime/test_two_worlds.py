@@ -10,7 +10,7 @@ import pytest
 import warp as wp
 from conftest import env_slice
 from helpers import find, needs_chole, push_actions, run, tet_volumes
-from i4h_isaaclab.composition import load_case, resolve_case
+from i4h_host.composition import load_case, resolve_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.debug import alias_checks
 from i4h_physics.loaders import add_tet_grid
@@ -18,7 +18,8 @@ from i4h_physics.scene import ACTIVE_INT
 from i4h_physics.systems.mechanics.bounds import Bounds
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.mechanics.tet import Tet
-from i4h_standalone.app.instruments import scripted_actions
+from i4h_surgical.instrument_storage import declare_instruments
+from i4h_surgical.interaction_storage import declare_instrument_contact
 from i4h_surgical.loaders.instrument_usd import add_instrument
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
@@ -45,59 +46,6 @@ def test_env_isolation(case):
     # run-to-run noise on the hanging block is far below 1e-3; an indexing leak is centimetres.
     assert np.allclose(q[1], baseline[1], rtol=1e-4, atol=1e-3), "contact in env 0 leaked into env 1"
     assert np.abs(q[0] - baseline[0]).max() > 1e-2, "sphere push had no effect in env 0"
-
-
-def test_masked_reset(case):
-    sim = load_case(case)
-    scene, body = sim.scene, sim.scene.bodies[0]
-    control = find(sim, InstrumentControl)
-    rest = control.rest
-
-    run(sim, 50, lambda t: scripted_actions(rest, scene.envs, t))
-    q_before = env_slice(scene, scene.q, body, 0)
-    qd_before = env_slice(scene, scene.qd, body, 0)
-    sphere_before = control.sphere_q.numpy()[0].copy()
-    assert not np.array_equal(control.sphere_q.numpy()[1], rest)
-
-    sim.reset([1])
-    assert np.array_equal(env_slice(scene, scene.q, body, 0), q_before)
-    assert np.array_equal(env_slice(scene, scene.qd, body, 0), qd_before)
-    assert np.array_equal(control.sphere_q.numpy()[0], sphere_before)
-    assert np.array_equal(env_slice(scene, scene.q, body, 1), env_slice(scene, scene.q0, body, 1))
-    assert np.all(env_slice(scene, scene.qd, body, 1) == 0.0)
-    assert np.array_equal(control.sphere_q.numpy()[1], rest)
-    assert np.array_equal(control.actions.numpy()[1][:, :3], rest) and control.actions.numpy()[1][:, 7].max() == 0.0
-
-    sim.reset(wp.array([1], dtype=wp.int32, device=scene.device))
-    assert np.array_equal(env_slice(scene, scene.q, body, 0), q_before)
-
-    # Topology masks are per-env state too: deactivate env 1, reset it, env 0 untouched.
-    tet = find(sim, Tet)
-    active_env0 = tet.active.numpy()[0].copy()
-    tet.active[1].fill_(0)
-    tet.edge_active[1].fill_(0)
-    sim.reset([1])
-    assert tet.active.numpy()[1].sum() == 5 * 27 and tet.edge_active.numpy()[1].sum() > 0
-    assert np.array_equal(tet.active.numpy()[0], active_env0)
-
-
-def test_captured_equals_uncaptured(case):
-    captured = load_case(case)
-    eager = load_case(case)
-    eager.cuda_graph = False
-    rest = find(captured, InstrumentControl).rest
-    def actions(t):
-        return scripted_actions(rest, captured.scene.envs, t)
-
-    run(captured, 100, actions)
-    run(eager, 100, actions)
-    assert captured.graph is not None and eager.graph is None
-    # Tolerance because of float atomics in the tet solve (see test_env_isolation).
-    for b in captured.scene.bodies:
-        if not b.integrate:
-            continue  # splashing water is chaotic run to run; the fluid tests compare it in a quiet setting
-        assert np.allclose(captured.scene.view(captured.scene.q, b).numpy(), eager.scene.view(eager.scene.q, b).numpy(), rtol=1e-4, atol=1e-3), b.name
-        assert np.allclose(captured.scene.view(captured.scene.qd, b).numpy(), eager.scene.view(eager.scene.qd, b).numpy(), rtol=1e-3, atol=1e-2), b.name
 
 
 def test_live_stiffness_no_recapture(case):
@@ -152,6 +100,14 @@ def test_velocity_clip_before_contact():
     scene = Scene("cuda:0", 1, (0.0, 0.0, 0.0))
     add_tet_grid(scene, "p", dim=(1, 1, 1), cell=0.02, origin=(-0.01, -0.01, 0.24), parts={"p": {"spring": 1.0, "volume": 1.0}})
     add_instrument(scene, "ball", "sphere", radius=0.2, initial={"position": (0.0, 0.0, 0.0)})
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'p', system_id='tet')
+    from i4h_physics import declare_surface
+    declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
+    declare_instruments(scene)
+    declare_instrument_contact(scene)
     scene.allocate()
     scene.qd.assign(np.tile(np.float32([0.0, 0.0, -20.0]), (scene.particle_count, 1)))  # 0.33 per step, past the centre
     particles = Particles(scene, damping=1.0, max_velocity=6.0)  # allows 0.1 per step
@@ -168,60 +124,6 @@ def test_velocity_clip_before_contact():
         distances.append(float(np.linalg.norm(scene.q.numpy(), axis=1).min()))
     assert min(distances) >= 0.15, distances
     assert abs(distances[-1] - 0.2) < 3e-3, distances  # resting on the sphere
-
-
-def test_contact_events_capped_and_reset(case):
-    """More contact events than solver iterations must not skip sweep intervals (the cap makes both configurations
-    identical launches), and a masked reset clears only that env's contact records."""
-    results = []
-    for events in (3, 1):
-        sim = load_case(case)
-        sim.iterations = 1
-        contact = find(sim, InstrumentContact)
-        contact.iterations = events
-        control = find(sim, InstrumentControl)
-        rest = control.rest
-        q0 = env_slice(sim.scene, sim.scene.q, sim.scene.bodies[0], 0)
-        run(sim, 40, lambda t: scripted_actions(rest, sim.scene.envs, t))
-        results.append(env_slice(sim.scene, sim.scene.q, sim.scene.bodies[0], 0))  # the block; water is chaotic run to run
-        assert contact.record_count.numpy().max() > 0
-        assert np.abs(results[-1] - q0).max() > 5e-3  # the probe pushed the block
-    assert np.allclose(results[0], results[1], atol=1e-4)  # same launches up to atomic noise
-
-    sim = load_case(case)
-    contact, control = find(sim, InstrumentContact), find(sim, InstrumentControl)
-    rest = control.rest
-    run(sim, 40, lambda t: scripted_actions(rest, sim.scene.envs, t))
-    counts = contact.record_count.numpy()
-    assert (counts > 0).all(), counts  # both probes touch their block
-    sim.reset([0])
-    after = contact.record_count.numpy()
-    assert after[0].max() == 0 and np.array_equal(after[1], counts[1])
-
-
-@pytest.mark.parametrize("records", [1, 8])
-def test_contact_record_overflow_readout(records):
-    """record_overflow counts the contacts beyond the record slots each step (a readout, not an observation)."""
-    from i4h_isaaclab.composition import read_case
-
-    cfg = read_case("two_worlds")
-    for entry in cfg["systems"]:
-        if entry["type"] == "instrument_contact":
-            entry["records"] = records
-    sim = load_case(cfg)
-    contact, control = find(sim, InstrumentContact), find(sim, InstrumentControl)
-    assert set(contact.readouts()) == {"record_overflow"}
-    rest, overflow, found = control.rest, 0, 0
-    for step in range(40):
-        control.actions.assign(scripted_actions(rest, sim.scene.envs, step * sim.dt))
-        sim.step()
-        overflow = max(overflow, int(contact.record_overflow.numpy().max()))
-        found = max(found, int(contact.record_count.numpy().max()))
-    assert found > 1, "the probe touched the block with several contacts per capsule"
-    assert (overflow > 0) == (found > records), (records, found, overflow)
-    sim.reset([0])
-    wp.synchronize()
-    assert contact.record_overflow.numpy()[0] == 0
 
 
 def test_frozen_structural_fields_rejected(case):
@@ -376,9 +278,12 @@ def test_estimate_bytes(case):
     scene = sim.scene
     n = scene.particle_count
     estimate = scene.estimate_bytes()
-    # The main block is Newton's model and state (q0, inv_mass, radius, flags on the model; q, qd, f on the state) plus the
-    # scene-owned q_prev and flags0; the pools are the private block.
-    assert estimate["q_prev"] == n * 12 and estimate["flags0"] == n * 4
+    # Exact defaults, mutable history/flags and initialization templates now
+    # belong to Newton; private pools remain on the legacy block.
+    assert estimate["newton_particle_defaults"] == n * 8
+    assert estimate["newton_particle_history"] == n * 16
+    assert estimate["newton_particle_templates"] == n * 16
+    assert "q_prev" not in estimate and "flags0" not in estimate
     assert estimate["newton_state"] == n * 36 and estimate["newton_model"] == n * 44 and "newton_grid" not in estimate
     assert scene.estimate_bytes(construction=True)["newton_grid"] > 0  # finalize allocates it; build_model drops it
     assert estimate["pool_q"] == scene.pool_count * 12 and "q" not in estimate
@@ -497,8 +402,11 @@ def test_two_bodies_keep_their_offsets():
     origin_a, origin_b = (-0.04, -0.04, 0.05), (0.26, -0.04, 0.05)
     a = add_tet_grid(scene, "a", [4, 4, 4], 0.02, origin=origin_a, fix_top=True)
     b = add_tet_grid(scene, "b", [4, 4, 4], 0.02, origin=origin_b, fix_top=True)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'a', system_id='a')
+    declare_tet(scene, 'b', system_id='b')
     scene.allocate()
-    systems = [Particles(scene), Tet(scene, "a"), Tet(scene, "b"),
+    systems = [Particles(scene), Tet(scene, "a", id="a"), Tet(scene, "b", id="b"),
                Bounds(scene, lower=(-1.0, -1.0, 0.0), upper=(1.0, 1.0, 1.0))]
     sim = Stepper.create(scene, systems, dt=1.0 / 60.0, substeps=4, iterations=8)
     for _ in range(100):
@@ -552,7 +460,7 @@ PEAK_PROBE = """
 import sys, warp as wp
 wp.init()
 import i4h_physics.scene as S
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 from i4h_physics.newton_model import build_model, rebuild_particle_bvh
 def allocate(self):
     dev = self.device
@@ -564,11 +472,12 @@ def allocate(self):
     wp.synchronize()
     peak, steady = wp.get_mempool_used_mem_high(dev) - base, wp.get_mempool_used_mem_current(dev) - base
     est, est_steady = self.estimate_bytes(construction=True), self.estimate_bytes()
-    newton = lambda e: sum(v for k, v in e.items() if k.startswith("newton"))
-    print(peak, steady, newton(est), newton(est_steady))
+    # C2.2 finalizes pool fields/templates and Scene metadata on Newton too.
+    # Count every declared Scene allocation, regardless of its historical key.
+    print(peak, steady, sum(est.values()), sum(est_steady.values()))
     raise SystemExit(0)
-S.Scene.allocate = allocate
-load_case(read_case(sys.argv[1]), envs=int(sys.argv[2]))
+from i4h_host.composition import load_scene
+allocate(load_scene(read_case(sys.argv[1]), envs=int(sys.argv[2])))
 """
 
 

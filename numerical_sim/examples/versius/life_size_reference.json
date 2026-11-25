@@ -1,0 +1,12 @@
+{
+  "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/life-size-chole",
+  "commit": "298f6e0b632541519d807b624b51b433a9df3769",
+  "source_sha256": {
+    "numerical_sim/surgical/src/i4h_surgical/cases/chole_tet_med_1x.yaml": "4229439b1e18bf4797d5858e76f05ea7a3bde194ec3e78e56c0bce4c68cf4c6b",
+    "numerical_sim/physics/src/i4h_physics/loaders/tet_bundle.py": "17fcc7daa98b38cf48e7bee6796c6cb584c4b1fa7d0e423d6ac8c08b0cca2c19",
+    "numerical_sim/surgical/src/i4h_surgical/loaders/tet_bundle.py": "4197df7eeeb6ec78d92e164fe004eb24956a35d005183c5a96c31ed7dd28d3a3",
+    "numerical_sim/physics/src/i4h_physics/systems/mechanics/tet.py": "77d13e8a7dfe9f8ff0d668e3e12ab45fab9bc114fc27b61ed91295ee73cb92da"
+  },
+  "geometry_scale": 0.14285714285714285,
+  "mechanics": "Reference retains masses/materials; not a physical calibration"
+}

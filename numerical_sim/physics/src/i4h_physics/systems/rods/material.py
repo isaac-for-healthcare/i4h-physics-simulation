@@ -3,17 +3,15 @@
 
 """Explicit regional providers. Tables persist across episode resets and disabling."""
 from dataclasses import dataclass
-from types import SimpleNamespace
 
 import numpy as np
 import warp as wp
-from i4h_physics.regions import RegionMembership, RegionProperties, RodControls
+from i4h_physics.regions import RegionMembership
 from i4h_physics.systems.base import System
 from i4h_physics.systems.rods.region_kernels import direct_regions, pbd_regions
-from i4h_physics.systems.rods.rod_pbd import chain_topology
 
 
-def _membership(body, edges):
+def region_membership(body, edges):
     membership = body.regions
     if membership is None:
         edge = np.zeros(edges, np.int32)
@@ -31,37 +29,23 @@ class RodPbdMaterial(System):
 
     structural = System.structural + ('radius_weighting',)
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.rod_storage import publish_material
+        return publish_material(authoring.scene, declarations, spec.get("id", spec["type"]),
+                                body=spec["body"], backend="pbd", settings=spec,
+                                solver_specs=[dict(body=s['body'], backend=s['type'][4:])
+                                              for s in authoring.cfg['systems'] if s['type'] in ('rod_pbd', 'rod_direct')])
+
     def __post_init__(self):
-        scene = self.scene
-        self.body = b = scene.body(self.body)
-        if b.rod_material is not None or b.rod_controls is not None:
-            raise ValueError('rod_pbd_material: duplicate provider or material must precede solver')
-        if b.rod is not None:
-            if b.rod.frames.shape[0] != 1:
-                raise ValueError('rod_pbd_material: only one variant supported')
-            seg, pair = chain_topology(b.count)
-        elif b.tree is not None:
-            if b.tree.frames.shape[0] != 1:
-                raise ValueError('rod_pbd_material: only one variant supported')
-            seg, pair = b.tree.edges[0], b.tree.bend_pairs[0]
-        else:
-            raise ValueError('rod_pbd_material: body needs a rod or centreline tree')
-        S, K = len(seg), len(pair)
-        b.region_properties = RegionProperties(scene, _membership(b, S), {'stretch': 1.0, 'bend': 1.0, 'twist': 1.0})
-        b.rod_controls = RodControls(scene, S, K)
-        baseline_radius = b.tree.material_radius if b.tree is not None else None
-        if baseline_radius is None:
-            baseline_radius = b.tree.radii if b.tree is not None else b.rest.radius[:1]
-        radius = 0.5 * (baseline_radius[0, seg[:, 0]] + baseline_radius[0, seg[:, 1]])
-        b.rod_material = SimpleNamespace(
-            backend='pbd', active=self.enabled, S=S, K=K,
-            pair=wp.array(pair[None], dtype=wp.vec2i, device=scene.device),
-            radius_baseline=wp.array((radius / radius.max()) ** 3, dtype=float, device=scene.device),
-            stretch=wp.empty((scene.envs, S), dtype=float, device=scene.device),
-            bend=wp.empty((scene.envs, K), dtype=float, device=scene.device),
-            twist=wp.empty((scene.envs, K), dtype=float, device=scene.device))
+        from i4h_physics.rod_storage import bind_material
+        self.body = self.scene.body(self.body)
+        if self.body.rod_material is not None or self.body.rod_controls is not None:
+            raise ValueError('rod material: duplicate provider or material must precede solver')
+        bind_material(self, "pbd")
 
     def prepare(self, scene):
+        scene.storage.check()
         super().prepare(scene)
         self.body.rod_material.active = self.enabled
 
@@ -80,27 +64,23 @@ class RodPbdMaterial(System):
 class RodDirectMaterial(System):
     body: str
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.rod_storage import publish_material
+        return publish_material(authoring.scene, declarations, spec.get("id", spec["type"]),
+                                body=spec["body"], backend="direct", settings=spec,
+                                solver_specs=[dict(body=s['body'], backend=s['type'][4:])
+                                              for s in authoring.cfg['systems'] if s['type'] in ('rod_pbd', 'rod_direct')])
+
     def __post_init__(self):
-        scene = self.scene
-        self.body = b = scene.body(self.body)
-        if b.rod_material is not None or b.rod_controls is not None:
-            raise ValueError('rod_direct_material: duplicate provider or material must precede solver')
-        if b.rod is None or b.rod.frames.shape[0] != 1:
-            raise ValueError('rod_direct_material: body needs a single-variant rod')
-        rod, Ed = b.rod, b.count - 1
-        fields = {'young_multiplier': 1.0, 'torsion_multiplier': 1.0, 'bend_multiplier': 1.0,
-                  'twist_multiplier': 1.0, 'curvature_x': 0.0, 'curvature_y': 0.0}
-        b.region_properties = RegionProperties(scene, _membership(b, Ed), fields, rod.rest_len[0], rod.rest_darboux[0])
-        b.rod_controls = RodControls(scene, Ed, Ed)
-        m = SimpleNamespace(backend='direct', active=self.enabled, Ed=Ed,
-                            rest_len=wp.array(rod.rest_len, dtype=float, device=scene.device),
-                            rest_darboux=wp.array(rod.rest_darboux, dtype=wp.vec3, device=scene.device),
-                            preferred_rest=wp.empty((scene.envs, Ed), dtype=wp.vec3, device=scene.device))
-        for name in ('young_multiplier', 'torsion_multiplier', 'bend_multiplier', 'twist_multiplier'):
-            setattr(m, name, wp.empty((scene.envs, Ed), dtype=float, device=scene.device))
-        b.rod_material = m
+        from i4h_physics.rod_storage import bind_material
+        self.body = self.scene.body(self.body)
+        if self.body.rod_material is not None or self.body.rod_controls is not None:
+            raise ValueError('rod material: duplicate provider or material must precede solver')
+        bind_material(self, "direct")
 
     def prepare(self, scene):
+        scene.storage.check()
         super().prepare(scene)
         self.body.rod_material.active = self.enabled
 

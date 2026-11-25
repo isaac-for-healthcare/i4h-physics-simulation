@@ -8,11 +8,10 @@ import yaml
 pytest.importorskip("isaaclab.envs")
 import torch  # noqa: E402 - optional dependency guard must run first
 from helpers import needs_external_data  # noqa: E402 - optional dependency guard must run first
-from i4h_isaaclab.composition import read_case  # noqa: E402 - optional dependency guard must run first
+from i4h_host.composition import read_case  # noqa: E402 - optional dependency guard must run first
 
 pytestmark = needs_external_data
 pytest_plugins = ("test_isaaclab_env",)
-
 
 
 def stationary_sequence():

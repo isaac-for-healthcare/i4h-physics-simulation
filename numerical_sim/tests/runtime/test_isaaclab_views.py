@@ -9,7 +9,7 @@ import pytest
 import warp as wp
 from helpers import find, needs_chole
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 
 torch = pytest.importorskip("torch")

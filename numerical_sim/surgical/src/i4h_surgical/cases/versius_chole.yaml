@@ -1,0 +1,250 @@
+# Robot-contact mechanics resolved from the original Versius profile.
+sim:
+  device: cuda:0
+  dt: 0.016666666666666666
+  substeps: 8
+  iterations: 8
+  envs: 1
+  gravity:
+  - 0.0
+  - -9.81
+  - 0.0
+assets:
+  tissue:
+    type: tet_bundle
+    path: ${DATA}/choly-mid
+    translation:
+    - 0.0
+    - -3.0
+    - 0.0
+    parts:
+      liver:
+        spring: 1.0
+        volume: 1.0
+        visual:
+          set: ${DATA}/textures/liver
+      fat:
+        spring: 0.1
+        volume: 0.1
+        heat: true
+        deletable: true
+        visual:
+          set: ${DATA}/textures/fat
+      gallbladder:
+        spring: 0.8
+        volume: 0.1
+        deletable: true
+        visual:
+          set: ${DATA}/textures/gallbladder
+    connectors:
+    - path: fat-liver.connector
+      particle_part: fat
+      triangle_part: liver
+      stiffness: 0.05
+      weight_ratio: 0.99
+    - path: gallbladder-fat.connector
+      particle_part: gallbladder
+      triangle_part: fat
+      stiffness: 0.05
+      weight_ratio: 0.8
+    pin:
+      center:
+      - 0.5
+      - 1.5
+      - -5.0
+      radius: 1.0
+    centrelines:
+    - name: cystic_artery
+      path: centrelines/cystic_artery.cntr
+      part: gallbladder
+    - name: cystic_duct
+      path: centrelines/cystic_duct.cntr
+      part: gallbladder
+  cavity:
+    type: static_mesh
+    path: ${DATA}/choly/cavity
+    translation:
+    - 0.8
+    - -3.3
+    - -0.4
+    visual:
+      diffuse: ${DATA}/choly/cavity/cavity_diffuse.tga
+      normal: ${DATA}/choly/cavity/cavity_normals.tga
+      specular: ${DATA}/choly/cavity/cavity_spec.png
+instruments:
+  probe:
+    kind: sphere
+    radius: 0.006
+    initial:
+      position:
+      - 0.0
+      - 0.0
+      - 100.0
+inputs:
+  pickup:
+    distance: 0.15
+    proxy_radius: 0.05
+    keys:
+      primary: '1'
+      secondary: '2'
+  box:
+    backend: ibcontroller
+    settings:
+      device_index: 0
+      channels: 6
+  primary:
+    backend: minimou
+    scale:
+    - 0.005
+    - 0.005
+    - 0.005
+    settings:
+      device_index: 0
+      handle_readout: raw
+      position_offset:
+      - 0.0
+      - 1.2
+      - -4.0
+      handle:
+        box: box
+        channel: 1
+  secondary:
+    backend: minimou
+    scale:
+    - 0.005
+    - 0.005
+    - 0.005
+    settings:
+      device_index: 1
+      handle_readout: raw
+      position_offset:
+      - 1.2
+      - 1.2
+      - -4.0
+      handle:
+        box: box
+        channel: 3
+systems:
+- type: particles
+  max_velocity: 5.0
+- type: tet
+  body: tissue
+- type: surface
+  tet: tet
+- type: attachments
+  body: tissue
+  stiffness: 0.0005
+- type: connectors
+  body: tissue
+- type: static_contact
+  body: tissue
+  mesh: cavity
+  parts:
+  - fat
+  - gallbladder
+- type: tissue_contact
+  id: liver_gallbladder_contact
+  enabled: false
+  surface: surface
+  surface_part: liver
+  particle_parts:
+  - gallbladder
+- type: instrument_control
+- type: instrument_contact
+  instruments: instrument_control
+  surface: surface
+  records: 256
+  front_side_only:
+  - liver
+- type: tool_force
+  instruments: instrument_control
+  contacts: instrument_contact
+- type: bounds
+  lower:
+  - -2.0
+  - 0.0
+  - -8.0
+  upper:
+  - 2.0
+  - 10.0
+  - -3.0
+haptics:
+  enabled: false
+  newtons_per_unit: 0.01
+  max_force_n: 0.5
+  handles:
+    max_force_n: 30.0
+render:
+  backend: slang
+  size:
+  - 1920
+  - 1080
+  env: 0
+  vsync: false
+  exposure: 0.972
+  tonemap: aces
+  post:
+    ao_enabled: true
+    ao_intensity: 1.637
+    ao_radius: 0.013
+    ao_bias: 0.015
+    ao_power: 1.608
+    bloom_enabled: true
+    bloom_threshold: 0.5
+    bloom_intensity: 1.783
+    bloom_radius: 6.182
+    fxaa_enabled: true
+  camera:
+    position:
+    - 0.469625
+    - 1.20226
+    - -2.45614
+    fov: 45.0
+    pitch: 6.8
+    yaw: 4.3
+    up:
+    - 0.0
+    - 1.0
+    - 0.0
+    near: 0.01
+    far: 100.0
+  environment:
+    path: ${DATA}/environments/abdomen.hdr
+    intensity: 0.84
+    pitch_degrees: -90.0
+    rotation_degrees: 0.0
+    lighting: true
+  headlight:
+    color:
+    - 1.0
+    - 0.92
+    - 0.78
+    intensity: 0.59
+  debug_spheres: false
+  tip:
+    instrument: grasper
+    distance: 0.0
+  xr:
+    world_units_per_meter: 1.0
+    runtime:
+      mode: managed
+      host_client: true
+    mirror: left
+    inputs:
+      pickup:
+        distance: 0.15
+        proxy_radius: 0.05
+        keys:
+          primary: '1'
+          secondary: '2'
+        start:
+          primary: hook
+          secondary: grasper
+      primary:
+        backend: openxr
+        settings:
+          hand: right
+      secondary:
+        backend: openxr
+        settings:
+          hand: left

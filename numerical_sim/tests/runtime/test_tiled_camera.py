@@ -5,21 +5,18 @@
 the shape-index image (tissue = triangle hits, instruments = shape ids, fluid and rods = particle hits) and depth
 ranges against the scene's own positions; env isolation and masked resets through frame comparisons."""
 
+
 import numpy as np
 import pytest
 import warp as wp
 from helpers import find, needs_chole, needs_vessels, push_actions, quiet, rest_actions, run, run_rates
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.camera.camera import Camera
+from i4h_host.camera.camera import Camera
+from i4h_host.composition import load_case, read_case
 from i4h_isaaclab.camera.tiled import TiledCamera
-from i4h_isaaclab.composition import load_case, read_case
-from i4h_physics.quat import quat_to_matrix
 from i4h_physics.systems.fluids.fluid import Fluid
-from i4h_standalone.render.instruments import piece_skins, skin_pieces
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.mechanics.surface import Surface
-
-torch = pytest.importorskip("torch")
 
 PROBE_IN_VIEW = np.array([0.08, -0.10, 0.15], np.float32)  # between the two_worlds camera and the block
 
@@ -107,27 +104,6 @@ def test_captured_render_matches_eager(case):
     wp.synchronize_device(sim.scene.device)
     eager = (cam.rgb.numpy(), cam.depth.numpy(), cam.shape_index.numpy())
     assert all(np.array_equal(x, y) for x, y in zip(captured, eager))
-
-
-@needs_chole
-def test_piece_transforms_match_skinning():
-    sim = load_case("chole_tet_med", envs=1)
-    scene, control = sim.scene, find(sim, InstrumentControl)
-    actions = rest_actions(control, 1)
-    actions[:, :, 7] = 1.0  # close every jaw so the hinge term is exercised
-    run(sim, 30, actions)
-    cam = camera_for(sim, "chole_tet_med", 32)
-    cam._update_geometry()
-    wp.synchronize_device(scene.device)
-    body_q = cam.body_q.numpy().reshape(scene.envs, cam.P + cam.S, 7)
-    skins = piece_skins(control, scene.device)
-    out = [wp.zeros(s.count, dtype=wp.vec3, device=scene.device) for s in skins]
-    skin_pieces(control, 0, skins, out, [wp.zeros_like(o) for o in out], scene.device)
-    assert len(skins) == cam.P
-    for i, (skin, points) in enumerate(zip(skins, cam.piece_points)):
-        t, q = body_q[0, i, :3], body_q[0, i, 3:]
-        world = points @ quat_to_matrix(q).T + t
-        assert np.allclose(world, out[i].numpy(), atol=1e-4), f"piece {skin.name} of instrument {skin.instrument}"
 
 
 @needs_chole
@@ -237,7 +213,7 @@ def test_aorta_shell_wall_and_catheter():
 
 
 def host_tip_transform(forward, hint_y, hint_x, world_up, tip, distance):
-    from i4h_isaaclab.camera.camera import stable_frame
+    from i4h_host.camera.camera import stable_frame
 
     right, up, f = stable_frame(forward, hint_y, hint_x, world_up)
     q = __import__("i4h_physics.quat", fromlist=["matrix_to_quat"]).matrix_to_quat(np.stack([right, up, -f], axis=1))

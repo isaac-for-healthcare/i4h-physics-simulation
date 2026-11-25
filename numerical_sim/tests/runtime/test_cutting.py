@@ -5,7 +5,7 @@
 
 import numpy as np
 from helpers import PUSH, find, live_surface_is_consistent, push_actions, run
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics.systems.mechanics.tet import Tet
 from i4h_surgical.systems.instruments.cutting import Cutting
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl

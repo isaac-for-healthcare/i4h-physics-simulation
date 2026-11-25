@@ -68,6 +68,17 @@ class GraphContainment(System):
     structural = System.structural + ("iterations", "capacity", "candidates", "spline", "tangent_scale", "newton_iterations",
                                       "two_way", "open_root")
 
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"depth": [(0,)]}
+
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.containment_storage import publish_graph_containment
+        return publish_graph_containment(
+            authoring.scene, declarations, spec.get("id", spec["type"]), body=spec["body"], centreline=spec["centreline"],
+            capacity=check_int("graph_containment.capacity", spec.get("capacity", cls.capacity), 1))
+
     def __post_init__(self):
         scene = self.scene
         E, dev = scene.envs, scene.device
@@ -104,14 +115,11 @@ class GraphContainment(System):
         self.edges = wp.array(tree.edges[0], dtype=wp.vec2i, device=dev)  # body-local, one variant
         self.controls = wp.array(tree.spline_controls[0], dtype=wp.vec4i, device=dev)
         self.neighbors = wp.array(tree.spline_neighbors[0], dtype=wp.vec2i, device=dev)
-        self.cand_idx = wp.full(E * n * self.capacity, -1, dtype=wp.int32, device=dev)
-        self.cand_count = wp.zeros(E * n, dtype=wp.int32, device=dev)
-        self.cand_overflow = wp.zeros(E * n, dtype=wp.int32, device=dev)
-        self.ref_samples = wp.zeros(E * n, dtype=wp.vec3, device=dev)
-        self.ref_tree = wp.zeros(E * Pt, dtype=wp.vec3, device=dev)
+        # Newton State, the candidate cache and its validity: cand_idx (E * n * capacity,), cand_count, cand_overflow,
+        # ref_samples (E * n,), ref_tree (E * Pt,), rebuild (E,), built (E,): (max_distance, skin) of the last build.
+        from i4h_physics.history_storage import bind_history
+        bind_history(self, "graph_containment", body=b, centreline=t, capacity=self.capacity, samples=n)
         self.max_disp = wp.zeros(2 * E, dtype=wp.float32, device=dev)  # (catheter, tree) motion since the last build
-        self.rebuild = wp.ones(E, dtype=wp.int32, device=dev)
-        self.built = wp.zeros(E, dtype=wp.vec2, device=dev)  # (max_distance, skin) the cache was built with
         self.cath_corr = wp.zeros(E * Pc, dtype=wp.vec3, device=dev)  # self-clearing accumulators
         self.cath_count = wp.zeros(E * Pc, dtype=wp.float32, device=dev)
         self.tree_corr = wp.zeros(E * Pt, dtype=wp.vec3, device=dev)
@@ -188,6 +196,10 @@ class GraphContainment(System):
             if self.two_way:
                 wp.launch(apply_corrections, dim=(E, Pt), inputs=[self.inv_mass_tree, self.flags_tree, Pt, self.q_prev_tree, self.target_max_delta],
                           outputs=[self.q_tree, self.tree_corr, self.tree_count], device=dev)
+
+    def refresh(self, scene, mask):
+        # Invalidate only selected worlds; candidate construction occurs before the next query.
+        self.clear(mask, (self.rebuild, wp.int32(1)))
 
     def reset(self, scene, mask):
         for arr, value in ((self.contact_depth, wp.float32(0.0)), (self.contact_count, wp.int32(0)), (self.overflow, wp.int32(0)),

@@ -5,7 +5,7 @@
 
 import numpy as np
 from helpers import find, live_surface_is_consistent, needs_chole
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics.systems.mechanics.tet import Tet
 from i4h_surgical.systems.mechanics.stretch_breaking import StretchBreaking
 from i4h_surgical.systems.mechanics.surface import Surface
@@ -83,7 +83,7 @@ def test_stretch_breaks_env_locally():
 # --- M9b: per-part targeting, the chole tuning, ring death -> bleeding cut -------------------------------------------
 
 import pytest  # noqa: E402
-from i4h_isaaclab.composition import read_case  # noqa: E402
+from i4h_host.composition import read_case  # noqa: E402
 from i4h_surgical.systems.fluids.bleeding import Bleeding  # noqa: E402
 from i4h_surgical.systems.instruments.grasp import Grasp  # noqa: E402
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl  # noqa: E402

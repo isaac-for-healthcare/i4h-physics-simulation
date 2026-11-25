@@ -108,6 +108,11 @@ class PartContact(System):
                   inputs=[self.q, self.flags, s.support, s.tris, s.tri_tet, s.active, self.face_start, self.F],
                   outputs=[self.lowers, self.uppers], device=self.scene.device)
 
+    def rebuild_caches(self, scene):
+        """The tree is built once and only refit while stepping, so its shape depends on when it was built."""
+        self._bounds()
+        self.bvh.rebuild()
+
     def step_start(self, scene, dt):
         self.zero(None, "contact_count", "overflow_count")
 

@@ -63,3 +63,39 @@ for trial in 1 2 3; do
     done
 done
 ```
+
+## Direct and manager-based Isaac Lab envs
+
+`scripts/isaaclab_run.py --num_envs 64 --steps 300 --policy random --seed 0 --visualizer none`, one run per task on
+2026-10-29: Isaac Lab 6864dd1, NVIDIA RTX PRO 6000 Blackwell Workstation Edition (x86_64), Warp 1.17.0, Newton 1.6.1.
+Median and p95 ms per policy step (decimation 2), timed with CUDA events after warm-up.
+
+| Task | `-Direct` median / p95 | `-Manager` median / p95 |
+| --- | --- | --- |
+| ReachTarget (aorta catheter) | 22.592 / 23.729 | 22.582 / 23.467 |
+| GraspTarget (chole tissue) | 174.158 / 221.695 | 176.934 / 220.776 |
+
+The manager env's per-step `reset_buf.nonzero()` host sync is not measurable against these step times. These are
+single development runs, not a qualification baseline; larger env counts are not measured here.
+
+### Larger env counts and training (remote, 2026-10-29)
+
+The same commands on a remote machine with two NVIDIA RTX PRO 6000 Blackwell Server Edition GPUs, Isaac Lab 6864dd1, `-Direct`
+on GPU 0 and `-Manager` on GPU 1 at the same time, one run each (branch commit `29bf9b8`). Median ms per policy step:
+
+| Task, envs | `-Direct` | `-Manager` |
+| --- | --- | --- |
+| ReachTarget, 64 | 27.0 | 27.6 |
+| ReachTarget, 256 | 61.4 | 62.3 |
+| ReachTarget, 1024 | 101.2 | 103.4 |
+| GraspTarget, 64 | 552 | 557 |
+| GraspTarget, 256 | 2,278 | 2,291 |
+| GraspTarget, 1024 | 10,102 | 10,152 |
+
+The manager env costs 0.5–2.1%. ReachTarget reaches about 10,000 env-steps/s at 1024 envs; GraspTarget stays near
+100–116 env-steps/s at every count (its step time grows with the env count), and used 15.7 GB of device memory at 1024.
+
+`--task I4h-ReachTarget-{Direct,Manager} --num_envs 64 --train 50 --seed 0` (the [ReachTarget example](reach-target-example.md)):
+0.58 and 0.59 s/iteration, the same logged mean reward at every iteration (0.00 for the first three, 0.94 by
+iteration 25, 0.93 at the end) and the same final losses (value 0.0001475, surrogate -0.003574, entropy 4.229). The
+two `model_49.pt` checkpoints are byte-identical (SHA256 `7ba558d6...672a83`).

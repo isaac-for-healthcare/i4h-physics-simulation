@@ -9,9 +9,9 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12,<3.13"
-# Isaac Lab is installed from source, not pinned here: targets isaac-sim/IsaacLab release/3.0.0
-# @ 6864dd126fd8efd04aaebe06bc9d00c1b9b989dc (README, i4h_isaaclab.lab.QUALIFIED).
-dependencies = ["i4h-physics==0.9.0", "torch>=2.10", "pillow>=10.0"]
+# Host-specific exact source pins are in qualification/c30-{main,lab30}.json.
+# C3.0 is a candidate until its recorded qualification gates are accepted.
+dependencies = ["i4h-host==0.9.0", "i4h-physics[coupled]==0.9.0", "torch>=2.10", "pillow>=10.0"]
 
 [project.optional-dependencies]
 apps = ["i4h-assessment==0.9.0"]  # procedure cases (rewards, terminations), tasks with procedures, recording, teleop

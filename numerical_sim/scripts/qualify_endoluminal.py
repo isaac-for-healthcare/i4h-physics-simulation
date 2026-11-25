@@ -14,7 +14,7 @@ import sys
 
 import numpy as np
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 
 CASES = ("aorta_shell", "aorta_centreline")
 

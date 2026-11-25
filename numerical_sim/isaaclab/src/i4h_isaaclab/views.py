@@ -21,6 +21,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 import warp as wp
+from i4h_host.controls import controls
 
 
 def _flat(arr: wp.array, E: int) -> torch.Tensor:
@@ -30,11 +31,6 @@ def _flat(arr: wp.array, E: int) -> torch.Tensor:
     if flat.data_ptr() != arr.ptr:
         raise RuntimeError(f"expected a zero-copy view of a {arr.shape} {arr.dtype.__name__} array")
     return flat
-
-
-def controls(sim) -> list:
-    """The control systems with a non-empty actions array, in system-list order."""
-    return [s for s in sim.systems if getattr(s, "is_control", False) and s.actions.size]
 
 
 def action_views(sim) -> list[torch.Tensor]:

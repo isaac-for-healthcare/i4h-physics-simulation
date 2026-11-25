@@ -4,16 +4,18 @@
 """M9b scissors: the kind (collision jaw chains plus cutting chains), the progressive cut while the jaw closes,
 the neighbour blood, the centreline node cut in the same step, and the clip applier kind."""
 
+
 import os
 
 import numpy as np
 import pytest
 from helpers import find, live_surface_is_consistent
-from i4h_isaaclab.composition import data_dir, load_case
+from i4h_host.composition import data_dir, load_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_tet_grid
 from i4h_physics.systems.fluids.fluid import Fluid
 from i4h_physics.systems.mechanics.tet import Tet
+from i4h_surgical.instrument_storage import declare_instruments
 from i4h_surgical.loaders.instrument_usd import (
     CHAIN_CUT,
     CHAIN_FIXED,
@@ -30,11 +32,22 @@ from i4h_surgical.systems.mechanics.centreline import Centreline
 from i4h_surgical.systems.mechanics.surface import Surface
 
 ASSETS = data_dir() / "instruments"
+
+
 CHOLE = data_dir() / "choly-mid"
+
+
 pytest.importorskip("pxr", reason="usd-core not installed")
+
+
 needs_rts = pytest.mark.skipif(not os.environ.get("I4H_DATA") and not (ASSETS / "rts.usdc").is_file(), reason=f"scissors mesh rts.usdc not under {ASSETS}")
+
+
 needs_grasper = pytest.mark.skipif(not os.environ.get("I4H_DATA") and not (ASSETS / "pgrasp.usdc").is_file(), reason=f"grasper mesh not under {ASSETS}")
+
+
 needs_chole = pytest.mark.skipif(not os.environ.get("I4H_DATA") and not (CHOLE.is_dir() and (ASSETS / "rts.usdc").is_file()), reason="chole data or rts.usdc missing")
+
 
 SCISSORS = dict(
     kind="scissors", mesh=str(ASSETS / "rts.usdc"), scale=0.0075,
@@ -42,6 +55,8 @@ SCISSORS = dict(
            "jaw_left": "/root/jawLeft_color_001/jawLeft_color_003", "jaw_right": "/root/jawRight_color_001/jawRight_color_003"},
     jaw_spheres={"count": 5, "radius": 0.015, "distance": 0.015, "offset": [0.0, -0.015, 0.0]},
 )
+
+
 GRASPER_PRIMS = {"shaft": "/root/shaft_color/shaft_color_001", "body": "/root/logobody_color/logobody_color_002",
                  "jaw_left": "/root/jawLeft_color/jawLeft_color_001", "jaw_right": "/root/jawRight_color/jawRight_color_001"}
 
@@ -52,6 +67,13 @@ def scissors_block(envs=2, trigger="closing", blood=1.0):
     block = add_tet_grid(scene, "block", [6, 6, 4], 0.02, origin=(-0.06, -0.06, 0.0), fix_top=True,
                          parts={"block": {"spring": 1.0, "volume": 1.0, "deletable": True}})
     add_instrument(scene, "scissors", trocar=[0.0, 0.0, -2.0], initial={"position": [0.0, 0.0, -0.3]}, **SCISSORS)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'block', system_id='tet')
+    from i4h_physics import declare_surface
+    declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
+    declare_instruments(scene)
     scene.allocate()
     ic = InstrumentControl(scene)
     tet = Tet(scene, body="block")
@@ -95,6 +117,7 @@ def test_scissors_loader():
     with pytest.raises(ValueError, match="jaw_left and jaw_right"):
         add_instrument(scene, "s3", kind="scissors", mesh=SCISSORS["mesh"], scale=0.0075,
                        prims={"shaft": SCISSORS["prims"]["shaft"], "body": SCISSORS["prims"]["body"]})
+    declare_instruments(scene)
     scene.allocate()
     ic = InstrumentControl(scene)
     tet_free = Cutting.__dataclass_fields__  # the system takes trigger and blood
@@ -325,8 +348,6 @@ def test_scissors_cut_the_artery():
     assert (bleeding.cut.numpy() == 0).all() and (bleeding.sources.numpy() == 0).all() and (fluid.alive_count.numpy() == 0).all()
 
 
-# --- clip applier ---------------------------------------------------------------------------------------------------
-
 from i4h_surgical.systems.instruments.clipping import Clipping  # noqa: E402
 from i4h_surgical.systems.instruments.grasp import Grasp  # noqa: E402
 
@@ -373,88 +394,6 @@ def test_clip_applier_never_grasps_and_its_fire_clips():
     assert np.linalg.norm(centreline.positions.numpy()[0, clipped] - control.root.numpy()[0, k]) <= 0.25 + 1e-3
     with pytest.raises(ValueError, match="clip_applier"):
         Clipping(scene, centreline=centreline, instruments=control, instrument="grasper", line="cystic_duct")
-
-
-@needs_chole
-def test_clip_applier_scripted_places_a_clip():
-    from i4h_standalone.app.instruments import InstrumentDriver
-
-    sim = load_case("chole_tet_med", envs=1)
-    control, clipping = find(sim, InstrumentControl), find(sim, Clipping)
-    driver = InstrumentDriver(sim, control, None, "scripted")
-    k, ks = control.names.index("clip_applier"), control.names.index("scissors")
-    assert any(entry[0] == k for entry in driver.script) and any(entry[0] == ks for entry in driver.script)
-    fired_scissors = 0
-    for step in range(240):  # up to the deepest point of the first cycle (PERIOD 6 s)
-        driver.update(step * sim.dt)
-        sim.step()
-        fired_scissors += int(control.fired.numpy()[0, ks])
-    assert clipping.count.numpy()[0] >= 1 and fired_scissors == 0  # the applier fired once at the closest approach; the scissors only closed
-    assert np.isfinite(sim.scene.q.numpy()).all()
-
-
-@needs_grasper
-def test_clip_applier_device_squeeze_fires():
-    """A MiniMou has no fire button: a clip applier driven by a device fires when the handle is squeezed to SQUEEZE."""
-    from i4h_standalone.app.instruments import SQUEEZE, InstrumentDriver
-
-    scene = Scene("cuda:0", 1)
-    add_instrument(scene, "applier", kind="clip_applier", mesh=str(ASSETS / "pgrasp.usdc"), prims=GRASPER_PRIMS, scale=0.0075,
-                   trocar=[3.0, 5.0, 3.0], initial={"position": [1.1, 1.2, -3.0]}, input="primary")
-    add_instrument(scene, "grasper", kind="grasper", mesh=str(ASSETS / "pgrasp.usdc"), prims=GRASPER_PRIMS, scale=0.0075,
-                   trocar=[-1.0, 5.0, 3.0], initial={"position": [0.3, 1.2, -3.0]}, input="secondary")
-    scene.allocate()
-    control = InstrumentControl(scene)
-    sim = Stepper.create(scene, [control], dt=1.0 / 60.0, substeps=1, iterations=1)
-    driver = InstrumentDriver(sim, control, {"primary": {"backend": "noop"}, "secondary": {"backend": "noop"}}, "devices")
-    driver.manager.poll = lambda: None
-    driver.squeeze_fire = {"primary", "secondary"}  # what the minimou backend registers (a noop device carries no fire of its own)
-    for dev in ("primary", "secondary"):
-        st = driver.manager.states[dev]
-        st.active, st.position, st.rotation, st.buttons = True, (0.1, 1.2, -3.1), (0.0, 0.0, 0.0, 1.0), {}
-    driver.manager.states["primary"].grip = driver.manager.states["secondary"].grip = SQUEEZE
-    driver.update(0.0)
-    a = control.actions.numpy()[0]
-    assert a[0, 7] == SQUEEZE and a[0, 9] == 1.0  # the applier fires when squeezed
-    assert a[1, 7] == SQUEEZE and a[1, 9] == 0.0  # the grasper only grips
-    driver.manager.states["primary"].grip = 0.5
-    driver.update(sim.dt)
-    assert control.actions.numpy()[0, 0, 9] == 0.0
-    driver.manager.states["primary"].buttons = {"fire": True}
-    driver.update(2 * sim.dt)
-    assert control.actions.numpy()[0, 0, 9] == 1.0  # a real fire button still works
-
-
-@needs_grasper
-def test_squeeze_fires_only_on_the_hardware_backend():
-    """Keyboard Space and replayed rows carry their own fire value: only a MiniMou's squeezed handle fires the applier."""
-    from types import SimpleNamespace
-
-    from i4h_isaaclab.camera.camera import Camera
-    from i4h_standalone.app.instruments import SQUEEZE, InstrumentDriver
-
-    scene = Scene("cuda:0", 1)
-    add_instrument(scene, "applier", kind="clip_applier", mesh=str(ASSETS / "pgrasp.usdc"), prims=GRASPER_PRIMS, scale=0.0075,
-                   trocar=[3.0, 5.0, 3.0], initial={"position": [1.1, 1.2, -3.0]}, input="primary")
-    scene.allocate()
-    control = InstrumentControl(scene)
-    sim = Stepper.create(scene, [control], dt=1.0 / 60.0, substeps=1, iterations=1)
-    driver = InstrumentDriver(sim, control, {"primary": {"backend": "noop"}}, "devices")  # a replay or a noop device: explicit fire
-    driver.manager.poll = lambda: None
-    st = driver.manager.states["primary"]
-    st.active, st.position, st.rotation, st.buttons, st.grip = True, (1.1, 1.2, -3.0), (0.0, 0.0, 0.0, 1.0), {}, SQUEEZE
-    driver.update(0.0)
-    assert control.actions.numpy()[0, 0, 7] == SQUEEZE and control.actions.numpy()[0, 0, 9] == 0.0 and not driver.squeeze_fire
-    st.buttons = {"fire": True}  # the explicit value is what fires
-    driver.update(sim.dt)
-    assert control.actions.numpy()[0, 0, 9] == 1.0
-    assert InstrumentDriver(sim, control, {"primary": {"backend": "noop"}}, "devices").squeeze_fire == set()
-    renderer = SimpleNamespace(env=0, camera=Camera(), key_handlers=[])
-    keyboard = InstrumentDriver(sim, control, None, "keyboard", renderer=renderer)
-    keyboard.hub.held.down.add("space")
-    keyboard.update(0.0)
-    row = control.actions.numpy()[0, 0]
-    assert row[7] == 1.0 and row[9] == 0.0  # Space closes the jaw; only F fires
 
 
 @needs_rts

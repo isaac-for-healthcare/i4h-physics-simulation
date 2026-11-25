@@ -14,6 +14,8 @@ The host decides what exists and what success means; the component computes how 
         env = HostEnv(env_cfg)                # Lab builds the scene; our particles join every world
 
     component.reset(env_ids)                  # in the host's reset, after its own state
+    component.initialize_particle_history(env_ids)  # after host reset events that edit particle positions
+    component.reset_procedure(env_ids)        # with a procedure: after the host's reset events
     component.write_actions(physical)         # (E, A) in the columns of component.action_bounds()
     component.sync_views()                    # torch after Warp, before reading views outside the step
     q = component.positions("tissue")         # (E, 3n) zero-copy torch view, component frame
@@ -23,13 +25,16 @@ host's observation, reward and termination functions read the step that just ran
 A hard rebuild (``sim.reset(soft=False)``) invalidates it: the handle rebinds
 (``on_rebuild`` callbacks run) and views taken before must be taken again; a method called on a closed or invalidated
 binding raises.
+
+A cfg with a ``procedure`` (``from_case(case, procedure=True)``) makes the component own the case's assessment: every
+solver build constructs it (``composition.build_procedure`` with the host's ``horizon_s``) as ``component.procedure``,
+the manager updates it after every physics step, and the host resets it with ``reset_procedure`` after its reset events.
 """
 
 from __future__ import annotations
 
-import dataclasses
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 import numpy as np
 import torch
@@ -51,23 +56,44 @@ class I4hComponentCfg:
     pose: tuple | None = None  # ((x, y, z), (qx, qy, qz, qw)) in the env frame
     loaders: dict | None = None  # {asset type: loader(scene, name, **params)}
     systems_registry: dict | None = None  # {system type: System subclass}
-    mounts: dict | None = None  # {instrument or catheter: {"body": label, "offset": (pos, quat_xyzw)}}
+    mounts: dict | None = (
+        None  # {instrument or catheter: {"body": label, "offset": (pos, quat_xyzw)}}
+    )
     coupling_mode: str = "one_way"
+    procedure: dict | None = (
+        None  # the case's assessment (i4h-assessment), owned by the component when given
+    )
 
     @classmethod
-    def from_case(cls, case, **kwargs) -> I4hComponentCfg:
+    def from_case(cls, case, *, procedure: bool = False, **kwargs) -> I4hComponentCfg:
         """The physical part of a case (a name, path or mapping, ``composition.read_case``): its assets, systems,
-        instruments and ``sim``; an app's keys (procedure, render, inputs, ...) are left out."""
-        from i4h_isaaclab.composition import read_case
+        instruments and ``sim``, and with ``procedure`` its ``procedure:``; an app's other keys (render, inputs, ...)
+        are left out."""
+        from i4h_host.composition import read_case
 
         cfg = read_case(case)
-        return cls(assets=dict(cfg.get("assets") or {}), systems=list(cfg.get("systems") or []),
-                   instruments=dict(cfg.get("instruments") or {}), sim=dict(cfg.get("sim") or {}), **kwargs)
+        if procedure:
+            kwargs.setdefault(
+                "procedure", dict(cfg["procedure"]) if cfg.get("procedure") else None
+            )
+        return cls(
+            assets=dict(cfg.get("assets") or {}),
+            systems=list(cfg.get("systems") or []),
+            instruments=dict(cfg.get("instruments") or {}),
+            sim=dict(cfg.get("sim") or {}),
+            **kwargs,
+        )
 
     def case(self) -> dict:
-        case = {"sim": dict(self.sim), "assets": dict(self.assets), "systems": [dict(s) for s in self.systems]}
+        case = {
+            "sim": dict(self.sim),
+            "assets": dict(self.assets),
+            "systems": [dict(s) for s in self.systems],
+        }
         if self.instruments:
             case["instruments"] = dict(self.instruments)
+        if self.procedure:
+            case["procedure"] = dict(self.procedure)
         return case
 
 
@@ -76,10 +102,15 @@ class I4hComponent:
 
     def __init__(self, cfg: I4hComponentCfg | None = None, *, solver_cfg=None):
         if (cfg is None) == (solver_cfg is None):
-            raise ValueError("I4hComponent takes an I4hComponentCfg or an already configured I4hSolverCfg")
+            raise ValueError(
+                "I4hComponent takes an I4hComponentCfg or an already configured I4hSolverCfg"
+            )
         self.cfg = cfg
-        self.sim = None  # the current NewtonSim (rebound by every solver build)
+        self.sim = None  # current PhysicsBinding, invalidated and replaced on every solver build
+        self._construction = None
         self.solver_cfg = solver_cfg
+        self.procedure = None  # the case's procedure, built with every solver build when the case has one
+        self.horizon_s = None  # the host's episode horizon (max_episode_length * step_dt), set before construction
         self._rebuild = []
         self._events = None
 
@@ -91,7 +122,9 @@ class I4hComponent:
         from a composed cfg constructs its handle here."""
         return cls(solver_cfg=solver_cfg)
 
-    def configure(self, sim_cfg, *, rigid: bool = True, gravity_from_case: bool = True) -> None:
+    def configure(
+        self, sim_cfg, *, rigid: bool = True, gravity_from_case: bool = True
+    ) -> None:
         """Make the host's ``SimulationCfg`` step this component: its Newton solver cfg (MuJoCo-Warp) becomes the rigid
         solver beside ``I4hSolver``, keeping its ``num_substeps`` (run inside the coupled step); every other host Newton
         setting (shape contact defaults, determinism, visual shapes, CUDA graph) is kept. ``rigid=True`` requires
@@ -99,9 +132,11 @@ class I4hComponent:
         ``rigid=False`` is i4h physics alone. ``sim.dt`` defaults to the host's physics dt. A case that declares
         ``sim.gravity`` sets the host's (``gravity_from_case``, as ``I4hEnvCfg``); otherwise the two must agree."""
         if self.cfg is None:
-            raise RuntimeError("this handle wraps a configured I4hSolverCfg; configure() needs an I4hComponentCfg")
+            raise RuntimeError(
+                "this handle wraps a configured I4hSolverCfg; configure() needs an I4hComponentCfg"
+            )
         from i4h_isaaclab.coupling import check_rigid_solver_cfg
-        from i4h_isaaclab.newton_manager import I4hSolverCfg
+        from i4h_isaaclab.newton_manager import I4hSolverCfg, physics_cfg
         from isaaclab_newton.physics import NewtonCfg
 
         host = sim_cfg.physics
@@ -124,15 +159,33 @@ class I4hComponent:
         case["sim"].setdefault("dt", float(sim_cfg.dt))
         if gravity_from_case and case["sim"].get("gravity") is not None:
             sim_cfg.gravity = tuple(float(g) for g in case["sim"]["gravity"])
-        self.solver_cfg = I4hSolverCfg(case=case, rigid_solver_cfg=rigid, coupling_mode=self.cfg.coupling_mode,
-                                       mounts=self.cfg.mounts, loaders=self.cfg.loaders,
-                                       systems=self.cfg.systems_registry, pose=self.cfg.pose,
-                                       rigid_substeps=int(getattr(host, "num_substeps", 1)) if rigid is not None else 1)
-        # Every host setting kept; only the solver and the substep split change (our substeps run inside the step).
-        # class_type is derived from the solver cfg by NewtonCfg itself.
-        kept = {f.name: getattr(host, f.name) for f in dataclasses.fields(host)
-                if f.name not in ("class_type", "solver_cfg", "num_substeps")} if newton_host else {}
-        sim_cfg.physics = NewtonCfg(solver_cfg=self.solver_cfg, num_substeps=1, **kept)
+        self.solver_cfg = I4hSolverCfg(
+            case=case,
+            rigid_solver_cfg=rigid,
+            coupling_mode=self.cfg.coupling_mode,
+            mounts=self.cfg.mounts,
+            loaders=self.cfg.loaders,
+            systems=self.cfg.systems_registry,
+            pose=self.cfg.pose,
+            rigid_substeps=int(getattr(host, "num_substeps", 1))
+            if rigid is not None
+            else 1,
+        )
+        kwargs = (
+            {
+                f.name: getattr(host, f.name)
+                for f in fields(host)
+                if f.name not in ("class_type", "solver_cfg", "num_substeps")
+            }
+            if isinstance(host, NewtonCfg)
+            else {}
+        )
+        sim_cfg.physics = physics_cfg(
+            self.solver_cfg, **kwargs
+        )  # our substeps run inside
+        self.solver_cfg = (
+            sim_cfg.physics.solver_cfg
+        )  # configclass copied the declaration; bind its actual host copy
 
     @contextmanager
     def construction(self, *, device, envs):
@@ -142,34 +195,79 @@ class I4hComponent:
 
         if self.solver_cfg is None:
             raise RuntimeError("I4hComponent.configure(env_cfg.sim) first")
-        with construction_context(self.solver_cfg, device=device, envs=envs, on_solver=self._bind):
+        if self._construction is not None:
+            self._construction.close()
+        with construction_context(
+            self.solver_cfg, device=device, envs=envs, on_solver=self._bind
+        ) as owner:
+            self._construction = owner
             yield self
 
     def detach(self) -> None:
         """Stop rebinding (a host env's ``close``): the manager forgets this handle's build callback."""
-        from i4h_isaaclab.newton_manager import I4hNewtonManager
-
-        if self._bind in I4hNewtonManager.on_solver:
-            I4hNewtonManager.on_solver.remove(self._bind)
+        if self._construction is not None:
+            self._construction.close()
+            self._construction = None
 
     def on_rebuild(self, callback) -> None:
-        """``callback(component)`` after every solver build: re-take the views there."""
+        """``callback(component)`` on fresh construction: re-take views and initialize positions.
+
+        After these callbacks, history is initialized from the new live positions.
+        Restoring an independent State's history belongs after construction.
+        """
         self._rebuild.append(callback)
+
+    def on_post_physics(self, callback) -> None:
+        """Register allocation-free device work during on_rebuild, before host capture.
+
+        Callbacks run in registration order after each completed physics step,
+        including both steps of a decimated action. Re-register on hard rebuild.
+        """
+        if not getattr(self, "_binding_callbacks_open", False):
+            raise RuntimeError("register post-physics callbacks during on_rebuild, before graph capture")
+        self._live().post_physics.append(callback)
 
     def _bind(self, sim) -> None:
         self.sim = sim
+        sim.post_physics = []
         self._events = None
-        sim.after_step = self.sync_views  # after every manager step: torch reads (observations, rewards) see it
-        for callback in list(self._rebuild):
-            callback(self)
+        self.procedure = None
+        case = self.solver_cfg.case or {}
+        if case.get("procedure"):
+            from i4h_host.composition import build_procedure
+
+            self.procedure = build_procedure(case, sim, horizon_s=self.horizon_s)
+        sim.procedure = (
+            self.procedure
+        )  # updated by the manager after every physics step
+        sim.after_step = (
+            self.sync_views
+        )  # after every manager step: torch reads (observations, rewards) see it
+        if self._rebuild:
+            self.sync_views()
+        self._binding_callbacks_open = True
+        try:
+            for callback in list(self._rebuild):
+                callback(self)
+        finally:
+            self._binding_callbacks_open = False
+        if self._rebuild:
+            self.initialize_particle_history()
 
     def _live(self):
         if self.sim is None:
-            raise RuntimeError("the component is not built yet (construct the host env inside construction())")
+            raise RuntimeError(
+                "the component is not built yet (construct the host env inside construction())"
+            )
         self.sim.physics.check_valid()
         return self.sim
 
     # the binding ---------------------------------------------------------------------------------------------
+
+    @property
+    def physics(self):
+        """Current physics binding; observers must bind again after a hard rebuild."""
+        return self._live().physics
 
     @property
     def systems(self) -> list:
@@ -186,14 +284,18 @@ class I4hComponent:
         base, stride, col = scene.main.place(scene.envs)
         return int(base), int(stride), int(col), int(scene.main.width)
 
-    def positions(self, body: str | None = None, part: str | None = None) -> torch.Tensor:
+    def positions(
+        self, body: str | None = None, part: str | None = None
+    ) -> torch.Tensor:
         """``(E, 3n)`` zero-copy view of a body's (or one part's) positions, component frame; all integrated bodies
         concatenated is ``views.observation_views``' job, so a body is required when the case has several."""
         sim = self._live()
         observe = "" if body is None else body + ("." + part if part else "")
         found = views.observation_views(sim, observe)
         if len(found) != 1:
-            raise ValueError(f"the component has {len(found)} integrated bodies: name one")
+            raise ValueError(
+                f"the component has {len(found)} integrated bodies: name one"
+            )
         return found[0]
 
     def state(self) -> dict[str, torch.Tensor]:
@@ -203,6 +305,12 @@ class I4hComponent:
 
     def action_views(self) -> list[torch.Tensor]:
         return views.action_views(self._live())
+
+    def command_views(self, system_id):
+        """Cached writable Torch slices; use the existing stream-ordering boundary."""
+        binding = self._live().physics
+        binding.command_views(system_id)
+        return binding.solver.command_view(system_id).torch_views()
 
     def action_bounds(self, workspace: float = 0.1) -> tuple[np.ndarray, np.ndarray]:
         """Physical ``(A,)`` bounds of the concatenated control columns, as each control declares them."""
@@ -219,10 +327,47 @@ class I4hComponent:
         self._order("in")
         self._live().physics.reset(env_ids, mask=mask)
 
+    def save(self, dst_state, dst_control, env_ids=None, *, mask=None) -> None:
+        """Copy the selected worlds' i4h-owned rows into another State and Control of the host's Model."""
+        self._order("in")
+        self._live().physics.save(dst_state, dst_control, env_ids, mask=mask)
+
+    def restore(self, src_state, src_control, env_ids=None, *, mask=None) -> None:
+        """Copy saved i4h-owned rows back into the live State and Control. Rigid body state, host time, assessment
+        and procedure state are the host's to restore; no reset or cache refresh runs here.
+
+        Order matters: Isaac Lab runs the solver's cache reset for every world whose state was written through its
+        asset API, at the next forward or step. Write the host's own state first, call the simulation's
+        ``forward()``, and restore the i4h rows last; otherwise that cache reset follows the restore and replaces
+        graph containment's saved rebuild request with a forced rebuild."""
+        self._order("in")
+        self._live().physics.restore(src_state, src_control, env_ids, mask=mask)
+
+    def initialize_particle_history(self, env_ids=None, *, mask=None) -> None:
+        """After host position edits, initialize selected history on Warp's stream.
+
+        Call after teleports through ``positions()`` or native State views and
+        before the next step. Other state, including velocity, remains unchanged.
+        """
+        self._order("in")
+        self._live().physics.initialize_particle_history(env_ids, mask=mask)
+
+    def reset_procedure(self, env_ids=None, *, mask=None) -> None:
+        """The selected worlds' procedure (no-op without one), after the host's reset events sampled the new state."""
+        self._live()
+        if self.procedure is not None:
+            self.procedure.reset(
+                env_ids, mask=mask
+            )  # select_envs orders Warp after torch's ids or mask
+
     def sync_views(self) -> None:
         """Torch's current stream waits for Warp's: before reading views outside the step."""
         self._live()
         self._order("out")
+
+    def order_inputs(self) -> None:
+        """Order Warp after Torch's current stream, before a Warp write that follows Torch writes into shared views."""
+        self._order("in")
 
     def _order(self, direction: str) -> None:
         dev = self.scene.device
@@ -230,8 +375,14 @@ class I4hComponent:
             return
         if self._events is None:
             torch_device = torch.device(f"cuda:{dev.ordinal}")
-            self._events = (torch.cuda.ExternalStream(wp.get_stream(dev).cuda_stream, device=torch_device),
-                            torch.cuda.Event(), torch.cuda.Event(), torch_device)
+            self._events = (
+                torch.cuda.ExternalStream(
+                    wp.get_stream(dev).cuda_stream, device=torch_device
+                ),
+                torch.cuda.Event(),
+                torch.cuda.Event(),
+                torch_device,
+            )
         ext, ev_in, ev_out, torch_device = self._events
         if direction == "in":
             ev_in.record(torch.cuda.current_stream(torch_device))

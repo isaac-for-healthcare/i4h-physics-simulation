@@ -10,7 +10,7 @@ import argparse
 
 import numpy as np
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import build_procedure, load_case, read_case
+from i4h_host.composition import build_procedure, load_case, read_case
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.volumetric_grasp import VolumetricGrasp
 
@@ -55,14 +55,14 @@ def qualify_sequence(sim, task, cfg, lifecycle):
     assert result["result"] == "success", result
     if lifecycle:
         sim.reset()
-        task.reset(mask=sim._mask)
+        task.reset(mask=sim.env_mask)
         for _ in range(int(np.ceil(task.timeout / sim.dt)) + 1):
             sim.step()
             task.update(sim.dt)
         assert task.results()[0]["result"] == "timeout", task.results()
         assert not (task.history.numpy()[:, :, 1] >= 0).any()
         sim.reset()
-        task.reset(mask=sim._mask)
+        task.reset(mask=sim.env_mask)
         assert not task.path_length.numpy().any()
         print("sequence zero-control timeout / reset passed", flush=True)
     return result
@@ -71,7 +71,7 @@ def qualify_sequence(sim, task, cfg, lifecycle):
 def navigation_lifecycle(sim, task, control, case):
     # Replay until inside, withdraw through controls before the hold completes.
     sim.reset()
-    task.reset(mask=sim._mask)
+    task.reset(mask=sim.env_mask)
     for i in range(navigation_steps(case)):
         control.actions.assign(navigation_action(case, i)[None])
         sim.step()
@@ -87,14 +87,14 @@ def navigation_lifecycle(sim, task, control, case):
             break
     assert task.rows.numpy()[0, 10] == 0 and task.rows.numpy()[0, 11] == 0
     sim.reset()
-    task.reset(mask=sim._mask)
+    task.reset(mask=sim.env_mask)
     # Authored 120-second timeout, measured by real physics steps, with zero controls.
     for _ in range(int(np.ceil(task.timeout / sim.dt)) + 1):
         sim.step()
         task.update(sim.dt)
     assert task.results()[0]["result"] == "timeout", task.results()
     sim.reset()
-    task.reset(mask=sim._mask)
+    task.reset(mask=sim.env_mask)
     assert task.rows.numpy()[0, 9] == 0 and task.rows.numpy()[0, 11] == 0
     print(case, "hold interruption / zero-control timeout / reset passed", flush=True)
 

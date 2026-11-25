@@ -40,7 +40,7 @@ E3 = wp.constant(wp.vec3(0.0, 0.0, 1.0))
 
 
 # pbd_cosserat.py:479-485 numpy quaternion helpers. Edits: none.
-def _qmul_np(a, b):
+def qmul_np(a, b):
     av, aw = a[:3], a[3]
     bv, bw = b[:3], b[3]
     v = aw * bv + bw * av + np.cross(av, bv)
@@ -56,7 +56,7 @@ def rest_darboux_quats(frames: np.ndarray, pairs: np.ndarray) -> np.ndarray:
     segment pairs ``pairs (K, 2)`` of one variant's ``(S, 4)`` segment frames."""
     rd = np.zeros((len(pairs), 4), dtype=np.float64)
     for k, (a, b) in enumerate(pairs):
-        rel = _qmul_np(_qconj_np(frames[a]), frames[b])
+        rel = qmul_np(_qconj_np(frames[a]), frames[b])
         if rel[3] < 0.0:
             rel = -rel
         rd[k] = rel
@@ -80,6 +80,12 @@ class RodPbd(System):
     sweeps: int = 1  # structural: Jacobi sweeps per runner iteration (omniendo centreline ``iterations``)
 
     structural = System.structural + ("sweeps",)
+
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.rod_storage import publish_rod
+        return publish_rod(authoring.scene, declarations, spec.get("id", spec["type"]),
+                           body=spec["body"], backend="pbd", settings=spec)
 
     def __post_init__(self):
         scene = self.scene
@@ -115,46 +121,35 @@ class RodPbd(System):
             "accumulators": n * 16 + ns * 20,
         })
         self.variant = b.variant
-        self.seg = wp.array(seg[None], dtype=wp.vec2i, device=dev)  # (V, S) node pairs
-        material = b.rod_material
-        self.pair = material.pair if material is not None and material.backend == 'pbd' else wp.array(pair[None], dtype=wp.vec2i, device=dev)  # (V, K)
-        self.frames0 = wp.array(frames, dtype=wp.quat, device=dev)  # (V, S)
-        self.rest_darboux = wp.array(rd, dtype=wp.quat, device=dev)  # (V, K)
-        self.rest_len = wp.array(rest_len, dtype=wp.float32, device=dev)  # (V, S)
-        self.inv_mass_q = wp.array(inv_mass_q, dtype=wp.float32, device=dev)  # (V, S)
-        self.frame = wp.empty(ns, dtype=wp.quat, device=dev)  # body-local: index env * S + segment
-        self.frame_pred = wp.empty(ns, dtype=wp.quat, device=dev)
-        self.omega = wp.zeros(ns, dtype=wp.vec3, device=dev)
-        from i4h_physics.regions import RodControls
+        from i4h_physics.rod_storage import PBD_LIVE, alias, bind_rod
         material = b.rod_material
         if b.regions is not None and material is None:
-            raise ValueError("rod_pbd: regional body requires rod_pbd_material before the solver")
+            raise ValueError("rod_pbd: regional body requires matching material before the solver")
         if material is not None and material.backend != "pbd":
             raise ValueError("rod_pbd: mismatched material backend")
-        if b.rod_controls is None:
-            b.rod_controls = RodControls(scene, S, K)
-        controls = b.rod_controls
-        self.bend_offset = controls.bend_offset
-        self.stretch_scale = controls.stretch_scale
-        self.bend_scale = controls.bend_scale
-        self.unit_twist = wp.ones((E, K), dtype=float, device=dev)
+        bind_rod(self, "pbd")
+        self.frame_pred = wp.clone(self.frame)
+        self.register_live(*PBD_LIVE)
         self.effective_stretch, self.effective_bend = self.stretch_scale, self.bend_scale
         self.effective_twist = self.unit_twist
-        self._live("stretch", "bend", "twist", "angular_damping")
+        for key in ("effective_stretch", "effective_bend", "effective_twist"):
+            alias(scene, self, key, getattr(self, key))
+        self.freeze("id", "P", "S", "K", "frame_count", "bend_count")
         # Jacobi accumulators: the apply kernels clear them, so they are zero between launches.
         self.pos_corr = wp.zeros(n, dtype=wp.vec3, device=dev)
         self.pos_count = wp.zeros(n, dtype=wp.int32, device=dev)
         self.ori_corr = wp.zeros(ns, dtype=wp.vec4, device=dev)
         self.ori_count = wp.zeros(ns, dtype=wp.int32, device=dev)
-        self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
 
     def prepare(self, scene):
+        from i4h_physics.rod_storage import route_alias
+        scene.storage.check()
         super().prepare(scene)
         material = self.body.rod_material
         self.regional = material is not None and material.active
-        self.effective_stretch = material.stretch if self.regional else self.stretch_scale
-        self.effective_bend = material.bend if self.regional else self.bend_scale
-        self.effective_twist = material.twist if self.regional else self.unit_twist
+        route_alias(scene, self, "effective_stretch", material.stretch if self.regional else self.stretch_scale)
+        route_alias(scene, self, "effective_bend", material.bend if self.regional else self.bend_scale)
+        route_alias(scene, self, "effective_twist", material.twist if self.regional else self.unit_twist)
 
 
     def substep_start(self, scene, dt, s, substeps):

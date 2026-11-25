@@ -7,7 +7,7 @@
 ``prepare()``: drop the graphs and the prepared status, call every system's
 ``prepare(scene)`` (capacity checks, configuration refresh), push ``dt``/``substeps``/``iterations`` into the solver,
 record the structural signature, capture the step graph (``solver.step(state, state, control, None, dt)``) and the
-masked-reset graph (``solver.reset(state, world_mask)``, a physical reset) when ``cuda_graph`` is set on a CUDA
+masked-reset graph (``solver.restore_episode(state, control, world_mask)``, a physical reset) when ``cuda_graph`` is set on a CUDA
 device, and only then mark itself prepared. ``step()`` and ``reset()`` refuse to run after a structural edit that has not
 been prepared again, so a forgotten recapture fails loudly instead of replaying stale launches.
 
@@ -34,7 +34,11 @@ class Stepper:
     def __init__(self, solver: I4hSolver, control=None, dt=1.0 / 60.0, substeps=1, iterations=4, cuda_graph=True,
                  debug=False):
         self.solver = solver
-        self.control = control if control is not None else solver.model.control()
+        self.control = control if control is not None else (solver.control if solver.control is not None else solver.model.control())
+        if solver.control is None:
+            solver.control = self.control
+        elif solver.control is not self.control:
+            raise ValueError("Stepper control differs from the solver's bound control")
         self.dt = check_float("dt", dt)
         if self.dt <= 0.0:
             raise ValueError("dt must be positive")
@@ -43,10 +47,11 @@ class Stepper:
         self.cuda_graph = check_bool("cuda_graph", cuda_graph)
         self.debug = check_bool("debug", debug)
         self.graph = self.reset_graph = None
+        self.observables = None
         self._prepared = None
         E, dev = self.scene.envs, self.scene.device
         self.world_mask = wp.zeros(E + 1, dtype=wp.bool, device=dev)  # the reset graph's selection; [E] is world -1
-        self._mask = self.world_mask[:E]
+        self.env_mask = self.world_mask[:E]
         from i4h_physics.bindings import PhysicsBinding
 
         self.physics = PhysicsBinding(self)
@@ -77,10 +82,12 @@ class Stepper:
     # structural contract ----------------------------------------------------------------------------------------
 
     def _signature(self):
-        return signature(self, self.systems)
+        self.solver.check_binding()
+        return signature(self, self.systems), id(self.observables)
 
     def prepare(self) -> None:
         """Validate the systems, configure the solver and (re)capture the step and masked-reset graphs."""
+        self.solver.check_binding()
         self.graph = self.reset_graph = None
         self._prepared = None
         from i4h_physics.systems.rods.material import validate_material_systems
@@ -103,12 +110,17 @@ class Stepper:
                         self._step()
                     self.graph = capture.graph
                     with wp.ScopedCapture(device=dev) as capture:
-                        self.solver.reset(self.state, self.world_mask)
+                        self.solver.restore_episode(self.state, self.control, self.world_mask)
                     self.reset_graph = capture.graph
             finally:
                 if collecting:
                     gc.enable()
         self._prepared = signature  # only after a successful capture, so a failed capture cannot fall back silently
+
+    @property
+    def prepared(self) -> bool:
+        """Whether the last ``prepare()`` completed; a structural change afterwards is reported by the next step."""
+        return self._prepared is not None
 
     def _check_prepared(self) -> None:
         if self._prepared is None:
@@ -117,7 +129,7 @@ class Stepper:
             raise RuntimeError("a structural setting changed or a live array was rebound after prepare(); call prepare() to recapture")
 
     def _step(self) -> None:
-        self.solver.step(self.state, self.state, self.control, None, self.dt)
+        self.solver.step(self.state, self.state, self.control, None, self.dt, observables=self.observables)
 
     def step(self) -> None:
         self._check_prepared()
@@ -141,12 +153,12 @@ class Stepper:
         (Isaac Lab's per-step ``reset_buf`` without its ``nonzero()`` sync). Replays the reset graph when captured.
         Torch inputs need no ordering by the caller (see ``select_envs``); Warp arrays are read on Warp's stream."""
         self._check_prepared()
-        if not select_envs(self._mask, env_ids, mask, debug=self.debug):
+        if not select_envs(self.env_mask, env_ids, mask, debug=self.debug):
             return False
         if self.reset_graph is not None:
             wp.capture_launch(self.reset_graph)
         else:
-            self.solver.reset(self.state, self.world_mask)
+            self.solver.restore_episode(self.state, self.control, self.world_mask)
         return True
 
 
@@ -155,6 +167,7 @@ def signature(owner, systems) -> tuple:
     every system's (identity included, so a replaced system counts as a change), plus the buffer of each live array
     (a rebound one counts as a change; a scalar or reshaped one raises in ``System.live_pointers``)."""
     own = tuple(getattr(owner, name) for name in owner.structural)
+    own += (tuple(id(output) for output in owner.solver.outputs),)
     return own, tuple((type(s).__name__, id(s)) + tuple(getattr(s, name) for name in s.structural) + (s.live_pointers(),)
                       for s in systems)
 

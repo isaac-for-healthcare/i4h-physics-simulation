@@ -4,23 +4,29 @@
 """M7: I4hEnv inside a kitless Isaac Lab 3.0 process. Runs only with the Isaac Lab venv's python
 (``$PY -m pytest tests/runtime/test_isaaclab_env.py``, see README); the worktree venv skips it. One env per
 process at a time: the fixture closes the previous env and clears Isaac Lab's simulation context. Every test runs on
-both backends (``backend`` fixture: Isaac Lab's NewtonManager and the fallback I4hPhysicsManager) unless it pins one."""
+the sole Newton host path, on either qualified Lab release."""
+
+
+import json
 
 import numpy as np
 import pytest
 import warp as wp
 import yaml
-from helpers import needs_external_data
+from helpers import lab_runtime, needs_external_data
 
 torch = pytest.importorskip("torch")
+
+
 pytest.importorskip("isaaclab.envs")
+
+
 gym = pytest.importorskip("gymnasium")
 
-import i4h_isaaclab.tasks  # noqa: E402, F401  registers the ids
+
 from helpers import find, needs_chole, needs_vessels  # noqa: E402
-from i4h_isaaclab.composition import read_case  # noqa: E402
+from i4h_host.composition import read_case  # noqa: E402
 from i4h_isaaclab.env import I4hEnv, I4hEnvCfg  # noqa: E402
-from i4h_isaaclab.physics import I4hPhysicsManager  # noqa: E402
 from i4h_physics.systems.mechanics.particles import Particles  # noqa: E402
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl  # noqa: E402
 from isaaclab.managers import EventTermCfg  # noqa: E402
@@ -34,7 +40,7 @@ def teardown():
         SimulationContext.clear_instance()
 
 
-@pytest.fixture(params=["newton", "i4h"])
+@pytest.fixture(params=["newton"])
 def backend(request):
     return request.param
 
@@ -216,10 +222,10 @@ def gravity_case(tmp_path, gravity):
 
 
 def lab_sim(gravity):
-    from i4h_isaaclab.physics import I4hPhysicsCfg
+    from i4h_isaaclab.newton_manager import I4hSolverCfg, physics_cfg
     from isaaclab.sim import SimulationCfg
 
-    return SimulationCfg(dt=1.0 / 60.0, render_interval=2, device="cuda:0", physics=I4hPhysicsCfg(), gravity=gravity)
+    return SimulationCfg(dt=1.0 / 60.0, render_interval=2, device="cuda:0", physics=physics_cfg(I4hSolverCfg()), gravity=gravity)
 
 
 def test_case_gravity_is_the_default(make_env, tmp_path):
@@ -259,7 +265,7 @@ def test_overridden_hooks_read_synced_views(make_env):
     u = env.unwrapped
     dev = torch.device(u.device)
     env.reset()
-    holder = u.simulator if u.cfg.backend == "newton" else I4hPhysicsManager
+    holder = u.simulator
     calls = []
     hook = holder.after_step
     holder.after_step = lambda: (calls.append(1), hook())
@@ -293,16 +299,17 @@ def test_one_case_read_and_one_scene_load_per_construction(make_env, backend, mo
     import i4h_isaaclab.newton_manager as nm
 
     reads = count_calls(monkeypatch, env_module, "read_case")
-    loads = count_calls(monkeypatch, nm, "load_scene")
-    for _ in range(2):  # two consecutive constructions, each on its own
+    loads = count_calls(monkeypatch, nm, "author_case")
+    for _ in range(2):
         reads.clear(), loads.clear()
         env = make_env(stagger_episodes=False)
-        assert len(reads) == 1 and len(loads) == (1 if backend == "newton" else 0), (len(reads), len(loads))
-        assert nm.I4hNewtonManager.pending_scene is None
-    if backend == "newton":
-        old = env.unwrapped.simulator
-        env.unwrapped.sim.reset(soft=False)
-        assert len(loads) == 2 and env.unwrapped.simulator is not old
+        assert len(reads) == 1 and len(loads) == 1
+    old = env.unwrapped.simulator
+    authoring = env.unwrapped._construction.authoring
+    env.unwrapped.sim.reset(soft=False)
+    assert len(loads) == 1 and env.unwrapped.simulator is not old
+    assert env.unwrapped._construction.authoring is authoring
+    assert not old.valid
 
 
 @pytest.mark.parametrize("backend", ["newton"])
@@ -316,14 +323,14 @@ def test_failed_construction_leaves_no_pending_scene(make_env, monkeypatch):
         patch.setattr(I4hEnv, "_bind", fail)
         with pytest.raises(RuntimeError, match="bind failed"):
             make_env(stagger_episodes=False)
-    assert nm.I4hNewtonManager.pending_scene is None
-    loads = count_calls(monkeypatch, nm, "load_scene")
+    assert SimulationContext.instance() is None
+    loads = count_calls(monkeypatch, nm, "author_case")
     env = make_env(stagger_episodes=False)
     env.step(torch.zeros((2, 10), device=env.unwrapped.device))
     assert len(loads) == 1
 
 
-def test_user_stream_ordering(make_env):
+def test_user_stream_ordering(make_env, tmp_path):
     """action -> step and step -> observation ordering hold when torch runs on a non-default stream."""
     dev = torch.device("cuda:0")
     gen = torch.Generator(device=dev).manual_seed(1)
@@ -331,15 +338,41 @@ def test_user_stream_ordering(make_env):
     obs_default, roots_default = rollout(make_env(stagger_episodes=False), sequence)
     env = make_env(stagger_episodes=False)
     obs_side, roots_side = rollout(env, sequence, stream=torch.cuda.Stream(device=dev))
-    assert torch.allclose(roots_side, roots_default, atol=1e-5), "a stale action moves the probe by millimetres"
-    assert torch.allclose(obs_side, obs_default, atol=1e-4)
+    def retain_failure(reason, **extra):
+        from i4h_isaaclab.views import observation_views, state_names, state_views
+
+        u = env.unwrapped
+        views = observation_views(u.simulator, u.cfg.observe) + state_views(u.simulator)
+        names = [f"positions/{i}" for i in range(len(u.obs_views))] + state_names(u.simulator)
+        labels = [f"{name}/{column}" for name, view in zip(names, views) for column in range(view.shape[1])]
+        artifact = tmp_path / "user-stream-ordering.npz"
+        np.savez_compressed(artifact, obs_default=obs_default.cpu().numpy(), obs_side=obs_side.cpu().numpy(),
+                            roots_default=roots_default.cpu().numpy(), roots_side=roots_side.cpu().numpy(), **extra)
+        (tmp_path / "user-stream-ordering.json").write_text(json.dumps({
+            "reason": reason, "observation_labels": labels, "roots_atol": 1e-5,
+            "observations_atol": 1e-4, "rtol": 1e-5, "step_observation_comparison": "torch.equal",
+        }, indent=2) + "\n")
+        return artifact
+
+    roots_close = torch.allclose(roots_side, roots_default, atol=1e-5)
+    if not roots_close:
+        retain_failure("root ordering")
+    assert roots_close, "a stale action moves the probe by millimetres"
+    observations_close = torch.allclose(obs_side, obs_default, atol=1e-4)
+    if not observations_close:
+        artifact = retain_failure("observation ordering")
+        pytest.fail(f"stream observation comparison failed; full observations: {artifact}")
     # step -> observation: the returned observation is the state after the step, read on the side stream
     q, _ = tissue_positions(env)
     with torch.cuda.stream(torch.cuda.Stream(device=dev)):
         obs, *_ = env.step(sequence[0])
         copy = obs["policy"][:, : q.shape[1]].clone()
     torch.cuda.synchronize()
-    assert torch.equal(copy, q)
+    equal = torch.equal(copy, q)
+    if not equal:
+        retain_failure("step -> observation", step_observation=obs["policy"].cpu().numpy(),
+                       step_positions=q.cpu().numpy(), step_copy=copy.cpu().numpy())
+    assert equal
 
 
 def test_reset_ids_from_a_side_stream(make_env):
@@ -377,18 +410,37 @@ class ShiftEvents:
     shift = EventTermCfg(func=shift_observed, mode="reset", params={"offset": 0.01})
 
 
+@configclass
+class StartupShiftEvents:
+    shift = EventTermCfg(func=shift_observed, mode="startup", params={"offset": 0.01})
+
+
+def test_startup_event_initializes_history_before_first_reset(make_env):
+    env = make_env(stagger_episodes=False, events=StartupShiftEvents())
+    scene = env.unwrapped.simulator.scene
+    q, q0 = tissue_positions(env)
+    history = wp.to_torch(scene.field("q_prev", scene.bodies[0])).view(2, -1)
+    assert torch.equal(q, q0 + 0.01), "startup position edits survive construction"
+    assert torch.equal(history, q), "startup history is live before any reset or step"
+
+
 def test_reset_event_survives_the_physical_reset(make_env):
     """An Isaac Lab reset event runs after the physical reset (on a non-default torch stream): its change stays."""
     env = make_env(stagger_episodes=False, events=ShiftEvents())
     u = env.unwrapped
     dev = torch.device(u.device)
     env.reset()
+    scene = u.simulator.scene
+    history = wp.to_torch(scene.field("q_prev", scene.bodies[0])).view(2, -1)
+    q, q0 = tissue_positions(env)
+    assert torch.equal(history, q), "initial reset events initialize history before the first step"
     a = torch.zeros((2, 10), device=dev)
     a[:, 2] = 1.0
     for _ in range(20):
         env.step(a)
     q, q0 = tissue_positions(env)
     moved = q[0].clone()
+    previous = history[0].clone()
     pad = torch.randn((2048, 2048), device=dev)
     with torch.cuda.stream(torch.cuda.Stream(device=dev)):
         (pad @ pad).sum()  # queued work on the side stream ahead of the reset
@@ -396,6 +448,8 @@ def test_reset_event_survives_the_physical_reset(make_env):
     torch.cuda.synchronize()
     assert torch.allclose(q[1], q0[1] + 0.01, atol=1e-6), "the event shifted the reset state, and it stayed"
     assert torch.equal(q[0], moved), "env 0 untouched"
+    assert torch.equal(history[1], q[1]), "side-stream reset event initializes selected history"
+    assert torch.equal(history[0], previous), "unselected history untouched"
 
 
 def shift_observed_late(env, env_ids, offset):
@@ -557,7 +611,7 @@ def test_ppo_smoke(make_env, task):
     assert len(set(u.episode_length_buf.tolist())) > 1, "episode lengths were randomised at the start"
     losses = checked_iteration(runner, wrapped)
     assert losses and all(np.isfinite(v) for v in losses.values()), losses
-    u.simulator.step()
+    u.sim.step(render=False)
     torch.cuda.synchronize()
     assert torch.isfinite(u.obs_views[0]).all()
 
@@ -573,15 +627,20 @@ def test_hard_reset_rebinds(make_env, backend):
     for _ in range(10):
         env.step(a)
     old_sim, old_q = u.simulator, u.simulator.scene.q.ptr
+    old_commands = old_sim.physics.command_views("instrument_control")
+    old_command_ptr = old_commands["actions"].ptr
     u.sim.reset(soft=False)
     torch.cuda.synchronize()
     q, q0 = tissue_positions(env)
     assert torch.equal(q, q0), "every env back at rest"
     if backend == "newton":
-        from isaaclab_newton.physics import NewtonManager
 
+        with pytest.raises(RuntimeError, match="invalidated"):
+            old_sim.physics.command_views("instrument_control")
+        commands = u.simulator.physics.command_views("instrument_control")
+        assert commands is not old_commands and commands["actions"].ptr != old_command_ptr
         assert u.simulator is not old_sim and u.simulator.scene.q.ptr != old_q
-        assert u.simulator.scene.q.ptr == NewtonManager.get_state_0().particle_q.ptr
+        assert u.simulator.scene.q.ptr == lab_runtime().state_0.particle_q.ptr
         assert u.obs_views[0].data_ptr() == wp.to_torch(u.simulator.scene.q).data_ptr()
         assert u.camera.sim is u.simulator
     for _ in range(10):
@@ -601,16 +660,12 @@ def test_close_and_reopen(make_env, backend):
     assert not previous.valid
     with pytest.raises(RuntimeError, match="invalidated"):
         previous.reset()
+    with pytest.raises(RuntimeError, match="invalidated"):
+        previous.command_views("instrument_control")
     u = env.unwrapped
     assert u.simulator.scene.envs == 3
-    if backend == "newton":
-        from i4h_isaaclab.newton_manager import I4hNewtonManager
-
-        assert len(I4hNewtonManager.on_solver) == 1 and I4hNewtonManager.simulator is u.simulator
-    else:
-        from i4h_isaaclab.physics import I4hPhysicsManager
-
-        assert I4hPhysicsManager.sim is u.simulator
+    assert u._construction.binding is u.simulator
+    assert u._construction.on_solver == u._bind_newton
     env.reset()
     for _ in range(5):
         obs, *_ = env.step(torch.rand((3, 10), device=u.device) * 2 - 1)
@@ -620,22 +675,44 @@ def test_close_and_reopen(make_env, backend):
 
 @pytest.mark.parametrize("backend", ["newton"])
 @pytest.mark.parametrize("case", ["two_worlds", pytest.param("aorta_static", marks=needs_vessels)])
-def test_backends_match(make_env, case):
-    """The same kernels on the same actions: both backends' observations agree up to atomics noise."""
-    dev = torch.device("cuda:0")
-    results = {}
-    for name in ("i4h", "newton"):
-        env = make_env(case=case, backend=name, stagger_episodes=False)
-        A = env.unwrapped.single_action_space.shape[0]
-        gen = torch.Generator(device=dev).manual_seed(3)
-        sequence = [torch.rand((2, A), generator=gen, device=dev) * 2 - 1 for _ in range(40)]
-        env.reset()
-        for a in sequence:
-            obs, *_ = env.step(a)
-        torch.cuda.synchronize()
-        results[name] = obs["policy"].clone()
-    diff = float((results["i4h"] - results["newton"]).abs().max())
-    assert diff < 1e-4, diff
+def test_standalone_matches_host(make_env, case, tmp_path):
+    """The standalone Stepper and host adapter run identical core actions and ordering."""
+    from i4h_host.composition import load_case
+    from i4h_host.controls import controls
+    from i4h_isaaclab.views import observation, observation_views, state_views
+
+    env = make_env(case=case, stagger_episodes=False)
+    u = env.unwrapped
+    standalone = load_case(u.resolved_case, envs=2)
+    standalone.reset()
+    env.reset()
+    gen = torch.Generator(device=u.device).manual_seed(3)
+    for _ in range(40):
+        action = torch.rand((2, u.low.numel()), generator=gen, device=u.device) * 2 - 1
+        physical = (u.action_mid + u.action_half * action).cpu().numpy()
+        offset = 0
+        for control in controls(standalone):
+            width = int(np.prod(control.actions.shape[1:]))
+            control.actions.assign(physical[:, offset:offset + width].reshape(control.actions.shape))
+            offset += width
+        obs, *_ = env.step(action)
+        for _ in range(u.cfg.decimation):
+            standalone.step()
+    wp.synchronize()
+    expected = observation(observation_views(standalone, u.cfg.observe), state_views(standalone))
+    if not torch.allclose(obs["policy"], expected, atol=1e-4):
+        from i4h_isaaclab.views import state_names
+
+        # Keep the unchanged comparison, but retain the full failed sample:
+        # pytest's truncated tensor repr cannot identify which product differs.
+        artifact = tmp_path / "host-parity.npz"
+        np.savez_compressed(artifact, host=obs["policy"].cpu().numpy(), standalone=expected.cpu().numpy())
+        views = observation_views(standalone, u.cfg.observe) + state_views(standalone)
+        names = [f"positions/{i}" for i in range(len(u.obs_views))] + state_names(standalone)
+        labels = [f"{name}/{column}" for name, view in zip(names, views) for column in range(view.shape[1])]
+        different = (~torch.isclose(obs["policy"], expected, atol=1e-4)).nonzero().cpu().tolist()
+        fields = [(world, labels[column]) for world, column in different]
+        pytest.fail(f"standalone/host parity failed: {fields}; full observations: {artifact}")
 
 
 @pytest.mark.parametrize("use_mask", [False, True], ids=["ids", "mask"])
@@ -678,19 +755,18 @@ def test_structural_edit_needs_prepare(make_env, backend):
         env.step(a)
     with pytest.raises(RuntimeError, match="prepare"):
         u.simulator.reset([0])
-    from isaaclab_newton.physics import NewtonManager
 
     def step_graph():
-        return NewtonManager._graph if backend == "newton" else u.simulator.graph
+        return lab_runtime().graph
 
     old_graph = step_graph()
     u.simulator.prepare()
     assert particles not in u.simulator.solver.active
     if backend == "newton":
         # The qualified Lab (i4h_isaaclab.lab.QUALIFIED) runs the next requested step eagerly, then captures.
-        assert NewtonManager._graph is None and NewtonManager._graph_capture_pending
+        assert lab_runtime().graph is None and lab_runtime().capture_pending
         env.step(a)
-        assert not NewtonManager._graph_capture_pending
+        assert lab_runtime().graph is not None
     assert step_graph() is not None and step_graph() is not old_graph, "the step graph was recaptured"
     for _ in range(5):
         obs, *_ = env.step(a)
@@ -730,7 +806,7 @@ def test_empty_reset_preserves_assessment_after_partial_reset(make_env, tmp_path
     env.step(action)
     u._reset_idx(torch.tensor([0], device=u.device))
     u.sim.step(render=False)  # advance one physics sample without the host automatic-reset path
-    assert u.simulator._mask.numpy().tolist() == [True, False]
+    assert u.simulator.env_mask.numpy().tolist() == [True, False]
     u._warp_to_torch()
     before = u.task_rows.clone()
     positions = u.simulator.scene.q.numpy().copy()
@@ -912,9 +988,11 @@ def test_staggered_terminal_notification_clears_next_action(make_env, ids):
 
 
 def test_newton_missing_regional_provider_fails_before_capture():
+    from types import SimpleNamespace
+
     from i4h_endoluminal.loaders.rod import add_rod
-    from i4h_isaaclab.newton_manager import NewtonSim
-    from i4h_physics import Scene
+    from i4h_isaaclab.newton_manager import ConstructionContext
+    from i4h_physics import I4hSolver, PhysicsBinding, Scene
     from i4h_physics.systems.rods.material import RodDirectMaterial
     from i4h_physics.systems.rods.rod_direct import RodDirect
 
@@ -922,14 +1000,22 @@ def test_newton_missing_regional_provider_fails_before_capture():
     add_rod(scene, "wire", [0, 0, 0], [1, 0, 0], 5, .02, .002,
             regions={"schema_version": 1, "default": "unassigned",
                      "regions": [{"name": "tip", "interval": [.8, 1]}]})
+    from i4h_physics.rod_storage import declare_rod_direct, declare_rod_direct_material
+    declare_rod_direct_material(scene, 'wire')
+    declare_rod_direct(scene, 'wire')
     scene.allocate()
     provider = RodDirectMaterial(scene, body="wire")
     rod = RodDirect(scene, body="wire")
-    sim = NewtonSim.__new__(NewtonSim)
-    sim.scene, sim.systems = scene, [rod]  # a removed provider leaves the existing channels behind
+    core = I4hSolver(scene.model, scene, [rod], scene.state)
+    core.configure(1 / 60, 1, 1)
+    owner = ConstructionContext.__new__(ConstructionContext)
+    owner.cfg = SimpleNamespace(mounts=None, coupling_mode="one_way")
+    owner.authoring = SimpleNamespace(mount_config=(((), False), "one_way"))
+    owner.api = SimpleNamespace(invalidate_graph=lambda _: None)
+    owner.binding = PhysicsBinding.hosted(core, core, owner.prepare)
     with pytest.raises(ValueError, match="must precede"):
-        sim.prepare()
-    assert sim.reset_graph is None and sim._prepared is None
+        owner.prepare()
+    assert not owner.binding.prepared
     assert provider.body.rod_material is rod.body.rod_material
 
 
@@ -959,62 +1045,11 @@ def test_effective_timeout_source_is_exported(make_env, deadline, source):
         pytest.fail("the effective deadline never terminated the episode")
 
 
-def test_adapter_without_assessment_or_standalone():
-    """The Isaac Lab adapter without the [apps] extra or i4h-standalone: its modules import, physics cases build and
-    step on both backends, and a procedure case asks for the extra."""
-    import os
-    import subprocess
-    import sys
-    import textwrap
-
-    from helpers import VESSELS
-
-    vessels = bool(os.environ.get("I4H_DATA")) or (VESSELS / "AortaWithVesselsStatic.usdc").is_file()  # as needs_vessels
-
-    script = textwrap.dedent(f"""
-        import importlib, sys
-        class Block:
-            def find_spec(self, fullname, path=None, target=None):
-                if fullname.split(".")[0] in ("i4h_assessment", "i4h_standalone"):
-                    raise ModuleNotFoundError(fullname, name=fullname)
-        sys.meta_path.insert(0, Block())
-        import torch
-        for name in ("newton_manager", "physics", "views", "env", "tasks", "recording", "composition", "lab"):
-            importlib.import_module("i4h_isaaclab." + name)
-        from i4h_isaaclab.env import I4hEnv, I4hEnvCfg
-        from isaaclab.scene import InteractiveSceneCfg
-        from isaaclab.sim import SimulationContext
-        cases = ["two_worlds"] + (["aorta_static"] if {vessels!r} else [])
-        for case in cases:
-            for backend in ("newton", "i4h"):
-                cfg = I4hEnvCfg(case=case, backend=backend, stagger_episodes=False)
-                cfg.scene = InteractiveSceneCfg(num_envs=2, env_spacing=1.0)
-                env = I4hEnv(cfg)
-                env.reset()
-                for _ in range(3):
-                    obs, *_ = env.step(torch.zeros((2, env.low.numel()), device=env.device))
-                assert env.procedure is None and torch.isfinite(obs["policy"]).all()
-                env.close()
-                SimulationContext.clear_instance()
-        try:
-            I4hEnv(I4hEnvCfg(case="chole_grasp"))
-        except ModuleNotFoundError as error:
-            assert error.name == "i4h_assessment" and "[apps]" in str(error), error
-        else:
-            raise AssertionError("a procedure case built without i4h-assessment")
-        print("adapter ok", cases)
-    """)
-    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
-    assert out.returncode == 0 and "adapter ok" in out.stdout, out.stderr[-3000:]
-
-
-
 @pytest.mark.parametrize("backend", ["newton"])
 def test_host_particles_share_the_model(make_env):
     """F1: a host hook adds its own particles to every world before ours: our rows are found among them, the env's
     observations equal those of a host-free run, the host particles stay put, and a hard rebuild keeps the layout."""
     from isaaclab_newton.cloner import newton_builder_world_hook
-    from isaaclab_newton.physics import NewtonManager
 
     def host_particles(builder, env, _position, _quaternion):
         builder.add_particles([(3.0, 3.0, 3.0), (3.1, 3.0, 3.0), (3.2, 3.0, 3.0)], [(0.0, 0.0, 0.0)] * 3, [0.0] * 3)
@@ -1036,7 +1071,7 @@ def test_host_particles_share_the_model(make_env):
     assert main.placement is not None and main.placement[2] == 3, main.placement
 
     def host_rows():
-        return NewtonManager.get_state_0().particle_q.numpy()[[e * main.placement[1] + i for e in range(2) for i in range(3)]]
+        return lab_runtime().state_0.particle_q.numpy()[[e * main.placement[1] + i for e in range(2) for i in range(3)]]
 
     before = host_rows()
     shared = rollout(env)
@@ -1055,7 +1090,7 @@ def test_rigid_bodies_step_beside_i4h(make_env):
     pendulum in every world swings, and i4h's observations equal a run without it."""
     pytest.importorskip("mujoco_warp")
     from isaaclab_newton.cloner import newton_builder_world_hook
-    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+    from isaaclab_newton.physics import MJWarpSolverCfg
 
     def host_pendulum(builder, env, _position, _quaternion):
         link = builder.add_link(xform=wp.transform((0.0, 2.0, 1.0), wp.quat_identity()), mass=1.0)
@@ -1076,11 +1111,11 @@ def test_rigid_bodies_step_beside_i4h(make_env):
     with newton_builder_world_hook(host_pendulum):  # the host env first: closing an env clears Lab's world hooks
         env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg())
     u = env.unwrapped
-    assert u.simulator.coupled is not None and NewtonManager._solver is u.simulator.coupled
-    state = NewtonManager.get_state_0()
+    assert u.simulator.coupled is not None and lab_runtime().solver is u.simulator.coupled
+    state = lab_runtime().state_0
     state.joint_q.assign(np.full(state.joint_q.shape[0], 0.5, np.float32))  # tilt the pendulums
     shared = rollout(env)
-    assert NewtonManager._graph is not None, "Lab captured the coupled step"
+    assert lab_runtime().graph is not None, "Lab captured the coupled step"
     body_q = state.body_q.numpy()
     assert np.isfinite(body_q).all() and not np.allclose(body_q[:, 2], 1.0), "the pendulums swing"
     alone = rollout(make_env(stagger_episodes=False))
@@ -1106,7 +1141,7 @@ def test_mounted_probe_two_way_under_lab(make_env):
     the probe follows the holder in the component frame and the block pushes the holder back down (two_way)."""
     pytest.importorskip("mujoco_warp")
     from isaaclab_newton.cloner import newton_builder_world_hook
-    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+    from isaaclab_newton.physics import MJWarpSolverCfg
 
     def rollout(mode):
         with newton_builder_world_hook(probe_holder):
@@ -1118,10 +1153,10 @@ def test_mounted_probe_two_way_under_lab(make_env):
             env.step(a)
         torch.cuda.synchronize()
         u = env.unwrapped
-        assert NewtonManager._graph is not None
+        assert lab_runtime().graph is not None
         ic = next(s for s in u.simulator.systems if type(s).__name__ == "InstrumentControl")
         mounts = u.simulator.coupled.mounts.groups[0]
-        result = ic.root.numpy()[:, 0].copy(), NewtonManager.get_state_0().body_q.numpy()[mounts.body.numpy()[:, 0]].copy()
+        result = ic.root.numpy()[:, 0].copy(), lab_runtime().state_0.body_q.numpy()[mounts.body.numpy()[:, 0]].copy()
         env.close()  # here, not inside the next hook context: closing clears Lab's world hooks
         return result
 
@@ -1134,10 +1169,9 @@ def test_mounted_probe_two_way_under_lab(make_env):
     assert np.isfinite(body_two).all()
 
 
-
 @pytest.mark.parametrize("backend", ["newton"])
 def test_physics_reset_clears_the_selected_worlds_pending_reactions(make_env):
-    """A masked physics reset (the captured reset graph) clears the reset worlds' queued two_way reactions, so a new
+    """A masked hosted episode reset clears the reset worlds' queued two_way reactions, so a new
     episode does not push its holder with the last episode's contact; other worlds keep theirs."""
     pytest.importorskip("mujoco_warp")
     from isaaclab_newton.cloner import newton_builder_world_hook
@@ -1150,7 +1184,7 @@ def test_physics_reset_clears_the_selected_worlds_pending_reactions(make_env):
     for _ in range(60):
         env.step(torch.zeros((2, 10), device=env.device))
     sim = env.unwrapped.simulator
-    assert sim.reset_graph is not None, "the captured reset path"
+    assert not hasattr(sim, "step") and not hasattr(sim, "reset_graph"), "Lab owns stepping and capture"
     group = sim.coupled.mounts.groups[0]
     torch.cuda.synchronize()
     before = group.force.numpy()[:, 0].copy()
@@ -1163,61 +1197,76 @@ def test_physics_reset_clears_the_selected_worlds_pending_reactions(make_env):
 
 
 @pytest.mark.parametrize("backend", ["newton"])
-def test_host_contact_sensor_works_in_the_coupled_step(make_env):
-    """A workflow robot's Newton contact sensor keeps working when i4h is added: the coupled solver forwards
-    update_contacts to MuJoCo-Warp and the manager allocates the solver's contact buffer (MuJoCo's own contacts)."""
-    pytest.importorskip("mujoco_warp")
+def test_mount_owned_host_rebuild_commands_and_close(make_env):
+    from i4h_isaaclab.component import I4hComponent, I4hComponentCfg
     from isaaclab_newton.cloner import newton_builder_world_hook
-    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+    from isaaclab_newton.physics import MJWarpSolverCfg
 
-    def ball_on_floor(builder, env, position, quaternion):
-        frame = wp.transform(wp.vec3(*map(float, position)), wp.quat(*map(float, quaternion)))
-        builder.add_shape_box(-1, xform=frame * wp.transform((0.0, 2.0, 0.0), wp.quat_identity()), hx=0.5, hy=0.5, hz=0.05,
-                              label="floor")
-        ball = builder.add_body(xform=frame * wp.transform((0.0, 2.0, 0.2), wp.quat_identity()), mass=1.0, label="ball")
-        builder.add_shape_sphere(ball, radius=0.1, label="ball_shape")
-
-    with newton_builder_world_hook(ball_on_floor):
-        env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg())
-    from i4h_isaaclab.newton_manager import I4hNewtonManager
-
-    # A workflow's ContactSensor registers while its scene is built, before the solver exists; the active manager's
-    # _initialize_contacts then allocates the buffer after _build_solver. Here the env is built already: same order.
-    NewtonManager.add_contact_sensor(body_names_expr=".*ball")
-    I4hNewtonManager._initialize_contacts()
-    NewtonManager._invalidate_graph()  # recaptured with the sensor
-    assert NewtonManager._contacts is not None and NewtonManager._contacts.force is not None
-    env.reset()
-    for _ in range(30):
+    component = I4hComponent(I4hComponentCfg(assets={}, systems=[]))
+    with newton_builder_world_hook(probe_holder):
+        env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg(), coupling_mode="two_way",
+                       mounts={"probe": {"body": "holder"}})
+        env.reset()
+        u = env.unwrapped
+        previous = u.simulator
+        component.sim = previous
+        commands = component.command_views("instrument_control")
+        assert set(commands) == {"actions", "position", "quaternion", "grip", "energy", "fire"}
+        group = previous.coupled.mounts.groups[0]
+        pose_ptr, reaction_ptr = group.control.mount_pose.ptr, group.force.ptr
+        for _ in range(3):
+            env.step(torch.zeros((2, 10), device=env.device))
+        previous.prepare()
+        assert group.control.mount_pose.ptr == pose_ptr and group.force.ptr == reaction_ptr
+        u.sim.reset(soft=False)
+        with pytest.raises(RuntimeError, match="invalidated"):
+            component.command_views("instrument_control")
+        component.sim = u.simulator
+        rebuilt = component.command_views("instrument_control")
+        group = u.simulator.coupled.mounts.groups[0]
+        assert group.control.mount_pose.ptr != pose_ptr and group.force.ptr != reaction_ptr
+        assert rebuilt is not commands and rebuilt["actions"].data_ptr() != commands["actions"].data_ptr()
+        np.testing.assert_array_equal(group.control.mounted.numpy(), [1])
         env.step(torch.zeros((2, 10), device=env.device))
-    torch.cuda.synchronize()
-    sensor = next(iter(NewtonManager._newton_contact_sensors.values()))
-    force = sensor.total_force.numpy() if hasattr(sensor, "total_force") else None
-    assert int(NewtonManager._contacts.rigid_contact_count.numpy()[0]) > 0, "MuJoCo's contacts reach Lab's buffer"
-    if force is not None:
-        assert np.abs(force).max() > 1.0, "the ball's weight is reported"
+        owner = u.simulator._prepare.__self__
+        owner.cfg.mounts["probe"]["body"] = "changed"
+        before = group.force.numpy().copy(), group.control.mount_pose.numpy().copy()
+        with pytest.raises(RuntimeError, match="mount configuration changed"):
+            u.simulator.prepare()
+        np.testing.assert_array_equal(group.force.numpy(), before[0])
+        np.testing.assert_array_equal(group.control.mount_pose.numpy(), before[1])
+    env.close()
+    with pytest.raises(RuntimeError, match="invalidated"):
+        component.command_views("instrument_control")
 
 
 @pytest.mark.parametrize("backend", ["newton"])
-def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
+@pytest.mark.parametrize("captured", [False, True])
+def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env, captured):
     """A host resets or randomizes its holder (joint state) before the component's reset: the reset instrument
-    starts at the holder's new pose (forward kinematics and the mount read in the reset itself, captured too); a
+    starts at the holder's new pose (forward kinematics and the mount read by the hosted reset); a
     world that is not reset keeps its instrument."""
     pytest.importorskip("mujoco_warp")
     from isaaclab_newton.cloner import newton_builder_world_hook
-    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonManager
+    from isaaclab_newton.physics import MJWarpSolverCfg
 
     with newton_builder_world_hook(probe_holder):
-        env = make_env(stagger_episodes=False, rigid_solver_cfg=MJWarpSolverCfg(), mounts={"probe": {"body": "holder"}})
+        sim_cfg = lab_sim((0.0, 0.0, -9.81))
+        sim_cfg.physics.use_cuda_graph = captured
+        env = make_env(stagger_episodes=False, sim=sim_cfg, rigid_solver_cfg=MJWarpSolverCfg(),
+                       mounts={"probe": {"body": "holder"}})
     env.reset()
     for _ in range(10):
         env.step(torch.zeros((2, 10), device=env.device))
     sim = env.unwrapped.simulator
-    assert sim.reset_graph is not None
+    assert sim.prepared and sim.runtime is sim.coupled
+    assert sim.state is sim.solver.state
+    if captured:
+        assert lab_runtime().graph is not None
     ic = next(s for s in sim.systems if type(s).__name__ == "InstrumentControl")
     torch.cuda.synchronize()
     before = ic.root.numpy()[:, 0].copy()
-    state = NewtonManager.get_state_0()
+    state = sim.state
     q = state.joint_q.numpy()
     q[0] = q[0] - 0.04  # the host lowers world 0's holder on its slide (joint coordinates)
     state.joint_q.assign(q)
@@ -1226,3 +1275,53 @@ def test_physics_reset_reads_the_mount_pose_the_host_just_set(make_env):
     after = ic.root.numpy()[:, 0]
     np.testing.assert_allclose(after[0, 2], before[0, 2] - 0.04, atol=1e-4)  # the reset world reads the new pose
     np.testing.assert_array_equal(after[1], before[1])  # the other world keeps its instrument
+
+
+def test_adapter_without_assessment_or_standalone():
+    """The Isaac Lab adapter without the [apps] extra or i4h-standalone: its modules import, physics cases build and
+    step on both backends, and a procedure case asks for the extra."""
+    import os
+    import subprocess
+    import sys
+    import textwrap
+
+    from helpers import VESSELS
+
+    vessels = bool(os.environ.get("I4H_DATA")) or (VESSELS / "AortaWithVesselsStatic.usdc").is_file()  # as needs_vessels
+
+    script = textwrap.dedent(f"""
+        import importlib, sys
+        class Block:
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname.split(".")[0] in ("i4h_assessment", "i4h_standalone", "i4h_isaaclab_standalone"):
+                    raise ModuleNotFoundError(fullname, name=fullname)
+        sys.meta_path.insert(0, Block())
+        import torch
+        for name in ("newton_manager", "views", "env", "tasks", "recording", "lab"):
+            importlib.import_module("i4h_isaaclab." + name)
+        importlib.import_module("i4h_host.composition")
+        from i4h_isaaclab.env import I4hEnv, I4hEnvCfg
+        from isaaclab.scene import InteractiveSceneCfg
+        from isaaclab.sim import SimulationContext
+        cases = ["two_worlds"] + (["aorta_static"] if {vessels!r} else [])
+        for case in cases:
+            for backend in ("newton",):
+                cfg = I4hEnvCfg(case=case, backend=backend, stagger_episodes=False)
+                cfg.scene = InteractiveSceneCfg(num_envs=2, env_spacing=1.0)
+                env = I4hEnv(cfg)
+                env.reset()
+                for _ in range(3):
+                    obs, *_ = env.step(torch.zeros((2, env.low.numel()), device=env.device))
+                assert env.procedure is None and torch.isfinite(obs["policy"]).all()
+                env.close()
+                SimulationContext.clear_instance()
+        try:
+            I4hEnv(I4hEnvCfg(case="chole_grasp"))
+        except ModuleNotFoundError as error:
+            assert error.name == "i4h_assessment" and "i4h-host[assessment]" in str(error), error
+        else:
+            raise AssertionError("a procedure case built without i4h-assessment")
+        print("adapter ok", cases)
+    """)
+    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert out.returncode == 0 and "adapter ok" in out.stdout, out.stderr[-3000:]

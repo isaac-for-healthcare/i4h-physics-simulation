@@ -6,7 +6,7 @@
 import numpy as np
 import pytest
 from helpers import CHOLE, find, kill, needs_chole
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics import Scene
 from i4h_physics.scene import ACTIVE_INT
 from i4h_physics.systems.mechanics.tet import Tet

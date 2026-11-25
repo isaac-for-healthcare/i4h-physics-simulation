@@ -16,6 +16,10 @@ if ! git -C "$ROOT" rev-parse -q --verify "$REF^{commit}" >/dev/null; then
     echo "  git fetch --no-recurse-submodules origin tag $REF" >&2
     exit 1
 fi
+if ! git -C "$ROOT" cat-file -e "$REF:physics_simulation/endoluminal/catheter-vasculature-solver"; then
+    echo "setup_reference.sh: $REF has no catheter-vasculature-solver reference source" >&2
+    exit 1
+fi
 mkdir -p "$DIR/src"
 git -C "$ROOT" archive "$REF" physics_simulation/endoluminal/catheter-vasculature-solver | tar -x -C "$DIR/src"
 uv venv -q --python 3.12 "$DIR/venv"

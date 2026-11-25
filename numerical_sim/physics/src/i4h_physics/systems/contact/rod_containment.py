@@ -61,6 +61,10 @@ class RodContainment(System):
 
     structural = System.structural + ("search", "iterations", "cap_open_ends", "keep_open")
 
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"depth": [(0,)]}
+
     def __post_init__(self):
         scene = self.scene
         self.body = b = scene.body(self.body)

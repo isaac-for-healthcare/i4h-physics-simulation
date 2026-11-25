@@ -1,0 +1,677 @@
+kind,device,distance_from_tip_m,flexural_modulus_Pa
+catheter,Cordis Angiographic 4 Fr,0.0,485512346.0
+catheter,Cordis Angiographic 4 Fr,0.01,452344332.0
+catheter,Cordis Angiographic 4 Fr,0.02,496474170.99999994
+catheter,Cordis Angiographic 4 Fr,0.03,448135914.99999994
+catheter,Cordis Angiographic 4 Fr,0.04,478347324.99999994
+catheter,Cordis Angiographic 4 Fr,0.05,469283902.00000006
+catheter,Cordis Angiographic 4 Fr,0.06,823764445.9999999
+catheter,Cordis Angiographic 4 Fr,0.07,1399795330.0
+catheter,Cordis Angiographic 4 Fr,0.08,1416915128.9999998
+catheter,Cordis Angiographic 4 Fr,0.09,1386703718.9999998
+catheter,Cordis Angiographic 4 Fr,0.1,1444105397.9999998
+catheter,Cordis Angiographic 4 Fr,0.11,1535746675.0
+catheter,Cordis Angiographic 4 Fr,0.12,1435041974.9999998
+catheter,Cordis Angiographic 4 Fr,0.13,1460218149.9999998
+catheter,Cordis Angiographic 4 Fr,0.14,1478344996.0000002
+catheter,Cordis Angiographic 4 Fr,0.15,1448133586.0
+catheter,Cordis Angiographic 4 Fr,0.17,1390731907.0
+catheter,Cordis Angiographic 4 Fr,0.19,1503521170.9999998
+catheter,Cordis Angiographic 4 Fr,0.21,1510570499.9999998
+catheter,Cordis Angiographic 4 Fr,0.23,1404830565.0
+catheter,Cordis Angiographic 4 Fr,0.25,1387710765.9999998
+catheter,Cordis Angiographic 4 Fr,0.27,1380661436.9999998
+catheter,Cordis Angiographic 4 Fr,0.29,1400802377.0
+catheter,Cordis Angiographic 4 Fr,0.31,1489422513.0
+catheter,Cordis Angiographic 4 Fr,0.33,1500500030.0
+catheter,Cordis Angiographic 4 Fr,0.35000000000000003,1411879894.0
+catheter,Cordis Angiographic 4 Fr,0.39,1473309761.0
+catheter,Cordis Angiographic 4 Fr,0.43,1466260432.0
+catheter,Cordis Angiographic 4 Fr,0.47000000000000003,1462232243.9999998
+catheter,Cordis Angiographic 4 Fr,0.51,1364548685.0
+catheter,Cordis Angiographic 4 Fr,0.55,1333330228.0
+catheter,Cordis Angiographic 4 Fr,0.59,1325273851.9999998
+catheter,Cordis Angiographic 4 Fr,0.63,1482373183.9999998
+catheter,Cordis Angiographic 4 Fr,0.67,1357499356.0
+catheter,Cordis Angiographic 4 Fr,0.71,1352464121.0
+catheter,Cordis Angiographic 4 Fr,0.75,1311175193.9999998
+catheter,Cordis Angiographic 4 Fr,0.79,1211477541.0
+catheter,Terumo Straight 5 Fr,0.0,204567000.0
+catheter,Terumo Straight 5 Fr,0.01,194537000.0
+catheter,Terumo Straight 5 Fr,0.02,204568000.0
+catheter,Terumo Straight 5 Fr,0.03,191827999.99999997
+catheter,Terumo Straight 5 Fr,0.04,191100000.0
+catheter,Terumo Straight 5 Fr,0.05,199108000.0
+catheter,Terumo Straight 5 Fr,0.06,192192000.0
+catheter,Terumo Straight 5 Fr,0.07,193648000.0
+catheter,Terumo Straight 5 Fr,0.08,196196000.00000003
+catheter,Terumo Straight 5 Fr,0.09,213668000.0
+catheter,Terumo Straight 5 Fr,0.1,228956000.0
+catheter,Terumo Straight 5 Fr,0.11,226772000.0
+catheter,Terumo Straight 5 Fr,0.12,213668000.0
+catheter,Terumo Straight 5 Fr,0.13,215488000.0
+catheter,Terumo Straight 5 Fr,0.14,216216000.00000003
+catheter,Terumo Straight 5 Fr,0.15,199472000.0
+catheter,Terumo Straight 5 Fr,0.17,231868000.00000003
+catheter,Terumo Straight 5 Fr,0.19,238784000.00000003
+catheter,Terumo Straight 5 Fr,0.21,234416000.0
+catheter,Terumo Straight 5 Fr,0.23,229320000.0
+catheter,Terumo Straight 5 Fr,0.25,222040000.0
+catheter,Terumo Straight 5 Fr,0.27,227864000.0
+catheter,Terumo Straight 5 Fr,0.29,214759999.99999997
+catheter,Terumo Straight 5 Fr,0.31,228228000.0
+catheter,Terumo Straight 5 Fr,0.33,237692000.0
+catheter,Terumo Straight 5 Fr,0.35000000000000003,238056000.00000003
+catheter,Terumo Straight 5 Fr,0.39,271180000.00000006
+catheter,Terumo Straight 5 Fr,0.43,247156000.0
+catheter,Terumo Straight 5 Fr,0.47000000000000003,245336000.00000003
+catheter,Terumo Straight 5 Fr,0.51,234051999.99999997
+catheter,Terumo Straight 5 Fr,0.55,234051999.99999997
+catheter,Terumo Straight 5 Fr,0.59,217672000.0
+catheter,Terumo Straight 5 Fr,0.63,219128000.0
+catheter,Terumo Straight 5 Fr,0.67,251888000.0
+catheter,Terumo Straight 5 Fr,0.71,250432000.0
+catheter,Terumo Straight 5 Fr,0.75,223132000.0
+catheter,Terumo Straight 5 Fr,0.79,213668000.0
+catheter,Terumo Straight 5 Fr,0.8300000000000001,255527999.99999997
+catheter,Terumo Straight 5 Fr,0.87,232960000.0
+catheter,Terumo Straight 5 Fr,0.91,155063999.99999997
+catheter,Terumo Straight 5 Fr,0.9500000000000001,174720000.0
+catheter,Terumo Straight 5 Fr,0.99,182364000.0
+catheter,Terumo Straight 5 Fr,1.03,225680000.00000003
+catheter,Terumo Straight 5 Fr,1.07,223496000.0
+catheter,Cook Royal Flush 5 Fr,0.0,658345000.0
+catheter,Cook Royal Flush 5 Fr,0.01,657856000.0
+catheter,Cook Royal Flush 5 Fr,0.02,774956000.0
+catheter,Cook Royal Flush 5 Fr,0.03,876148000.0
+catheter,Cook Royal Flush 5 Fr,0.04,938027999.9999999
+catheter,Cook Royal Flush 5 Fr,0.05,927472000.0000001
+catheter,Cook Royal Flush 5 Fr,0.06,927836000.0
+catheter,Cook Royal Flush 5 Fr,0.07,930020000.0
+catheter,Cook Royal Flush 5 Fr,0.08,945308000.0
+catheter,Cook Royal Flush 5 Fr,0.09,933296000.0
+catheter,Cook Royal Flush 5 Fr,0.1,945672000.0
+catheter,Cook Royal Flush 5 Fr,0.11,950040000.0000001
+catheter,Cook Royal Flush 5 Fr,0.12,942396000.0000001
+catheter,Cook Royal Flush 5 Fr,0.13,924924000.0
+catheter,Cook Royal Flush 5 Fr,0.14,906724000.0
+catheter,Cook Royal Flush 5 Fr,0.15,919100000.0
+catheter,Cook Royal Flush 5 Fr,0.17,897260000.0
+catheter,Cook Royal Flush 5 Fr,0.19,891799999.9999999
+catheter,Cook Royal Flush 5 Fr,0.21,916187999.9999999
+catheter,Cook Royal Flush 5 Fr,0.23,930384000.0
+catheter,Cook Royal Flush 5 Fr,0.25,938391999.9999999
+catheter,Cook Royal Flush 5 Fr,0.27,957684000.0
+catheter,Cook Royal Flush 5 Fr,0.29,927836000.0
+catheter,Cook Royal Flush 5 Fr,0.31,952588000.0
+catheter,Cook Royal Flush 5 Fr,0.33,991172000.0
+catheter,Cook Royal Flush 5 Fr,0.35000000000000003,933296000.0
+catheter,Cook Royal Flush 5 Fr,0.39,931112000.0
+catheter,Cook Royal Flush 5 Fr,0.43,944944000.0
+catheter,Cook Royal Flush 5 Fr,0.47000000000000003,937664000.0
+catheter,Cook Royal Flush 5 Fr,0.51,979888000.0
+catheter,Cook Royal Flush 5 Fr,0.55,985348000.0
+catheter,Cook Royal Flush 5 Fr,0.59,984620000.0000001
+catheter,Cook Royal Flush 5 Fr,0.63,956591999.9999999
+catheter,Cook Royal Flush 5 Fr,0.67,920556000.0
+catheter,Cook Royal Flush 5 Fr,0.71,855399999.9999999
+catheter,Cook Royal Flush 5 Fr,0.75,863772000.0000001
+catheter,Cook Royal Flush 5 Fr,0.79,864864000.0000001
+catheter,Cook Royal Flush 5 Fr,0.8300000000000001,884520000.0
+catheter,Cook Royal Flush 5 Fr,0.87,904904000.0
+catheter,Terumo Straight 4 Fr,0.0,373122345.0
+catheter,Terumo Straight 4 Fr,0.01,374456783.0
+catheter,Terumo Straight 4 Fr,0.02,372412890.0
+catheter,Terumo Straight 4 Fr,0.03,378849656.0
+catheter,Terumo Straight 4 Fr,0.04,373332427.99999994
+catheter,Terumo Straight 4 Fr,0.05,376091042.0
+catheter,Terumo Straight 4 Fr,0.06,388964573.9999999
+catheter,Terumo Straight 4 Fr,0.07,364137048.0
+catheter,Terumo Straight 4 Fr,0.08,353102591.99999994
+catheter,Terumo Straight 4 Fr,0.09,354022129.99999994
+catheter,Terumo Straight 4 Fr,0.1,351263515.99999994
+catheter,Terumo Straight 4 Fr,0.11,357700282.0
+catheter,Terumo Straight 4 Fr,0.12,357700282.0
+catheter,Terumo Straight 4 Fr,0.13,351263515.99999994
+catheter,Terumo Straight 4 Fr,0.14,384366883.9999999
+catheter,Terumo Straight 4 Fr,0.15,710802873.9999999
+catheter,Terumo Straight 4 Fr,0.17,641837523.9999999
+catheter,Terumo Straight 4 Fr,0.19,768733767.9999998
+catheter,Terumo Straight 4 Fr,0.21,740228090.0
+catheter,Terumo Straight 4 Fr,0.23,600458313.9999999
+catheter,Terumo Straight 4 Fr,0.25,600458313.9999999
+catheter,Terumo Straight 4 Fr,0.27,638159372.0
+catheter,Terumo Straight 4 Fr,0.29,684136271.9999999
+catheter,Terumo Straight 4 Fr,0.31,678619044.0000001
+catheter,Terumo Straight 4 Fr,0.33,645515676.0
+catheter,Terumo Straight 4 Fr,0.35000000000000003,695170727.9999999
+catheter,Terumo Straight 4 Fr,0.39,594941086.0
+catheter,Terumo Straight 4 Fr,0.43,599538775.9999999
+catheter,Terumo Straight 4 Fr,0.47000000000000003,705285645.9999999
+catheter,Terumo Straight 4 Fr,0.51,605975541.9999999
+catheter,Terumo Straight 4 Fr,0.55,621607688.0
+catheter,Terumo Straight 4 Fr,0.59,649193827.9999999
+catheter,Terumo Straight 4 Fr,0.63,735630399.9999999
+catheter,Terumo Straight 4 Fr,0.67,594021548.0
+catheter,Terumo Straight 4 Fr,0.71,656550132.0
+catheter,Terumo Straight 4 Fr,0.75,650113365.9999999
+catheter,Terumo Straight 4 Fr,0.79,636320295.9999999
+catheter,Terumo Straight 4 Fr,0.8300000000000001,662067359.9999999
+catheter,Terumo Straight 4 Fr,0.87,667584588.0
+catheter,Terumo Straight 4 Fr,0.91,566435407.9999999
+catheter,Terumo Straight 4 Fr,0.9500000000000001,620688150.0
+catheter,Terumo Straight 4 Fr,0.99,537929730.0
+guidewire,Cook Straight,0.0,193936000.0
+guidewire,Cook Straight,0.01,208896000.0
+guidewire,Cook Straight,0.02,204271999.99999997
+guidewire,Cook Straight,0.03,494926250.0
+guidewire,Cook Straight,0.04,813637000.0
+guidewire,Cook Straight,0.05,1446707500.0
+guidewire,Cook Straight,0.06,2109147250.0
+guidewire,Cook Straight,0.07,2919520999.9999995
+guidewire,Cook Straight,0.08,3948532500.0
+guidewire,Cook Straight,0.09,5104810749.999999
+guidewire,Cook Straight,0.1,6293721500.0
+guidewire,Cook Straight,0.11,7569652250.0
+guidewire,Cook Straight,0.12,8209249249.999999
+guidewire,Cook Straight,0.13,8375674999.999999
+guidewire,Cook Straight,0.14,8226653249.999998
+guidewire,Cook Straight,0.15,8301708000.0
+guidewire,Cook Straight,0.16,8311497749.999999
+guidewire,Cook Straight,0.17,8288654999.999998
+guidewire,Cook Straight,0.18,8294093750.0
+guidewire,Cook Straight,0.19,8133106750.0
+guidewire,Cook Straight,0.2,8088508999.999998
+guidewire,Cook Straight,0.21,8049350000.0
+guidewire,Cook Straight,0.22,8302795750.0
+guidewire,Cook Straight,0.23,8192933000.0
+guidewire,Cook Straight,0.24,8293006000.0
+guidewire,Cook Straight,0.25,8407219749.999999
+guidewire,Cook Straight,0.26,8362622000.0
+guidewire,Cook Straight,0.27,8432237999.999998
+guidewire,Cook Straight,0.28,8707438750.0
+guidewire,Cook Straight,0.29,9058782000.0
+guidewire,Cook Straight,0.3,8958708999.999998
+guidewire,Cook Straight,0.31,9159942750.0
+guidewire,Cook Straight,0.32,9141451000.0
+guidewire,Cook Straight,0.33,8969586500.0
+guidewire,Cook Straight,0.34,9015272000.0
+guidewire,Cook Straight,0.35000000000000003,8981551750.0
+guidewire,Cook Straight,0.36,9206716000.0
+guidewire,Cook Straight,0.37,9003306750.0
+guidewire,Cook Straight,0.38,9032675999.999998
+guidewire,Cook Straight,0.39,9126222500.0
+guidewire,Cook Straight,0.4,8981551750.000002
+guidewire,Cook Straight,0.42,8784669000.0
+guidewire,Cook Straight,0.44,9078361500.0
+guidewire,Cook Straight,0.46,9069659500.0
+guidewire,Cook Straight,0.48,8901058249.999998
+guidewire,Cook Straight,0.5,9057694250.0
+guidewire,Cook Straight,0.52,8832530000.0
+guidewire,Cook Straight,0.54,8799897500.0
+guidewire,Cook Straight,0.56,8840144250.0
+guidewire,Cook Straight,0.58,8793371000.0
+guidewire,Cook Straight,0.6,8656314500.0
+guidewire,Cook Straight,0.65,8862987000.0
+guidewire,Cook Straight,0.7000000000000001,8989166000.0
+guidewire,Cook Straight,0.75,9119696000.0
+guidewire,Cook Straight,0.8,9114257250.0
+guidewire,Cook Straight,0.85,9215418000.0
+guidewire,Cook Straight,0.9,9211067000.000002
+guidewire,Cook Straight,0.9500000000000001,9208891500.0
+guidewire,Cook Straight,1.0,9129485750.0
+guidewire,Cook Straight,1.05,9207803750.0
+guidewire,Cook Straight,1.1,9112081750.0
+guidewire,Cook Straight,1.1500000000000001,9120783750.0
+guidewire,Cook Straight,1.2,9292648250.0
+guidewire,Cook Straight,1.25,8072192749.999999
+guidewire,Cook Straight,1.3,8320199750.0
+guidewire,Cook Straight,1.35,8312585500.000001
+guidewire,Cook Straight,1.4000000000000001,8555153750.000001
+guidewire,Cook Safe-T-J Curved,0.0,103334539.99999999
+guidewire,Cook Safe-T-J Curved,0.01,171861656.0
+guidewire,Cook Safe-T-J Curved,0.02,459022904.0
+guidewire,Cook Safe-T-J Curved,0.03,735319000.0
+guidewire,Cook Safe-T-J Curved,0.04,1700153249.9999998
+guidewire,Cook Safe-T-J Curved,0.05,2274485250.0
+guidewire,Cook Safe-T-J Curved,0.06,3026120500.0
+guidewire,Cook Safe-T-J Curved,0.07,4124747999.9999995
+guidewire,Cook Safe-T-J Curved,0.08,5303869000.0
+guidewire,Cook Safe-T-J Curved,0.09,6330704999.999999
+guidewire,Cook Safe-T-J Curved,0.1,7699094499.999999
+guidewire,Cook Safe-T-J Curved,0.11,8025419499.999998
+guidewire,Cook Safe-T-J Curved,0.12,8092860000.0
+guidewire,Cook Safe-T-J Curved,0.13,8117878249.999999
+guidewire,Cook Safe-T-J Curved,0.14,8136369999.999999
+guidewire,Cook Safe-T-J Curved,0.15,8084157999.999999
+guidewire,Cook Safe-T-J Curved,0.16,8149422999.999999
+guidewire,Cook Safe-T-J Curved,0.17,8164651500.0
+guidewire,Cook Safe-T-J Curved,0.18,8056964249.999998
+guidewire,Cook Safe-T-J Curved,0.19,7882924249.999998
+guidewire,Cook Safe-T-J Curved,0.2,7838326500.000001
+guidewire,Cook Safe-T-J Curved,0.21,7841589750.0
+guidewire,Cook Safe-T-J Curved,0.22,7866608000.0
+guidewire,Cook Safe-T-J Curved,0.23,7988435999.999999
+guidewire,Cook Safe-T-J Curved,0.24,7973207499.999999
+guidewire,Cook Safe-T-J Curved,0.25,8044999000.000001
+guidewire,Cook Safe-T-J Curved,0.26,8277777499.999999
+guidewire,Cook Safe-T-J Curved,0.27,8408307499.999999
+guidewire,Cook Safe-T-J Curved,0.28,8750948750.0
+guidewire,Cook Safe-T-J Curved,0.29,8970674250.0
+guidewire,Cook Safe-T-J Curved,0.3,8918462250.0
+guidewire,Cook Safe-T-J Curved,0.31,9018535250.000002
+guidewire,Cook Safe-T-J Curved,0.32,8741159000.0
+guidewire,Cook Safe-T-J Curved,0.33,8914111250.0
+guidewire,Cook Safe-T-J Curved,0.34,8774879250.0
+guidewire,Cook Safe-T-J Curved,0.35000000000000003,8699824500.0
+guidewire,Cook Safe-T-J Curved,0.36,8872776750.0
+guidewire,Cook Safe-T-J Curved,0.37,8947831500.0
+guidewire,Cook Safe-T-J Curved,0.38,8973937500.0
+guidewire,Cook Safe-T-J Curved,0.39,8877127750.0
+guidewire,Cook Safe-T-J Curved,0.4,8907584750.0
+guidewire,Cook Safe-T-J Curved,0.42,8665016500.0
+guidewire,Cook Safe-T-J Curved,0.44,9081624750.0
+guidewire,Cook Safe-T-J Curved,0.46,8916286750.0
+guidewire,Cook Safe-T-J Curved,0.48,8913023499.999998
+guidewire,Cook Safe-T-J Curved,0.5,8848846250.0
+guidewire,Cook Safe-T-J Curved,0.52,8823827999.999998
+guidewire,Cook Safe-T-J Curved,0.54,8806424000.0
+guidewire,Cook Safe-T-J Curved,0.56,8989166000.0
+guidewire,Cook Safe-T-J Curved,0.58,8526872249.999998
+guidewire,Cook Safe-T-J Curved,0.6,8584522999.999999
+guidewire,Cook Safe-T-J Curved,0.65,8495327499.999998
+guidewire,Cook Safe-T-J Curved,0.7000000000000001,8731369249.999998
+guidewire,Cook Safe-T-J Curved,0.75,8908672500.0
+guidewire,Cook Safe-T-J Curved,0.8,8756387500.0
+guidewire,Cook Safe-T-J Curved,0.85,8764001750.0
+guidewire,Cook Safe-T-J Curved,0.9,8897794999.999998
+guidewire,Cook Safe-T-J Curved,0.9500000000000001,9166469250.0
+guidewire,Cook Safe-T-J Curved,1.0,9033763750.0
+guidewire,Cook Safe-T-J Curved,1.05,8902146000.0
+guidewire,Cook Safe-T-J Curved,1.1,8938041750.0
+guidewire,Cook Safe-T-J Curved,1.1500000000000001,9107730750.0
+guidewire,Cook Safe-T-J Curved,1.2,8860811499.999998
+guidewire,Cook Safe-T-J Curved,1.25,8475747999.999998
+guidewire,Cook Safe-T-J Curved,1.3,8433325750.0
+guidewire,Cook Safe-T-J Curved,1.35,8462695000.0
+guidewire,Cook Safe-T-J Curved,1.4000000000000001,8645437000.000002
+guidewire,Cook Rosen Curved,0.0,206669079.99999997
+guidewire,Cook Rosen Curved,0.01,547129196.0
+guidewire,Cook Rosen Curved,0.02,1798020996.0
+guidewire,Cook Rosen Curved,0.03,2770499250.0000005
+guidewire,Cook Rosen Curved,0.04,5803146250.000001
+guidewire,Cook Rosen Curved,0.05,9649430250.0
+guidewire,Cook Rosen Curved,0.06,10969958749.999998
+guidewire,Cook Rosen Curved,0.07,11110278500.0
+guidewire,Cook Rosen Curved,0.08,11129857999.999998
+guidewire,Cook Rosen Curved,0.09,11190772000.0
+guidewire,Cook Rosen Curved,0.1,11098313249.999996
+guidewire,Cook Rosen Curved,0.11,10930799750.0
+guidewire,Cook Rosen Curved,0.12,10973221999.999998
+guidewire,Cook Rosen Curved,0.13,10991713749.999998
+guidewire,Cook Rosen Curved,0.14,10837253250.0
+guidewire,Cook Rosen Curved,0.15,10640370500.0
+guidewire,Cook Rosen Curved,0.16,10544648500.0
+guidewire,Cook Rosen Curved,0.17,10533771000.0
+guidewire,Cook Rosen Curved,0.18,10653423499.999998
+guidewire,Cook Rosen Curved,0.19,10745882249.999998
+guidewire,Cook Rosen Curved,0.2,10801357500.0
+guidewire,Cook Rosen Curved,0.21,10783953500.0
+guidewire,Cook Rosen Curved,0.22,10752408750.0
+guidewire,Cook Rosen Curved,0.23,10504401750.0
+guidewire,Cook Rosen Curved,0.24,10670827500.0
+guidewire,Cook Rosen Curved,0.25,10776339249.999998
+guidewire,Cook Rosen Curved,0.26,10843779749.999998
+guidewire,Cook Rosen Curved,0.27,10793743249.999998
+guidewire,Cook Rosen Curved,0.28,10928624250.0
+guidewire,Cook Rosen Curved,0.29,11071119500.0
+guidewire,Cook Rosen Curved,0.3,11176631249.999998
+guidewire,Cook Rosen Curved,0.31,11535588749.999998
+guidewire,Cook Rosen Curved,0.32,11668294249.999996
+guidewire,Cook Rosen Curved,0.33,11658504500.000002
+guidewire,Cook Rosen Curved,0.34,11611731249.999998
+guidewire,Cook Rosen Curved,0.35000000000000003,11911950249.999998
+guidewire,Cook Rosen Curved,0.36,12049006749.999998
+guidewire,Cook Rosen Curved,0.37,11975039749.999998
+guidewire,Cook Rosen Curved,0.38,11780332499.999998
+guidewire,Cook Rosen Curved,0.39,11633486250.0
+guidewire,Cook Rosen Curved,0.4,11798824249.999998
+guidewire,Cook Rosen Curved,0.42,11286494000.000002
+guidewire,Cook Rosen Curved,0.44,11484464500.0
+guidewire,Cook Rosen Curved,0.46,11775981500.000002
+guidewire,Cook Rosen Curved,0.48,11794473249.999998
+guidewire,Cook Rosen Curved,0.5,11626959750.0
+guidewire,Cook Rosen Curved,0.52,11700926749.999998
+guidewire,Cook Rosen Curved,0.54,11808613999.999998
+guidewire,Cook Rosen Curved,0.56,11288669500.0
+guidewire,Cook Rosen Curved,0.58,11463797250.0
+guidewire,Cook Rosen Curved,0.6,11448568750.0
+guidewire,Cook Rosen Curved,0.65,11169016999.999998
+guidewire,Cook Rosen Curved,0.7000000000000001,11353934500.0
+guidewire,Cook Rosen Curved,0.75,11399620000.0
+guidewire,Cook Rosen Curved,0.8,11237545249.999998
+guidewire,Cook Rosen Curved,0.85,11604116999.999998
+guidewire,Cook Rosen Curved,0.9,11696575750.0
+guidewire,Cook Rosen Curved,0.9500000000000001,11607380249.999998
+guidewire,Cook Rosen Curved,1.0,11546466250.0
+guidewire,Cook Rosen Curved,1.05,11504044000.0
+guidewire,Cook Rosen Curved,1.1,11554080500.0
+guidewire,Cook Rosen Curved,1.1500000000000001,11462709500.0
+guidewire,Cook Rosen Curved,1.2,11775981500.0
+guidewire,Cook Rosen Curved,1.25,11789034499.999998
+guidewire,Cook Rosen Curved,1.3,11717242999.999998
+guidewire,Cook Rosen Curved,1.35,11401795500.0
+guidewire,Cook Rosen Curved,1.4000000000000001,11498605249.999998
+guidewire,Cook Rosen Curved,1.45,12224134499.999998
+guidewire,Cook Rosen Curved,1.5,11960898999.999998
+guidewire,Cook Rosen Curved,1.55,11370250749.999998
+guidewire,Cook Rosen Curved,1.6,10932975249.999998
+guidewire,Cook Rosen Curved,1.6500000000000001,10867710249.999998
+guidewire,Cook Rosen Curved,1.7,11087435750.0
+guidewire,Cook Rosen Curved,1.75,11060241999.999998
+guidewire,Amplatz Super Stiff,0.0,79404436.00000001
+guidewire,Amplatz Super Stiff,0.01,122913715.99999999
+guidewire,Amplatz Super Stiff,0.02,115299592.0
+guidewire,Amplatz Super Stiff,0.03,125089180.0
+guidewire,Amplatz Super Stiff,0.04,144500000.0
+guidewire,Amplatz Super Stiff,0.05,205400000.0
+guidewire,Amplatz Super Stiff,0.06,266700000.0
+guidewire,Amplatz Super Stiff,0.07,534500000.0
+guidewire,Amplatz Super Stiff,0.08,1578900000.0
+guidewire,Amplatz Super Stiff,0.09,3159800000.0
+guidewire,Amplatz Super Stiff,0.1,5026492749.999999
+guidewire,Amplatz Super Stiff,0.11,8926076499.999998
+guidewire,Amplatz Super Stiff,0.12,16163964999.999998
+guidewire,Amplatz Super Stiff,0.13,27757204500.0
+guidewire,Amplatz Super Stiff,0.14,41159372250.0
+guidewire,Amplatz Super Stiff,0.15,51950939999.99999
+guidewire,Amplatz Super Stiff,0.16,57367934999.99999
+guidewire,Amplatz Super Stiff,0.17,59540171750.00001
+guidewire,Amplatz Super Stiff,0.18,60142785249.99999
+guidewire,Amplatz Super Stiff,0.19,59456415000.0
+guidewire,Amplatz Super Stiff,0.2,59478170000.0
+guidewire,Amplatz Super Stiff,0.21,59864321249.99999
+guidewire,Amplatz Super Stiff,0.22,64427432499.99999
+guidewire,Amplatz Super Stiff,0.23,63422351499.99999
+guidewire,Amplatz Super Stiff,0.24,62490149750.0
+guidewire,Amplatz Super Stiff,0.25,63158028250.0
+guidewire,Amplatz Super Stiff,0.26,62751209750.0
+guidewire,Amplatz Super Stiff,0.27,62192106249.999985
+guidewire,Amplatz Super Stiff,0.28,62542361750.00001
+guidewire,Amplatz Super Stiff,0.29,62164912499.99999
+guidewire,Amplatz Super Stiff,0.3,62045260000.00001
+guidewire,Amplatz Super Stiff,0.31,62264985499.99999
+guidewire,Amplatz Super Stiff,0.32,62436850000.0
+guidewire,Amplatz Super Stiff,0.33,62008276499.99999
+guidewire,Amplatz Super Stiff,0.34,62015890750.00001
+guidewire,Amplatz Super Stiff,0.35000000000000003,62084419000.00001
+guidewire,Amplatz Super Stiff,0.36,61819007999.99999
+guidewire,Amplatz Super Stiff,0.37,62022417250.0
+guidewire,Amplatz Super Stiff,0.38,62084419000.0
+guidewire,Amplatz Super Stiff,0.39,62107261749.99999
+guidewire,Amplatz Super Stiff,0.4,62374848250.0
+guidewire,Amplatz Super Stiff,0.42,63184134250.00001
+guidewire,Amplatz Super Stiff,0.44,64155494999.999985
+guidewire,Amplatz Super Stiff,0.46,64175074499.99999
+guidewire,Amplatz Super Stiff,0.48,65960072249.99999
+guidewire,Amplatz Super Stiff,0.5,64349114500.0
+guidewire,Amplatz Super Stiff,0.52,64584068500.0
+guidewire,Amplatz Super Stiff,0.54,64747231000.0
+guidewire,Amplatz Super Stiff,0.56,64330622749.99999
+guidewire,Amplatz Super Stiff,0.58,64734178000.0
+guidewire,Amplatz Super Stiff,0.6,64609086750.0
+guidewire,Amplatz Super Stiff,0.65,63652954499.99999
+guidewire,Amplatz Super Stiff,0.7000000000000001,63722570500.0
+guidewire,Amplatz Super Stiff,0.75,63880294249.999985
+guidewire,Amplatz Super Stiff,0.8,63902049250.00001
+guidewire,Amplatz Super Stiff,0.85,63537652999.99999
+guidewire,Amplatz Super Stiff,0.9,63478914499.99999
+guidewire,Amplatz Super Stiff,0.9500000000000001,63836784250.0
+guidewire,Amplatz Super Stiff,1.0,63480002249.99999
+guidewire,Amplatz Super Stiff,1.05,63312488749.999985
+guidewire,Amplatz Super Stiff,1.1,62308495499.99999
+guidewire,Amplatz Super Stiff,1.1500000000000001,62688120249.99999
+guidewire,Amplatz Super Stiff,1.2,62602188000.0
+guidewire,Amplatz Super Stiff,1.25,63211327999.99999
+guidewire,Amplatz Super Stiff,1.3,62974198500.0
+guidewire,Amplatz Super Stiff,1.35,63335331500.0
+guidewire,Amplatz Super Stiff,1.4000000000000001,63357086500.0
+guidewire,Amplatz Super Stiff,1.45,63158028249.999985
+guidewire,Amplatz Super Stiff,1.5,64057597500.0
+guidewire,Amplatz Super Stiff,1.55,63434316749.99999
+guidewire,Amplatz Super Stiff,1.6,63983630500.0
+guidewire,Amplatz Super Stiff,1.6500000000000001,63160203749.99999
+guidewire,Amplatz Super Stiff,1.7,62423796999.99999
+guidewire,Amplatz Super Stiff,1.75,62337864750.0
+guidewire,Amplatz Super Stiff,1.8,63239609499.99999
+guidewire,Amplatz Super Stiff,1.85,63026410500.0
+guidewire,Amplatz Super Stiff,1.9000000000000001,63359261999.99999
+guidewire,Amplatz Super Stiff,1.95,63421263750.0
+guidewire,Amplatz Super Stiff,2.0,63224381000.00001
+guidewire,Amplatz Super Stiff,2.05,63037288000.0
+guidewire,Amplatz Super Stiff,2.1,63115606000.0
+guidewire,Amplatz Super Stiff,2.15,63552881500.0
+guidewire,Amplatz Super Stiff,2.2,63774782500.0
+guidewire,Amplatz Super Stiff,2.25,62580432999.99999
+guidewire,Amplatz Super Stiff,2.3000000000000003,60350545500.0
+guidewire,Amplatz Super Stiff,2.35,59622840749.99999
+guidewire,Amplatz Super Stiff,2.4,59560839000.00001
+guidewire,Amplatz Super Stiff,2.45,59848004999.99999
+guidewire,Amplatz Super Stiff,2.5,60109064999.99999
+guidewire,Amplatz Super Stiff,2.5500000000000003,60105801750.00001
+guidewire,Bentson,0.0,60912991.99999999
+guidewire,Bentson,0.01,56562063.99999999
+guidewire,Bentson,0.02,55474332.0
+guidewire,Bentson,0.03,64180199.99999999
+guidewire,Bentson,0.04,72338699.99999999
+guidewire,Bentson,0.05,84848399.99999999
+guidewire,Bentson,0.06,98445900.0
+guidewire,Bentson,0.07,208313700.00000003
+guidewire,Bentson,0.08,258884500.00000003
+guidewire,Bentson,0.09,436187749.99999994
+guidewire,Bentson,0.1,657001000.0
+guidewire,Bentson,0.11,835391999.9999999
+guidewire,Bentson,0.12,1159541500.0
+guidewire,Bentson,0.13,1420601499.9999998
+guidewire,Bentson,0.14,1722996000.0
+guidewire,Bentson,0.15,2123287999.9999995
+guidewire,Bentson,0.16,2311468750.0
+guidewire,Bentson,0.17,2676952750.0000005
+guidewire,Bentson,0.18,3910461249.9999995
+guidewire,Bentson,0.19,5499664000.0
+guidewire,Bentson,0.2,6861527000.0
+guidewire,Bentson,0.21,7819834749.999998
+guidewire,Bentson,0.22,8558417000.0
+guidewire,Bentson,0.23,9493882000.0
+guidewire,Bentson,0.24,10294465999.999998
+guidewire,Bentson,0.25,10556613749.999998
+guidewire,Bentson,0.26,10577281000.0
+guidewire,Bentson,0.27,10506577250.0
+guidewire,Bentson,0.28,10503314000.0
+guidewire,Bentson,0.29,10357555499.999998
+guidewire,Bentson,0.3,10539209750.0
+guidewire,Bentson,0.31,10578368750.0
+guidewire,Bentson,0.32,10515279249.999998
+guidewire,Bentson,0.33,10396714500.0
+guidewire,Bentson,0.34,10562052500.0
+guidewire,Bentson,0.35000000000000003,10568579000.0
+guidewire,Bentson,0.36,10629493000.0
+guidewire,Bentson,0.37,10615352250.0
+guidewire,Bentson,0.38,10791567749.999998
+guidewire,Bentson,0.39,10773076000.0
+guidewire,Bentson,0.4,10785041250.0
+guidewire,Bentson,0.42,10752408749.999998
+guidewire,Bentson,0.44,10504401750.0
+guidewire,Bentson,0.46,10394539000.0
+guidewire,Bentson,0.48,10572930000.0
+guidewire,Bentson,0.5,10580544250.0
+guidewire,Bentson,0.52,10627317499.999998
+guidewire,Bentson,0.54,10527244500.0
+guidewire,Bentson,0.56,10534858749.999998
+guidewire,Bentson,0.58,10534858750.0
+guidewire,Bentson,0.6,10516366999.999998
+guidewire,Bentson,0.65,10542473000.0
+guidewire,Bentson,0.7000000000000001,10409767500.0
+guidewire,Bentson,0.75,10550087249.999998
+guidewire,Bentson,0.8,10624054250.0
+guidewire,Bentson,0.85,10831814500.0
+guidewire,Bentson,0.9,10828551249.999998
+guidewire,Bentson,0.9500000000000001,10838341000.0
+guidewire,Bentson,1.0,10814410500.0
+guidewire,Bentson,1.05,10795918750.0
+guidewire,Bentson,1.1,10990626000.0
+guidewire,Bentson,1.1500000000000001,10781778000.0
+guidewire,Bentson,1.2,10910132500.000002
+guidewire,Bentson,1.25,10864447000.0
+guidewire,Bentson,1.3,10308606750.0
+guidewire,Bentson,1.35,9979018499.999998
+guidewire,Bentson,1.4000000000000001,10111724000.0
+guidewire,Bentson,1.45,10083442499.999998
+guidewire,Terumo Angled,0.0,128352375.99999999
+guidewire,Terumo Angled,0.01,189265368.0
+guidewire,Terumo Angled,0.02,213195472.0
+guidewire,Terumo Angled,0.03,354728000.0
+guidewire,Terumo Angled,0.04,464469250.0
+guidewire,Terumo Angled,0.05,618929750.0
+guidewire,Terumo Angled,0.06,847357250.0
+guidewire,Terumo Angled,0.07,1089925499.9999998
+guidewire,Terumo Angled,0.08,1389056750.0
+guidewire,Terumo Angled,0.09,1697977750.0000002
+guidewire,Terumo Angled,0.1,2180938750.0
+guidewire,Terumo Angled,0.11,2646495750.0
+guidewire,Terumo Angled,0.12,3236056250.0
+guidewire,Terumo Angled,0.13,4171521249.9999995
+guidewire,Terumo Angled,0.14,4317279750.0
+guidewire,Terumo Angled,0.15,4418440500.0
+guidewire,Terumo Angled,0.16,4364053000.0
+guidewire,Terumo Angled,0.17,4348824500.0
+guidewire,Terumo Angled,0.18,4408650749.999999
+guidewire,Terumo Angled,0.19,4435844500.0
+guidewire,Terumo Angled,0.2,4393422250.0
+guidewire,Terumo Angled,0.21,4438020000.0
+guidewire,Terumo Angled,0.22,4380369250.0
+guidewire,Terumo Angled,0.23,4418440499.999999
+guidewire,Terumo Angled,0.24,4523952250.0
+guidewire,Terumo Angled,0.25,4438020000.0
+guidewire,Terumo Angled,0.26,4665359750.0
+guidewire,Terumo Angled,0.27,4488056500.0
+guidewire,Terumo Angled,0.28,4596831499.999999
+guidewire,Terumo Angled,0.29,4880734250.0
+guidewire,Terumo Angled,0.3,4968842000.0
+guidewire,Terumo Angled,0.31,4766520500.0
+guidewire,Terumo Angled,0.32,4915542250.0
+guidewire,Terumo Angled,0.33,4931858500.0
+guidewire,Terumo Angled,0.34,5010176500.0
+guidewire,Terumo Angled,0.35000000000000003,4768696000.0
+guidewire,Terumo Angled,0.36,4712133000.0
+guidewire,Terumo Angled,0.37,4832873250.0
+guidewire,Terumo Angled,0.38,4864418000.000001
+guidewire,Terumo Angled,0.39,4788275499.999999
+guidewire,Terumo Angled,0.4,4759994000.0
+guidewire,Terumo Angled,0.42,4778485750.0
+guidewire,Terumo Angled,0.44,4791538749.999999
+guidewire,Terumo Angled,0.46,4715396249.999999
+guidewire,Terumo Angled,0.48,4774134749.999999
+guidewire,Terumo Angled,0.5,4765432750.0
+guidewire,Terumo Angled,0.52,4780661250.0
+guidewire,Terumo Angled,0.54,4805679500.0
+guidewire,Terumo Angled,0.56,4737151250.0
+guidewire,Terumo Angled,0.58,4726273750.0
+guidewire,Terumo Angled,0.6,4740414500.0
+guidewire,Terumo Angled,0.65,4689290250.0
+guidewire,Terumo Angled,0.7000000000000001,4643604750.0
+guidewire,Terumo Angled,0.75,4671886250.0
+guidewire,Terumo Angled,0.8,4728449250.0
+guidewire,Terumo Angled,0.85,4765432750.0
+guidewire,Terumo Angled,0.9,4796977500.0
+guidewire,Terumo Angled,0.9500000000000001,4782836750.0
+guidewire,Terumo Angled,1.0,4770871499.999999
+guidewire,Terumo Angled,1.05,4745853250.0
+guidewire,Terumo Angled,1.1,4761081750.0
+guidewire,Terumo Angled,1.1500000000000001,4832873250.0
+guidewire,Terumo Angled,1.2,4724098250.0
+guidewire,Terumo Angled,1.25,4791538750.0
+guidewire,Terumo Angled,1.3,4843750750.0
+guidewire,Terumo Angled,1.35,4845926250.0
+guidewire,Terumo Angled,1.4000000000000001,4851364999.999999
+guidewire,Terumo Angled,1.45,4932946250.0
+guidewire,Terumo Angled,1.5,4969929750.0
+guidewire,Terumo Angled,1.55,4890524000.0
+guidewire,Terumo Angled,1.6,4577252000.0
+guidewire,Terumo Angled,1.6500000000000001,4432581249.999999
+guidewire,Terumo Angled,1.7,4515250249.999999
+guidewire,Terumo Angled,1.75,4591392750.0
+guidewire,Terumo Stiff Angled,0.0,125089180.0
+guidewire,Terumo Stiff Angled,0.01,149019284.0
+guidewire,Terumo Stiff Angled,0.02,237125576.0
+guidewire,Terumo Stiff Angled,0.03,246919250.0
+guidewire,Terumo Stiff Angled,0.04,318710750.0
+guidewire,Terumo Stiff Angled,0.05,491662999.99999994
+guidewire,Terumo Stiff Angled,0.06,751635249.9999999
+guidewire,Terumo Stiff Angled,0.07,1089925500.0
+guidewire,Terumo Stiff Angled,0.08,1484778750.0
+guidewire,Terumo Stiff Angled,0.09,2026478249.9999998
+guidewire,Terumo Stiff Angled,0.1,2664987499.9999995
+guidewire,Terumo Stiff Angled,0.11,3447079750.0
+guidewire,Terumo Stiff Angled,0.12,4455424000.0
+guidewire,Terumo Stiff Angled,0.13,5496400749.999999
+guidewire,Terumo Stiff Angled,0.14,6881106500.0
+guidewire,Terumo Stiff Angled,0.15,8780318000.0
+guidewire,Terumo Stiff Angled,0.16,10507665000.0
+guidewire,Terumo Stiff Angled,0.17,12699481250.0
+guidewire,Terumo Stiff Angled,0.18,15587457500.0
+guidewire,Terumo Stiff Angled,0.19,17699868000.000004
+guidewire,Terumo Stiff Angled,0.2,18774565000.0
+guidewire,Terumo Stiff Angled,0.21,19091100250.0
+guidewire,Terumo Stiff Angled,0.22,19070432999.999996
+guidewire,Terumo Stiff Angled,0.23,18888778750.0
+guidewire,Terumo Stiff Angled,0.24,18845268750.000004
+guidewire,Terumo Stiff Angled,0.25,19064994249.999996
+guidewire,Terumo Stiff Angled,0.26,18960570250.0
+guidewire,Terumo Stiff Angled,0.27,19045414750.0
+guidewire,Terumo Stiff Angled,0.28,19237946500.0
+guidewire,Terumo Stiff Angled,0.29,19115030750.0
+guidewire,Terumo Stiff Angled,0.3,19064994249.999996
+guidewire,Terumo Stiff Angled,0.31,19247736250.0
+guidewire,Terumo Stiff Angled,0.32,19414161999.999996
+guidewire,Terumo Stiff Angled,0.33,19196612000.0
+guidewire,Terumo Stiff Angled,0.34,19421776250.0
+guidewire,Terumo Stiff Angled,0.35000000000000003,19462023000.000004
+guidewire,Terumo Stiff Angled,0.36,19218366999.999996
+guidewire,Terumo Stiff Angled,0.37,19479426999.999996
+guidewire,Terumo Stiff Angled,0.38,19071520750.0
+guidewire,Terumo Stiff Angled,0.39,19279280999.999996
+guidewire,Terumo Stiff Angled,0.4,19499006500.0
+guidewire,Terumo Stiff Angled,0.42,19772031750.0
+guidewire,Terumo Stiff Angled,0.44,20038530500.0
+guidewire,Terumo Stiff Angled,0.46,19777470499.999996
+guidewire,Terumo Stiff Angled,0.48,20633529750.0
+guidewire,Terumo Stiff Angled,0.5,20359416750.0
+guidewire,Terumo Stiff Angled,0.52,20072250750.0
+guidewire,Terumo Stiff Angled,0.54,20351802499.999996
+guidewire,Terumo Stiff Angled,0.56,20376820750.0
+guidewire,Terumo Stiff Angled,0.58,20337661750.0
+guidewire,Terumo Stiff Angled,0.6,20451875499.999996
+guidewire,Terumo Stiff Angled,0.65,20365943250.0
+guidewire,Terumo Stiff Angled,0.7000000000000001,20127726000.0
+guidewire,Terumo Stiff Angled,0.75,20099444499.999996
+guidewire,Terumo Stiff Angled,0.8,19814454000.0
+guidewire,Terumo Stiff Angled,0.85,20326784250.0
+guidewire,Terumo Stiff Angled,0.9,20468191750.0
+guidewire,Terumo Stiff Angled,0.9500000000000001,20473630500.0
+guidewire,Terumo Stiff Angled,1.0,20259343749.999996
+guidewire,Terumo Stiff Angled,1.05,20576966749.999996
+guidewire,Terumo Stiff Angled,1.1,20537807750.0
+guidewire,Terumo Stiff Angled,1.1500000000000001,20236501000.0
+guidewire,Terumo Stiff Angled,1.2,20196254250.0
+guidewire,Terumo Stiff Angled,1.25,20103795500.0
+guidewire,Terumo Stiff Angled,1.3,19999371500.0
+guidewire,Terumo Stiff Angled,1.35,20351802499.999996
+guidewire,Terumo Stiff Angled,1.4000000000000001,20485595750.0
+guidewire,Terumo Stiff Angled,1.45,19823156000.0
+guidewire,Terumo Stiff Angled,1.5,19205314000.0
+guidewire,Terumo Stiff Angled,1.55,18764775249.999996
+guidewire,Terumo Stiff Angled,1.6,19136785750.0
+guidewire,Terumo Stiff Angled,1.6500000000000001,19416337500.0
+guidewire,Terumo Stiff Angled,1.7,19375003000.0
+guidewire,Terumo Stiff Angled,1.75,19198787500.0

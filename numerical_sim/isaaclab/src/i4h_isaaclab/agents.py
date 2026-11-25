@@ -50,6 +50,12 @@ def runner_dict(agent: I4hPPORunnerCfg) -> dict:
     """The runner's ``train_cfg`` dict for the installed rsl_rl: Isaac Lab's migration drops the deprecated model
     fields (``stochastic``, ``init_noise_std``, ...) that rsl_rl 5.x's ``MLPModel`` no longer accepts."""
     from importlib import metadata
+    from importlib.util import find_spec
+
+    if find_spec("isaaclab_rl.rsl_rl.utils") is None:
+        # Current Lab removed the migration shim together with the deprecated
+        # config fields. Its configs already match the RSL-RL 5.x schema.
+        return agent.to_dict()
 
     from isaaclab_rl.rsl_rl.utils import handle_deprecated_rsl_rl_cfg
 

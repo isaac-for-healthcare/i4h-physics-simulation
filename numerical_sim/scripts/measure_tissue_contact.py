@@ -18,7 +18,7 @@ import time
 def measure(envs, enabled, steps):
     import numpy as np
     import warp as wp
-    from i4h_isaaclab.composition import load_case
+    from i4h_host.composition import load_case
     from i4h_physics.systems.contact.part_contact import PartContact
 
     wp.init()

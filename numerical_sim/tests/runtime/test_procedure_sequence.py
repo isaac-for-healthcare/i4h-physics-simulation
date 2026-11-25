@@ -1,17 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import copy
 import os
 
 import numpy as np
 import pytest
 from assessment_host import AssessmentHost
-from i4h_isaaclab.composition import build_procedure
+from i4h_host.composition import build_procedure
 from test_procedures import rod_task
-
-# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
-
-
 
 
 def sequence(count=3, hold=0.1, timeout=1, device="cpu", graph=False):
@@ -172,6 +169,7 @@ def test_real_grasp_and_mixed_sequence(mixed):
     from i4h_physics import Scene, Stepper
     from i4h_physics.loaders import add_rod, add_tet_grid
     from i4h_physics.systems.mechanics.tet import Tet
+    from i4h_surgical.instrument_storage import declare_instruments
     from i4h_surgical.loaders.instrument_usd import add_instrument
     from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
     from i4h_surgical.systems.instruments.volumetric_grasp import VolumetricGrasp
@@ -183,6 +181,11 @@ def test_real_grasp_and_mixed_sequence(mixed):
     )
     add_rod(scene, "wire", [1, 0, 0], [1, 0, 0], 3, 0.05, 0.01)
     add_instrument(scene, "grasper", **GRASPER)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'block', system_id='tet')
+    declare_instruments(scene)
+    from i4h_surgical.interaction_storage import declare_volumetric_grasp
+    declare_volumetric_grasp(scene, body="block", capacity=64)
     scene.allocate()
     control = InstrumentControl(scene)
     grasp = VolumetricGrasp(scene, instruments=control, body="block", capacity=64)
@@ -253,26 +256,3 @@ def test_effective_deadline_and_completion_precedence(timeout, horizon, source, 
     t.update(.1)
     assert t.result.numpy().tolist() == ([1, 1] if complete else [2, 2])
     assert all(row["timeout_source"] == source and row["timeout_s"] == .2 for row in t.results())
-
-
-def test_empty_worker_reset_after_previous_masked_reset():
-    from types import SimpleNamespace
-
-    from i4h_standalone.app.worker import PhysicsWorker
-
-    sim, cfg = rod_task()
-    sim = sim.simulation
-    task = build_procedure(cfg, sim)
-    driver_resets = []
-    worker = PhysicsWorker(sim, [SimpleNamespace(reset=lambda ids: driver_resets.append(ids))],
-                           SimpleNamespace(), procedure=task)
-    worker._do_reset([0])
-    task.update(sim.dt)
-    worker.t = .25
-    before = [a.numpy().copy() for a in task._state()]
-    q = sim.scene.q.numpy().copy()
-    assert worker._do_reset([]) is False
-    assert worker.t == .25 and driver_resets == [[0]]
-    np.testing.assert_array_equal(sim.scene.q.numpy(), q)
-    for a, old in zip(task._state(), before):
-        np.testing.assert_array_equal(a.numpy(), old)

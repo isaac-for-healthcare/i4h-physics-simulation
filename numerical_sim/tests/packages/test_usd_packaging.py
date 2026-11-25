@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """USD providers are exclusive on standalone platforms and opt-in for Lab."""
+
+
 import tomllib
 from pathlib import Path
 
@@ -21,7 +23,7 @@ def test_platform_selects_one_usd_provider(member, machine, provider):
     assert selected == [provider]
 
 
-@pytest.mark.parametrize("member", ["physics", "assessment", "surgical", "endoluminal", "isaaclab", "standalone"])
+@pytest.mark.parametrize("member", ["physics", "assessment", "surgical", "endoluminal", "isaaclab", "host"])
 def test_lab_base_install_does_not_request_usd(member):
     project = tomllib.loads((ROOT / member / "pyproject.toml").read_text())["project"]
     for raw in project.get("dependencies", []):

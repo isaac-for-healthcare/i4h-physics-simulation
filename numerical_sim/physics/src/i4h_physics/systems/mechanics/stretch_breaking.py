@@ -72,19 +72,19 @@ class StretchBreaking(System):
     def substep_end(self, scene, dt):
         sf, b = self.surface, self.body
         E, dev = scene.envs, scene.device
-        T, S = sf.tets.shape[1], sf.edges.shape[1]
+        T, S = sf.tet_fields.tets.shape[1], sf.tet_fields.edges.shape[1]
         if T == 0:
             return
         wp.launch(measure_and_break, dim=(E, T),
-                  inputs=[scene.field("q", b), sf.variant, sf.tets, sf.tet_part, self.target, sf.tet_edges, sf.edges, sf.edge_rest, self.threshold,
+                  inputs=[scene.field("q", b), sf.tet_fields.variant, sf.tet_fields.tets, sf.tet_fields.tet_part, self.target, sf.tet_edges, sf.tet_fields.edges, sf.tet_fields.edge_rest, self.threshold,
                           b.count],
-                  outputs=[self.stretch, sf.active, sf.edge_active, sf.support, sf.edge_support, scene.field("flags", b), sf.deleted,
+                  outputs=[self.stretch, sf.tet_fields.active, sf.tet_fields.edge_active, sf.support, sf.edge_support, scene.field("flags", b), sf.deleted,
                            sf.dirty],
                   device=dev)
         if self.break_edges and S:
             wp.launch(break_edges, dim=(E, S),
-                      inputs=[scene.field("q", b), sf.variant, sf.edges, sf.edge_part, self.target, sf.edge_rest, self.threshold],
-                      outputs=[sf.edge_active], device=dev)
+                      inputs=[scene.field("q", b), sf.tet_fields.variant, sf.tet_fields.edges, sf.tet_fields.edge_part, self.target, sf.tet_fields.edge_rest, self.threshold],
+                      outputs=[sf.tet_fields.edge_active], device=dev)
 
     def step_end(self, scene, dt):
         wp.launch(finish_stretch, dim=(scene.envs, self.body.count), inputs=[self.body.count],

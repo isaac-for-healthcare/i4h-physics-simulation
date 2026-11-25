@@ -3,31 +3,14 @@
 
 """M9b contact paint: a held mask tints the vertices of the triangles the tools touch, per env, clamped to [0, 1]."""
 
-from types import SimpleNamespace
 
 import numpy as np
-import warp as wp
 from helpers import find, push_actions, run
-from i4h_isaaclab.composition import load_case
-from i4h_standalone.input.keyboard import PAINT_KEYS, PaintKeys
+from i4h_host.composition import load_case
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
 from i4h_surgical.systems.instruments.contact_paint import ContactPaint
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.mechanics.surface import Surface
-
-
-class _Key:
-    def __init__(self, name, press, release=False):
-        self.key, self._press, self._release = SimpleNamespace(name=name), press, release
-
-    def is_key_press(self):
-        return self._press
-
-    def is_key_release(self):
-        return self._release
-
-    def is_key_repeat(self):
-        return False
 
 
 def test_paint_follows_the_contacts_env_locally():
@@ -59,32 +42,3 @@ def test_paint_follows_the_contacts_env_locally():
     assert np.isfinite(scene.q.numpy()).all()
     sim.reset([0])
     assert not surface.appearance.visual.numpy().any() and not paint.painted.numpy().any()
-
-
-def test_paint_keys_write_the_drawn_env():
-    from i4h_isaaclab.camera.camera import Camera
-    from i4h_standalone.app.instruments import InstrumentDriver
-
-    keys = PaintKeys()
-    assert keys.mask().tolist() == [0.0, 0.0, 0.0] and list(PAINT_KEYS) == ["m", "v", "b"]
-    keys.handle_key(_Key("m", True))
-    keys.handle_key(_Key("b", True))
-    keys.handle_key(_Key("n", True))  # step-once, not a paint key
-    assert keys.mask().tolist() == [1.0, 0.0, 1.0]
-    keys.handle_key(_Key("m", False, release=True))
-    assert keys.mask().tolist() == [0.0, 0.0, 1.0]
-
-    sim = load_case("two_worlds")
-    control = find(sim, InstrumentControl)
-    mask = wp.zeros((2, 3), dtype=wp.float32, device=sim.scene.device)
-    renderer = SimpleNamespace(env=0, camera=Camera(), key_handlers=[])
-    driver = InstrumentDriver(sim, control, None, "keyboard", renderer=renderer, paint=mask)
-    assert driver.paint_keys is not None and driver.paint_keys.handle_key in renderer.key_handlers
-    driver.paint_keys.handle_key(_Key("v", True))
-    driver.update(0.0)
-    assert mask.numpy().tolist() == [[0.0, 1.0, 0.0], [0.0, 0.0, 0.0]]
-    renderer.env = 1
-    driver.update(sim.dt)
-    assert mask.numpy().tolist() == [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]  # the left env stops painting
-    scripted = InstrumentDriver(sim, control, None, "scripted", renderer=renderer, paint=mask)
-    assert scripted.paint_keys is None  # no window keys in scripted mode

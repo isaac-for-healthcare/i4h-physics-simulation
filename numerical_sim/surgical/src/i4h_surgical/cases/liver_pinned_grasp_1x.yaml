@@ -1,0 +1,93 @@
+# Life-size numerical fixture. Soft attachments permit drift; mechanics are uncalibrated.
+sim:
+  device: cuda:0
+  dt: 0.016666666666666666
+  substeps: 8
+  iterations: 8
+  envs: 1
+  gravity:
+  - 0.0
+  - -9.81
+  - 0.0
+assets:
+  tissue:
+    type: tet_bundle
+    path: ${DATA}/choly-mid
+    scale: 0.142857143
+    translation:
+    - 0.0
+    - -0.428571
+    - 0.0
+    radius: 0.00142857
+    parts:
+      liver:
+        spring: 1.0
+        volume: 1.0
+        visual:
+          set: ${DATA}/textures/liver
+    pin:
+      center:
+      - 0.0714286
+      - 0.214286
+      - -0.714286
+      radius: 0.142857
+instruments:
+  grasper:
+    kind: grasper
+    mesh: ${DATA}/instruments/pgrasp.usdc
+    prims:
+      shaft: /root/shaft_color/shaft_color_001
+      body: /root/logobody_color/logobody_color_002
+      jaw_left: /root/jawLeft_color/jawLeft_color_001
+      jaw_right: /root/jawRight_color/jawRight_color_001
+    scale: 0.00107143
+    trocar:
+    - -0.142857
+    - 0.714286
+    - 0.428571
+    initial:
+      position:
+      - 0.0428571
+      - 0.171429
+      - -0.428571
+    input: primary
+    jaw_spheres:
+      radius: 0.00214286
+      distance: 0.00214286
+      offset:
+      - 0.0
+      - -0.00214286
+      - 0.0
+    shaft_spheres:
+      radius: 0.00571429
+      distance: 0.00285714
+systems:
+- type: particles
+  max_velocity: 0.5
+- type: tet
+  body: tissue
+  volume_epsilon: 4.16493e-12
+- type: surface
+  tet: tet
+- type: attachments
+  body: tissue
+  stiffness: 0.0005
+- type: instrument_control
+  max_velocity: 0.3
+- type: instrument_contact
+  instruments: instrument_control
+  surface: surface
+  front_side_only:
+  - liver
+  margin: 0.000285714
+- type: grasp
+  instruments: instrument_control
+  contacts: instrument_contact
+- type: volumetric_grasp
+  instruments: instrument_control
+  body: tissue
+- type: tool_force
+  instruments: instrument_control
+  contacts: instrument_contact
+  grasp: grasp
+  volumetric_grasp: volumetric_grasp

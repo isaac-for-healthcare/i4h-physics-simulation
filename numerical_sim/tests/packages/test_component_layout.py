@@ -9,7 +9,7 @@ import pytest
 
 newton = pytest.importorskip("newton")
 from i4h_physics.config import build_systems, load_case, load_scene, sim_settings  # noqa: E402
-from i4h_physics.newton_model import add_env_particles  # noqa: E402
+from i4h_physics.newton_model import add_env_particles, complete_scene  # noqa: E402
 from i4h_physics.quat import axis_angle_quat, quat_to_matrix  # noqa: E402
 from i4h_physics.sim import I4hSolver  # noqa: E402
 from i4h_physics.stepper import Stepper  # noqa: E402
@@ -25,7 +25,9 @@ def host_sim(rotations, gravity=(0.0, 0.0, -9.81), case_gravity=None):
     world ``e`` placed at ``(e, 0, 0)`` with orientation ``rotations[e]`` (xyzw)."""
     case = CASE if case_gravity is None else CASE | {"sim": CASE["sim"] | {"gravity": list(case_gravity)}}
     scene = load_scene(case)
-    b = newton.ModelBuilder(gravity=gravity[2])
+    from i4h_physics.rod_storage import declare_rod_direct
+    declare_rod_direct(scene, "rod")
+    b = newton.ModelBuilder(gravity=gravity)
     b.add_particle((9.0, 9.0, 9.0), (0.0, 0.0, 0.0), 1.0)  # a global particle
     for e in range(scene.envs):
         b.begin_world()
@@ -33,6 +35,7 @@ def host_sim(rotations, gravity=(0.0, 0.0, -9.81), case_gravity=None):
         add_env_particles(b, scene, e, xform=(np.float32([e, 0.0, 0.0]), np.float32(rotations[e])))
         b.add_particles(HOST_AFTER, [(0.0, 0.0, 0.0)], [1.0])
         b.end_world()
+    complete_scene(b, scene)
     model = b.finalize(device="cpu")
     model.set_gravity(gravity)
     state = model.state()
@@ -82,6 +85,8 @@ def test_rotated_env_sees_gravity_in_the_component_frame():
 
 def test_misplaced_rows_are_rejected():
     scene = load_scene(CASE)
+    from i4h_physics.rod_storage import declare_rod_direct
+    declare_rod_direct(scene, "rod")
     b = newton.ModelBuilder()
     for e in range(scene.envs):
         b.begin_world()
@@ -89,6 +94,7 @@ def test_misplaced_rows_are_rejected():
             b.add_particles(HOST_BEFORE, [(0.0, 0.0, 0.0)] * 2, [1.0] * 2)  # only world 1 has host particles
         add_env_particles(b, scene, e, xform=(np.zeros(3), np.float32([0, 0, 0, 1])))
         b.end_world()
+    complete_scene(b, scene)
     model = b.finalize(device="cpu")
     with pytest.raises(RuntimeError, match="one column of equally sized worlds"):
         scene.allocate(model, model.state())

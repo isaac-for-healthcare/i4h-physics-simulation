@@ -1,0 +1,95 @@
+{
+  "imports": {
+    "newton": {
+      "path": "/home/pkorzeniowsk/Projects/newton/newton-1.9-worktrees/i4h-v2-soft-solvers/newton/__init__.py",
+      "version": "1.9.0.dev0"
+    },
+    "isaaclab": {
+      "path": "/home/pkorzeniowsk/Projects/isaaclab/isaaclab-main/source/isaaclab/isaaclab/__init__.py",
+      "version": "46.1.1"
+    },
+    "isaaclab_newton": {
+      "path": "/home/pkorzeniowsk/Projects/isaaclab/isaaclab-main/source/isaaclab_newton/isaaclab_newton/__init__.py",
+      "version": "17.2.3"
+    },
+    "i4h_physics": {
+      "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/physics/src/i4h_physics/__init__.py",
+      "version": null
+    },
+    "i4h_surgical": {
+      "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/surgical/src/i4h_surgical/__init__.py",
+      "version": null
+    },
+    "i4h_isaaclab": {
+      "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/isaaclab/src/i4h_isaaclab/__init__.py",
+      "version": null
+    },
+    "warp": {
+      "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/examples/versius/.venv/lib/python3.12/site-packages/warp/__init__.py",
+      "version": "1.17.0"
+    },
+    "torch": {
+      "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/examples/versius/.venv/lib/python3.12/site-packages/torch/__init__.py",
+      "version": "2.11.0+cu130"
+    },
+    "mujoco": {
+      "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/examples/versius/.venv/lib/python3.12/site-packages/mujoco/__init__.py",
+      "version": "3.17.0"
+    },
+    "mujoco_warp": {
+      "path": "/home/pkorzeniowsk/Projects/i4h/i4h-physics-simulation-internal-worktrees/i4h-isaaclab/numerical_sim/examples/versius/.venv/lib/python3.12/site-packages/mujoco_warp/__init__.py",
+      "version": "3.17.0"
+    }
+  },
+  "repositories": {
+    "newton": {
+      "path": "/home/pkorzeniowsk/Projects/newton/newton-1.9-worktrees/i4h-v2-soft-solvers",
+      "commit": "ba27cbe6caad3ed6d852469658031e1990c12037",
+      "dirty_sha256": {
+        "changelog/+deletion-mesh-upload.added.md": "575b45a84a0d473262f8f7617e31f4091982352ba440296fcb00cd405a114069",
+        "changelog/+deletion-review.fixed.md": "f87e4645c102ffb2472c05f012ed44c5ce70b3550c17dea69472110e8f78b992",
+        "changelog/+viewer-pbr-maps-50f7ac9e.added.md": "173566ee93406f2eea38a9b65cd5cb396a760077b55b229a32b608724398842f",
+        "docs/guide/visualization.rst": "140531e36ad2ada32bc90e05daf09b8818d4c1f20c4e9406a46d82b2d722fc0f",
+        "newton/_src/geometry/deformable_visual.py": "5045fd0e5ca502e4dc1908206b0094b8f688c0874b73cb29375c46138d6e8414",
+        "newton/_src/sim/builder.py": "bbe1c7c64a9c3246c2e509d7dad1f155bf36c8fc48051f8a0b45e7aa9d23bedd",
+        "newton/_src/viewer/gl/opengl.py": "61812a59358a72d8083c1dd96014aa209f7c5d6b1eb980551a73bff1d4a6be32",
+        "newton/_src/viewer/viewer.py": "160c3694d86e1230be2a6cc3dba5a1c519be72ceae20823cff72642fc1d45e1d",
+        "newton/_src/viewer/viewer_file.py": "7c7b6dde8935ff5c57bb9a2e1376aabc35335a32fa5226a76357b8f0c4a00d71",
+        "newton/_src/viewer/viewer_gl.py": "5132b94a4e8d704536685980ababe60f622c877d8d36f3e878e77afd1dc98357",
+        "newton/_src/viewer/viewer_rtx.py": "d38bdf40d70c10484e054778a9426fad3751a207ca1c153749ba4601248296c0",
+        "newton/_src/viewer/viewer_usd.py": "ad377957c4839ed5bf204b056a05760afdac6a345c55cc095bf187ad827ce47f",
+        "newton/tests/test_deformable_visual_mesh.py": "336a0b7ad158c23b54cf5f94b88ef1a3d96cd1a45586cc55e8cceb2408ffb78b",
+        "newton/tests/test_viewer_get_frame.py": "ae22ede5fa23e656dedeacaf3bd12dd9c917bbe9496d8f5fb0cafee4c8bb84a3",
+        "newton/tests/test_viewer_rtx.py": "a7842db14fc0e618fa536da9a737b1182fadc38a60b7051e6b4db7448a932811",
+        "newton/tests/test_viewer_usd.py": "f0be277f751b7bec79ea8b07c3a93ba0904bd40a88973dd71188c5e6b899e1f1"
+      }
+    },
+    "isaaclab": {
+      "path": "/home/pkorzeniowsk/Projects/isaaclab/isaaclab-main",
+      "commit": "a9c1eb5de328c61e285532d72cb6164b9d0c16f0",
+      "dirty_sha256": {
+        "source/isaaclab/changelog.d/deletion-presentation.added.rst": "e51fc22c7e1728f6fe80ef276ce3a139356a326269df9b2f76fb295430019f9f",
+        "source/isaaclab/changelog.d/deletion-presentation.minor": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source/isaaclab/changelog.d/deletion-review.fixed.rst": "96eb1efe1c1dd26c1fa57c88eefe433e703ead02e3eeea95198b3972135028d5",
+        "source/isaaclab/isaaclab/renderers/render_context.py": "3faaaebffcc5bfdadc3f4691d540352076da43042ec793868dadf4600b6ae9a1",
+        "source/isaaclab/isaaclab/sensors/camera/camera.py": "44da3ffa0769c7a82e652d74054b5184c3e4473c0d54ed1f2d3038e04f12a5b3",
+        "source/isaaclab/isaaclab/sim/simulation_context.py": "955bd748acfe02858793eb85ab40039c79a96fa196014320555578b8ad5aa9e7",
+        "source/isaaclab/isaaclab/visualizers/image_view.py": "0274e0d093f32d7377fb01dcdf6d89313728eab201f329c290a02acc0e72d5d6",
+        "source/isaaclab/test/sim/test_render_callbacks_kitless.py": "432be92232c9d31618d720c9c7092af8b593c34a3de42d6746c9f2199050547f",
+        "source/isaaclab_ov/changelog.d/deletion-presentation.added.rst": "ecfa91eb559fe960154991f23d3d14174480b9b37ab32647f604bb48823d8e67",
+        "source/isaaclab_ov/changelog.d/deletion-presentation.minor": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source/isaaclab_ov/changelog.d/deletion-review.fixed.rst": "e8bcf2b0b44039415f087410ac8f6a283db9fbbba013a700ce07eb6fd6291485",
+        "source/isaaclab_ov/isaaclab_ov/renderers/ovrtx_renderer.py": "80b7ee74810283e6ff441c72013c0cd051c61813174443ac399373d3cffa5f1b",
+        "source/isaaclab_ov/test/test_ovrtx_renderer_contract.py": "975a49b92e85c567690e9e2ec0dd1a7e4b6e1cc6b35986e77d7fd5b9019abf28",
+        "source/isaaclab_visualizers/changelog.d/deletion-presentation.added.rst": "c6dc6f44dd33ea02f024f53e83f61e1e93241adb2cdeb41b41d8bd47275cce08",
+        "source/isaaclab_visualizers/changelog.d/deletion-presentation.minor": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source/isaaclab_visualizers/changelog.d/deletion-review.fixed.rst": "11e9abe00533f608a2fe68d9f6b9293de38c4916cb8c0986c0fd0c2894b1f524",
+        "source/isaaclab_visualizers/isaaclab_visualizers/newton/newton_visualizer.py": "1b4e3029b0488d55d2f1887329e0cbcc92b79cd4fbb24938110b8f58875c477a",
+        "source/isaaclab_visualizers/test/test_newton_adapter.py": "d7b771cae6d39add41b351a4316b7dc5917d8e40e21b06d833232e2e0beeeeed"
+      }
+    }
+  },
+  "warp_native_sha256": "eb4bda4537f7c7a35ef4640d89fbfba96cc9b2b786fdf1591535ea420ec8b6eb",
+  "rsl_rl": "5.5.1",
+  "retained_dependencies": ".tmp_tests/stage-c30-20261109/main-env"
+}

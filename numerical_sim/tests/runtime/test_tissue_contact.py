@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 """Bounded same-body contact: original equations, topology, lifecycle and integration."""
+
+
 import numpy as np
 import pytest
-from helpers import find, kill, needs_chole, needs_external_data, slang_tests
-from i4h_isaaclab.composition import load_case, read_case
+from helpers import find, kill, needs_chole, needs_external_data
+from i4h_host.composition import load_case, read_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders.tet_bundle import TET_EDGES, TET_FACES, PartMesh, pack_tet_body, parse_materials
 from i4h_physics.systems.contact.part_contact import PartContact
@@ -14,6 +17,7 @@ from i4h_physics.systems.mechanics.tet import Tet
 from i4h_surgical.systems.mechanics.surface import Surface
 
 pytestmark = needs_external_data
+
 
 def fixture(**kw):
     cfg = read_case('tissue_contact')
@@ -157,6 +161,12 @@ def topology_fixture():
     scene = Scene('cuda:0', 2, (0,0,0))
     materials, visuals = parse_materials({n: {'spring': 0, 'volume': 0, 'deletable': True} for n in variants[0]})
     body = pack_tet_body(scene, 'tissue', variants, materials, .01, visuals)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'tissue', system_id='tet')
+    from i4h_physics import declare_surface
+    declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
     scene.allocate()
     tet = Tet(scene, body='tissue')
     surface = Surface(scene, tet=tet)
@@ -285,92 +295,6 @@ def test_chole_disabled_preserves_physics():
             sim.step()
     assert find(with_contact, PartContact) not in with_contact.solver.active
     np.testing.assert_array_equal(with_contact.scene.q.numpy(), without.scene.q.numpy())
-
-
-@needs_chole
-def test_chole_enabled_scripted_grasp_pull():
-    from i4h_standalone.app.instruments import InstrumentDriver
-    from i4h_surgical.systems.instruments.grasp import Grasp
-    from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-    sim = load_case("chole_tet_med", envs=2)
-    c = find(sim, PartContact)
-    c.enabled = True
-    control = find(sim, InstrumentControl)
-    driver = InstrumentDriver(sim, control, None, "scripted")
-    total_contacts = 0
-    for step in range(132):
-        driver.update(step * sim.dt)
-        sim.step()
-        total_contacts += int(c.contact_count.numpy().sum())
-    assert total_contacts > 0
-    grasp = find(sim, Grasp)
-    assert grasp.count.numpy()[0, 0] > 0
-    before = c.q.numpy().copy()
-    actions = control.actions.numpy()
-    for step in range(30):
-        actions[:, 0, 2] += .002  # closed jaw pulls back 6 cm
-        control.actions.assign(actions)
-        sim.step()
-    assert np.isfinite(c.q.numpy()).all()
-    assert grasp.count.numpy()[0, 0] > 0
-    assert np.linalg.norm(c.q.numpy() - before, axis=-1).max() > .001
-
-
-@slang_tests
-@needs_chole
-def test_slang_contact_panel_activation():
-    import time
-
-    import warp as wp
-    from i4h_standalone.app.instruments import InstrumentDriver
-    from i4h_standalone.app.ui import Panels, SimControls
-    from i4h_standalone.app.worker import PhysicsWorker
-    from i4h_standalone.render.slang import SlangRenderer
-    from i4h_standalone.render.snapshots import Snapshots
-    from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
-
-    sim = load_case('chole_tet_med', envs=2)
-    c = find(sim, PartContact)
-    cfg = read_case('chole_tet_med')['render']
-    cfg.pop('backend')
-    renderer = SlangRenderer(sim, **dict(cfg, size=(320, 180), window=False))
-    sim.prepare()
-    ring = Snapshots(sim)
-    ring.publish()
-    renderer.stream, renderer.lock = wp.Stream(sim.scene.device), ring.lock
-    driver = InstrumentDriver(sim, find(sim, InstrumentControl), None, 'keyboard', renderer=renderer)
-    worker = PhysicsWorker(sim, [driver], ring, steps=0)
-    panels = Panels(worker, renderer, SimControls(worker, (0, -9.81, 0)), driver.hub, overrides_path='/dev/null')
-    try:
-        panels.enabled_boxes[id(c)].callback(True)
-        row = next(r for r in panels.rows if r.system is c and r.knob.label == 'stiffness')
-        row.widgets[0].callback(.75)
-        panels.update()
-        worker.pause(True)
-        worker.start()
-        done = [False]
-        worker.edit(lambda s: done.__setitem__(0, True))
-        until = time.monotonic() + 10
-        while not done[0] and time.monotonic() < until:
-            time.sleep(.005)
-        worker.check()
-        assert done[0]
-        for _ in range(3):
-            panels.update()
-            snap = ring.acquire()
-            if snap is not None:
-                renderer.publish(snap)
-            renderer.draw()
-        frame = renderer.read_frame()
-        assert np.isfinite(frame).all() and frame.max() > frame.min()
-        worker.stop()
-        assert c.enabled
-        np.testing.assert_allclose(c.stiffness.numpy(), .75)
-    finally:
-        worker.stop()
-        panels.close()
-        renderer.close()
 
 
 @pytest.mark.parametrize('point,bary', [([-.003, .25, -.004], [.75, 0, .25]),

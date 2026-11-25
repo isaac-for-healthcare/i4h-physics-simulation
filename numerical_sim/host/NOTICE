@@ -1,0 +1,15 @@
+i4h numerical simulation, version 0.9.0
+Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+
+Licensed under the Apache License, Version 2.0; see LICENSE. Ported kernels cite
+omnisurg and omniendo source files in their comments. Retain those attributions.
+Production assets, vendor wrappers and the separately maintained catheter solver
+are not part of this package.
+
+Versius robot configuration, Cartesian differential IK, 24-value observation layout,
+timeout PPO correction and input-only device utilities adapted from
+i4h-v2-physics-simulation/training/src/i4h_poking at 16882a4da24a2457f81a7180b4730ffe354906f3
+with local changes. NVIDIA CORPORATION & AFFILIATES, Apache-2.0.
+External prepared USD is read only; no v2 task or solver is imported.
+The Follou utility is adapted from src/i4h_v2_physics_simulation/follou_input.py
+in the same external checkout. Its XYZ adapter commands zero device force.

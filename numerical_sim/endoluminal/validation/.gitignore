@@ -1,0 +1,20 @@
+# Generated when replaying the benchmarks.
+/elastrat/catheters/*.yaml
+/elastrat/guidewires/*.yaml
+/elastrat/guidewires_profiled/*.yaml
+/harrison_i4h/traces/*.csv
+!/harrison_i4h/traces/amplatz-extra-stiff_100us_24e.csv
+!/harrison_i4h/traces/lunderquist-extra-stiff_100us_24e.csv
+/harrison_i4h/1ms_stiffness_sweep/input_*.csv
+/harrison_i4h/1ms_stiffness_sweep/*_slope.csv
+/harrison_i4h/1ms_stiffness_sweep/*_curve.csv
+/harrison_i4h/figure2_comparison.png
+/harrison_sofa/traces/
+/harrison_sofa/force_control/
+/harrison_vbd/traces/
+/harrison_vbd/force_control/
+/harrison_vbd/refinement_32_iterations/
+/harrison_vbd/backend_comparison.png
+/imperial/catheter_bending/traces/
+/xpbd/xpbd8.csv
+/xpbd/xpbd32.csv

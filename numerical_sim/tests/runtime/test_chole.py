@@ -8,7 +8,7 @@ import os
 import numpy as np
 import pytest
 from helpers import find, tet_volumes
-from i4h_isaaclab.composition import data_dir, load_case
+from i4h_host.composition import data_dir, load_case
 from i4h_physics.systems.mechanics.attachments import Attachments
 from i4h_physics.systems.mechanics.bounds import Bounds
 from i4h_physics.systems.mechanics.connectors import Connectors

@@ -9,21 +9,21 @@ Six distributions share the Warp/Newton mechanics and one numerical workspace lo
 | i4h-surgical | i4h_surgical | Instruments, appearance, surgical systems, grasp measurements |
 | i4h-assessment | i4h_assessment | Shared executor, history, evidence consumption, reward products |
 | i4h-isaaclab | i4h_isaaclab | Isaac Lab hosts, gym tasks, tiled camera |
-| i4h-standalone | i4h_standalone | i4h-sim app, Slang/GL, recording, XR, devices, panel adapters |
+| i4h-host | i4h_host | Case composition, procedures, camera geometry, appearance, controls |
 
-From the repository root:
+The standalone viewer, device backends, capture and XR moved to a separate application.
+See [package ownership and migration](docs/standalone-split.md).
+The optional `i4h-isaaclab-standalone` bridge supplies `i4h-lab-run` and `i4h-lab-teleop`.
+The numerical repository retains headless Lab training/evaluation and all task measurements.
 
 ```bash
 cd numerical_sim
-uv sync --locked --extra render --extra gl --group dev
-uv run i4h-sim chole_tet_med --data ./data
-uv run i4h-sim two_worlds --data ./data --render noop --steps 200
-I4H_DATA="$PWD/data" uv run pytest tests/runtime -q
+uv sync --locked --group dev
+I4H_DATA="$PWD/data" uv run pytest tests/runtime tests/packages -q
+uv run python examples/core_synthetic.py --device cpu
 ```
 
-The window uses Tab to select a tool, IJKL/UO to move it, Space to grip, Shift for energy, F to fire, P to pause, N to step, Backspace to reset and F1 for panels. XR uses `--extra xr` instead of `--extra render`; these extras are mutually exclusive. Device and haptic support is optional and physical devices require separate qualification.
-
-Production assets are included in `data/` and licensed under Apache-2.0; `docs/asset-manifest.json` records each file's SHA-256, size and license. See `data/README.md`. They are excluded from wheels and source distributions. `scripts/fetch_assets.py --source PATH_OR_URL` can copy a matching asset tree into `data/` (or `$I4H_DATA`) and verifies every file. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; installed packages do not search for a checkout or download assets. Headless runs do not load unused textures.
+Production assets are included in `data/` and licensed under Apache-2.0, except for the MIT-licensed dVRK instruments; `docs/asset-manifest.json` records each file's SHA-256, size and license. See `data/README.md`. They are excluded from wheels and source distributions. `scripts/fetch_assets.py --source PATH_OR_URL` can copy a matching asset tree into `data/` (or `$I4H_DATA`) and verifies every file. `${DATA}` resolves in this order: explicit `--data PATH` (absolute and propagated to child processes), then `I4H_DATA`; installed packages do not search for a checkout or download assets. Headless runs do not load unused textures.
 
 Use each domain directly:
 
@@ -34,21 +34,19 @@ sim.step()
 sim.reset([1])  # physical reset only
 ```
 
+Newton owns the simulation data: particles, topology, history and commands are fields of the Newton Model, State and
+Control, declared before finalize. Systems hold views of them and keep only scratch, outputs and tables. A State and
+Control pair can be saved and restored with `sim.physics.save(state, control)` and `sim.physics.restore(state, control)`;
+see `docs/component-contracts.md` for what that covers.
+
 There is no `i4h_sim` compatibility package. Assessment is constructed and advanced by the host after each completed physics sample, before rewards or terminations. Episode reset explicitly resets both physical state and the assessment object. Constructor maps are passed explicitly; systems may receive ordinary sidecars from factories without registration or a sidecar lifecycle framework.
 
 Build members with `uv build --all-packages`. Use Python `>=3.12,<3.13`; development
-continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton 1.6.1.
+continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton at revision `7f0c13af` (1.9.0.dev0, pinned in `physics/pyproject.toml`); coupling uses MuJoCo and MuJoCo-Warp 3.17.0.
 
-Camera observations are owned by Isaac Lab and do not require standalone. Teleoperation
-adapters now import from `i4h_standalone.devices` and `i4h_standalone.teleop`.
-Follou support requires the separately installed `follou-sdk` Python wrappers and
-`FOLLOU_LIB_PATH` pointing to the vendor native library file. Local development uses
-`uv run --with /path/to/follou-sdk i4h-sim CASE --input devices --data /path/to/data`.
-Fake devices, keyboard and headless runs remain independent of the SDK.
-
-Missing textures raise an explicit asset error when rendering consumes them. Physical
-surfaces without appearance metadata render with host defaults. Haptic force sliders
-can only reduce and restore each device's configured pose and handle ceilings.
+Camera observations are owned by Isaac Lab and require neither standalone nor the bridge.
+Shared helpers live in `i4h_host`; neither host depends on the other. See
+[split migration](docs/standalone-split.md) for moved Python symbols and launchers.
 
 See [architecture](docs/package-migration.md), [contribution](CONTRIBUTING.md)
 and [license notices](../NOTICE).
@@ -59,3 +57,6 @@ Physical surfaces without appearance sidecars use the host renderer's default ma
 A requested texture that is missing raises an error naming its path; supply the original
 external data tree rather than substitute textures. Headless stepping does not require
 unused presentation assets.
+
+Versius robot tasks use the [shared Isaac Lab launchers](docs/versius.md).
+See [consolidation validation](docs/versius-consolidation-results.md) for results and retained limitations.

@@ -12,9 +12,11 @@ import pytest
 pytest.importorskip("mujoco_warp")
 newton = pytest.importorskip("newton")
 import warp as wp  # noqa: E402
-from i4h_isaaclab.coupling import CoupledSolver, Mounts, check_rigid_solver_cfg  # noqa: E402
+from i4h_isaaclab.coupling import check_rigid_solver_cfg  # noqa: E402
 from i4h_physics.config import build_systems, load_case, load_scene, sim_settings  # noqa: E402
-from i4h_physics.newton_model import add_env_particles  # noqa: E402
+from i4h_physics.coupling import CoupledSolver, Mounts  # noqa: E402
+from i4h_physics.mount_storage import declare_mounts  # noqa: E402
+from i4h_physics.newton_model import add_env_particles, complete_scene  # noqa: E402
 from i4h_physics.sim import I4hSolver  # noqa: E402
 from i4h_physics.stepper import Stepper  # noqa: E402
 
@@ -35,6 +37,8 @@ def pendulum(b, e):
 def host(with_rod=True):
     """Per world: a revolute pendulum (the host's rigid body), then (``with_rod``) the i4h rod through the hook."""
     scene = load_scene(CASE)
+    from i4h_physics.rod_storage import declare_rod_direct
+    declare_rod_direct(scene, "rod")
     b = newton.ModelBuilder()
     for e in range(2):
         b.begin_world()
@@ -42,6 +46,8 @@ def host(with_rod=True):
         if with_rod:
             add_env_particles(b, scene, e, xform=(np.float32([e, 0, 0]), np.float32([0, 0, 0, 1])))
         b.end_world()
+    if with_rod:
+        complete_scene(b, scene)
     model = b.finalize(device="cuda:0")
     state = model.state()
     state.joint_q.assign(np.full(model.joint_coord_count, 0.5, np.float32))
@@ -59,7 +65,7 @@ def test_coupled_step_integrates_each_once():
     _, rmodel, rstate = host(with_rod=False)
     rigid_only = newton.solvers.SolverMuJoCo(rmodel)
     alone = load_case(CASE | {"sim": CASE["sim"] | {"gravity": [0.0, 0.0, -9.81]}})
-    control, rcontrol = model.control(), rmodel.control()
+    control, rcontrol = ours.control, rmodel.control()
     for _ in range(30):
         coupled.step(state, state, control, None, DT)
         rigid_only.step(rstate, rstate, rcontrol, None, DT)
@@ -80,7 +86,7 @@ def test_rigid_reset_leaves_i4h_particles():
     Stepper(ours, **sim_settings(CASE)).prepare()
     coupled = CoupledSolver(model, newton.solvers.SolverMuJoCo(model), ours)
     for _ in range(10):
-        coupled.step(state, state, model.control(), None, DT)
+        coupled.step(state, state, ours.control, None, DT)
     before = state.particle_q.numpy().copy()
     mask = wp.array([True, False, False], dtype=wp.bool, device="cuda:0")
     coupled.reset(state, world_mask=mask)
@@ -109,7 +115,7 @@ TARGET = 0.12  # the holder's slide (it sags 1 cm under gravity): probe root nea
 
 def probe_case():
     """two_worlds' block and probe only (no rod, fluid or cautery)."""
-    from i4h_isaaclab.composition import read_case
+    from i4h_host.composition import read_case
 
     cfg = copy.deepcopy(read_case("two_worlds"))
     cfg["sim"]["cuda_graph"] = False
@@ -121,11 +127,23 @@ def probe_case():
 
 def held_probe(mode):
     """Per world a holder sliding along z (a stiff drive towards TARGET) from z -0.05, then the block and probe."""
-    from i4h_isaaclab.composition import build_systems as build
-    from i4h_isaaclab.composition import load_scene as scene_of
+    from i4h_host.composition import build_systems as build
+    from i4h_host.composition import load_scene as scene_of
+    from i4h_physics import declare_tet
 
     cfg = probe_case()
     scene = scene_of(cfg)
+    declare_tet(scene, "block")
+    from i4h_physics import declare_surface
+    declare_surface(scene)
+    from i4h_surgical.interaction_storage import declare_appearance
+    declare_appearance(scene)
+    from i4h_surgical.instrument_storage import declare_instruments
+    declare_instruments(scene)
+    from i4h_surgical.interaction_storage import declare_instrument_contact
+    contact = next(s for s in cfg["systems"] if s["type"] == "instrument_contact")
+    declare_instrument_contact(scene, surface=contact["surface"], records=contact.get("records", 8))
+    declare_mounts(scene, {"probe": {"body": "holder", "offset": OFFSET}}, two_way=mode == "two_way")
     b = newton.ModelBuilder()
     for e, (pos, quat) in enumerate(ENV_XFORMS):
         env = wp.transform(wp.vec3(*pos), wp.quat(*quat))
@@ -137,6 +155,7 @@ def held_probe(mode):
         b.add_articulation([j])
         add_env_particles(b, scene, e, xform=(np.float32(pos), np.float32(quat)))
         b.end_world()
+    complete_scene(b, scene)
     model = b.finalize(device="cuda:0")
     state = model.state()
     newton.eval_fk(model, state.joint_q, state.joint_qd, state)
@@ -145,7 +164,7 @@ def held_probe(mode):
     ours = I4hSolver(model, scene, systems, state)
     Stepper(ours, **sim_settings(cfg)).prepare()
     mounts = Mounts(model, scene, systems, {"probe": {"body": "holder", "offset": OFFSET}}, mode == "two_way")
-    control = model.control()
+    control = ours.control
     control.joint_target_q.assign(np.full(model.joint_dof_count, TARGET, np.float32))
     return scene, systems, model, state, control, CoupledSolver(model, newton.solvers.SolverMuJoCo(model), ours, mounts)
 
@@ -210,15 +229,20 @@ def test_two_way_reaction_moves_the_holder_and_reset_clears_it():
     assert np.isfinite(state.body_q.numpy()).all()
     mounts = coupled.mounts.groups[0]
     assert mounts.force.numpy()[:, 0].any(axis=1).all()
-    coupled.reset(state, world_mask=wp.array([False, True, False], dtype=wp.bool, device="cuda:0"))
+    mask = wp.array([False, True, False], dtype=wp.bool, device="cuda:0")
+    before_force, before_torque = mounts.force.numpy().copy(), mounts.torque.numpy().copy()
+    coupled.reset(state, world_mask=mask)
+    np.testing.assert_array_equal(mounts.force.numpy(), before_force)
+    np.testing.assert_array_equal(mounts.torque.numpy(), before_torque)
+    coupled.restore_episode(state, coupled.ours.control, world_mask=mask)
     assert mounts.force.numpy()[0].any() and not mounts.force.numpy()[1].any() and not mounts.torque.numpy()[1].any()
 
 
 def test_mount_configuration_errors():
     scene, systems, model, *_ = held_probe("one_way")
-    with pytest.raises(ValueError, match="no instrument 'grasper'"):
+    with pytest.raises(ValueError, match="no mount target 'grasper'"):
         Mounts(model, scene, systems, {"grasper": {"body": "holder"}}, False)
-    with pytest.raises(ValueError, match="0 bodies match"):
+    with pytest.raises(ValueError, match="incompatible mount declaration"):
         Mounts(model, scene, systems, {"probe": {"body": "arm"}}, False)
     with pytest.raises(ValueError, match="must be"):
         Mounts(model, scene, systems, {"probe": {"link": "holder"}}, False)
@@ -229,12 +253,19 @@ def test_mount_configuration_errors():
 def held_catheter(mode):
     """Per world a holder on a vertical slide (a stiff drive at the rod's rest root, z 1) carrying the catheter driver
     of a horizontal 20-node rod under gravity; the driver frame is the rod's rest root frame."""
-    from i4h_isaaclab.composition import build_systems as build
-    from i4h_isaaclab.composition import load_scene as scene_of
+    from i4h_host.composition import build_systems as build
+    from i4h_host.composition import load_scene as scene_of
     from test_catheter_mount import case as catheter_case
 
     cfg = catheter_case(gravity=(0.0, 0.0, -9.81), track=0.0)
     scene = scene_of(cfg)
+    from i4h_endoluminal.rod_storage import declare_catheter_control
+    from i4h_physics.rod_storage import declare_rod_direct
+    declare_rod_direct(scene, 'catheter', system_id='rod')
+    declare_catheter_control(scene, 'rod', track_length=0.0, tip_edges=2)
+    rest_frame = tuple(float(x) for x in scene.body('catheter').rod.frames[0, 0])
+    declared_mounts = {'catheter': {'body': 'driver', 'offset': ((0.0, 0.0, 0.0), rest_frame)}}
+    declare_mounts(scene, declared_mounts, two_way=mode == 'two_way')
     b = newton.ModelBuilder()
     for e, (pos, quat) in enumerate(ENV_XFORMS):
         env = wp.transform(wp.vec3(*pos), wp.quat(*quat))
@@ -247,6 +278,7 @@ def held_catheter(mode):
         b.add_articulation([j])
         add_env_particles(b, scene, e, xform=(np.float32(pos), np.float32(quat)))
         b.end_world()
+    complete_scene(b, scene)
     model = b.finalize(device="cuda:0")
     state = model.state()
     newton.eval_fk(model, state.joint_q, state.joint_qd, state)
@@ -259,9 +291,7 @@ def held_catheter(mode):
     rest_frame = tuple(float(x) for x in cc.mount_pose.numpy()[0, 0, 3:])
     mounts = Mounts(model, scene, systems, {"catheter": {"body": "driver", "offset": ((0.0, 0.0, 0.0), rest_frame)}},
                     mode == "two_way")
-    coupled = CoupledSolver(model, newton.solvers.SolverMuJoCo(model), ours, mounts)
-    coupled.stepper = stepper  # tests re-prepare after structural edits
-    return systems, model, state, model.control(), coupled
+    return systems, model, state, ours.control, CoupledSolver(model, newton.solvers.SolverMuJoCo(model), ours, mounts)
 
 
 def test_catheter_held_by_a_body_two_way():
@@ -298,7 +328,7 @@ def test_rigid_substeps_match_a_substepped_rigid_solver():
     _, rmodel, rstate = host(with_rod=False)
     rigid = newton.solvers.SolverMuJoCo(rmodel)
     alone = load_case(CASE | {"sim": CASE["sim"] | {"gravity": [0.0, 0.0, -9.81]}})
-    control, rcontrol = model.control(), rmodel.control()
+    control, rcontrol = ours.control, rmodel.control()
     for _ in range(30):
         coupled.step(state, state, control, None, DT)
         for _ in range(2):
@@ -312,8 +342,49 @@ def test_rigid_substeps_match_a_substepped_rigid_solver():
         CoupledSolver(model, coupled.rigid, ours, rigid_substeps=0)
 
 
+def test_pending_reaction_delay_and_cache_reset():
+    scene, systems, model, state, control, coupled = held_probe("two_way")
+    ic = by_type(systems, "InstrumentControl")
+    group = coupled.mounts.groups[0]
+    np.testing.assert_array_equal(ic.root.numpy(), np.tile(ic.rest, (scene.envs, 1, 1)))
+    pose = ic.mount_pose.numpy().copy()
+    group.force.fill_(wp.vec3(1.0, 2.0, 3.0))
+    group.torque.fill_(wp.vec3(4.0, 5.0, 6.0))
+    coupled.reset(state)
+    np.testing.assert_array_equal(ic.mount_pose.numpy(), pose)
+    np.testing.assert_array_equal(group.force.numpy(), np.tile([[[1., 2., 3.]]], (2, 1, 1)))
+    state.body_f.zero_()
+    coupled.mounts.apply(state, model)
+    first = state.body_f.numpy().copy()
+    assert first.any()
+    coupled.mounts.apply(state, model)
+    np.testing.assert_array_equal(state.body_f.numpy(), first)
+    for source in group.sources:
+        source.impulse.fill_(wp.vec3(0.1, 0.2, 0.3))
+        source.moment.fill_(wp.vec3(0.4, 0.5, 0.6))
+    coupled.mounts.fill(coupled.ours.substeps, DT)
+    np.testing.assert_array_equal(state.body_f.numpy(), first)  # filled for the next step only
+    assert group.force.numpy().any()
 
-def test_a_disabled_catheter_driver_stops_its_reaction():
+
+@pytest.mark.parametrize("mode", ["one_way", "two_way"])
+def test_catheter_mujoco_warp_captured(mode):
+    systems, model, state, control, coupled = held_catheter(mode)
+    wp.synchronize_device(model.device)
+    with wp.ScopedCapture(device=model.device) as capture:
+        state.body_f.zero_()
+        coupled.step(state, state, control, None, 1.0 / 60)
+    for _ in range(10):
+        coupled.ours.check_binding()
+        wp.capture_launch(capture.graph)
+    wp.synchronize_device(model.device)
+    group = coupled.mounts.groups[0]
+    assert np.isfinite(state.body_q.numpy()).all()
+    np.testing.assert_allclose(group.control.root.numpy(), group.control.mount_pose.numpy()[..., :3], atol=1e-6)
+    assert bool(group.force.numpy().any()) == (mode == "two_way")
+
+@pytest.mark.parametrize("captured", [False, True])
+def test_a_disabled_catheter_driver_stops_its_reaction(captured):
     """Disabling catheter_control (then prepare) clears its published reaction, and the coupling no longer fills or
     applies a stale one: the holder feels no force on the following steps."""
     systems, model, state, control, coupled = held_catheter("two_way")
@@ -325,10 +396,32 @@ def test_a_disabled_catheter_driver_stops_its_reaction():
     assert np.abs(group.force.numpy()).max() > 0.1, "the rod's weight hangs on the holder"
     cc = by_type(systems, "CatheterControl")
     cc.enabled = False
-    coupled.stepper.prepare()
+    cc.prepare(coupled.ours.scene)
     assert not cc.impulse.numpy().any() and not cc.moment.numpy().any(), "prepare clears the disabled driver's products"
     for _ in range(3):
         state.body_f.zero_()
         coupled.step(state, state, control, None, 1.0 / 60)
         wp.synchronize()
         assert not group.force.numpy().any() and not group.torque.numpy().any(), "no stale reaction is filled"
+
+    if captured:
+        with wp.ScopedCapture(device=model.device) as capture:
+            state.body_f.zero_()
+            coupled.step(state, state, control, None, 1.0 / 60)
+        wp.capture_launch(capture.graph)
+        assert not group.force.numpy().any() and not group.torque.numpy().any()
+        assert not state.body_f.numpy().any(), "disabled source contributes no force after recapture"
+    cc.enabled = True
+    for system in systems:
+        system.prepare(coupled.ours.scene)
+    if captured:
+        with wp.ScopedCapture(device=model.device) as capture:
+            state.body_f.zero_()
+            coupled.step(state, state, control, None, 1.0 / 60)
+        for _ in range(30):
+            wp.capture_launch(capture.graph)
+    else:
+        for _ in range(30):
+            state.body_f.zero_()
+            coupled.step(state, state, control, None, 1.0 / 60)
+    assert np.abs(group.force.numpy()).max() > 0.1, "re-enabled driver publishes its live reaction"

@@ -7,7 +7,7 @@ Reference: ``catheter_vasculature_solver.CathRodSolver`` at physics repo tag ``v
 branch ``feat/catheter-navigation-reward`` @ 95d0335 installs), run as the workflow's ``CatheterRodSpec`` configures it
 (physical rotational inertia, 128 distance sweeps, one block-Thomas solve per substep, no vessel). It needs only warp,
 torch and numpy; ``setup_reference.sh`` builds its venv on the old stack (warp 1.13). Ours: ``rod_direct`` +
-``catheter_control`` on the current stack, through ``i4h_isaaclab.composition``.
+``catheter_control`` on the current stack, through ``i4h_host.composition``.
 
     $REF/bin/python scripts/parity/catheter.py run --engine reference --out parity/reference.npz
     $PY scripts/parity/catheter.py run --engine ours --out parity/ours.npz
@@ -213,7 +213,7 @@ def add_lumen(scene, name, points, radius):
 
 
 def run_ours(rod: Rod, gravity, steps, command, lumen=None):
-    from i4h_isaaclab.composition import load_case
+    from i4h_host.composition import load_case
 
     area_moment = math.pi * rod.radius**4 / 4.0
     # reference compliance L / (4 E (b I) dt^2) == ours 1 / (E k L dt^2): k = 4 b I / L^2 (twist: J = 2I, G)
