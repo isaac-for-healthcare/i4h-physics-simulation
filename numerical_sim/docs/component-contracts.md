@@ -302,4 +302,4 @@ MuJoCo-Warp, including subset selection. Pure i4h continues to reject native
 `CONTACT_F`. Surgical export must not be interpreted as native rigid contacts.
 
 See [vessel regions](vessel-regions.md) for the aorta branch mapping, sidecar schema
-and standalone stiffness controls. Territory calibration remains deferred.
+and multiplier semantics. Territory calibration remains deferred.

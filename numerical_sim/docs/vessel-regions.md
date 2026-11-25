@@ -72,12 +72,8 @@ were tuned for, so that region keeps them:
 This linear mapping is a first-order default, not a calibration: it ignores wall
 thickness and radius (see `radius_weighting`).
 
-The standalone Slang workspace selects and highlights one region. Edits apply
-to all environments by default; disable that option to edit the displayed one.
-Episode reset preserves material edits. Restore all region defaults resets every
-region of the selected body to its initial value (1, or the modulus ratio) in
-the selected environment scope.
-Save/Load and `--overrides FILE` use the existing `regions` override section:
+Region multipliers persist across episode reset. Overrides use the `regions`
+override section:
 
 ```yaml
 regions:
@@ -88,10 +84,7 @@ regions:
 ```
 
 Scalar values apply to all environments; per-environment lists are also supported.
-The standalone workspace's group `limits` maps a declared knob label to a finite
-`[minimum, maximum]` within the knob's underlying bounds. The aorta case uses
-stretch 0–1 and bend/twist 0–10. Its base solver coefficients are 1, 0.1 and 0.1,
-respectively. Panel edits and standalone override files enforce these limits;
-the lower-level physics API retains its existing bounds. Limits do not establish
-physiological realism or guarantee stability. Vascular templates remain neutral,
-uncalibrated UI presets and do not rename region membership.
+The lower-level physics API keeps its existing bounds. The aorta case's base solver
+coefficients are stretch 1, bend 0.1 and twist 0.1. Vascular templates remain neutral,
+uncalibrated presets and do not rename region membership. Panel editing and limits
+belong to the standalone application and are not specified here.
