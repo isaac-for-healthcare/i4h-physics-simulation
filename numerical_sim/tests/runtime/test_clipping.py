@@ -134,11 +134,29 @@ def test_tracker_and_clip(retain_clipping_failure):
         control.actions.assign(actions)
         sim.step()
     assert ring_radius(scene, body, centreline, 0, node) < 0.35 * before and np.isfinite(scene.q.numpy()).all()
-    # a second press takes the next nearest node
+    # NVBug 7011011: after sagging, the next live duct node can be outside the
+    # unchanged reach. Reposition through actions as before the first press.
+    candidates = duct[(clipping.eligible.numpy()[duct] != 0)
+                      & (clipping.clipped.numpy()[0, duct] == 0)
+                      & (centreline.active_count.numpy()[0, duct] > 0)]
+    assert candidates.size, "no unclipped live duct node remains for the second press"
+    distances = np.linalg.norm(centreline.positions.numpy()[0, candidates] - control.root.numpy()[0, ka], axis=1)
+    next_node = int(candidates[np.argmin(distances)])
+    for _ in range(90):
+        actions[0, ka, :3] = centreline.positions.numpy()[0, next_node]
+        control.actions.assign(actions)
+        sim.step()
+    gap = float(np.linalg.norm(control.root.numpy()[0, ka] - centreline.positions.numpy()[0, next_node]))
+    reach = float(clipping.reach.numpy()[0])
+    assert gap < reach, f"second press: node {next_node} is {gap:.6f} from the root, reach {reach:.6f}"
+    assert clipping.eligible.numpy()[next_node] and centreline.active_count.numpy()[0, next_node] > 0
+    assert clipping.clipped.numpy()[0, next_node] == 0
+    assert clipping.count.numpy().tolist() == [1, 0] and sim.graph is graph
+    # A new fire edge takes a different node; repositioning alone must not clip.
     actions[0, ka, 9] = 1.0
     control.actions.assign(actions)
     sim.step()
-    assert clipping.count.numpy()[0] == 2 and clipping.node.numpy()[0, 1] != node and clipping.clipped.numpy()[0].sum() == 2
+    assert clipping.count.numpy().tolist() == [2, 0] and clipping.node.numpy()[0, 1] != node and clipping.clipped.numpy()[0].sum() == 2
     # masked reset of env 1 leaves env 0's clips; of env 0 clears them
     sim.reset([1])
     assert clipping.count.numpy().tolist() == [2, 0]
