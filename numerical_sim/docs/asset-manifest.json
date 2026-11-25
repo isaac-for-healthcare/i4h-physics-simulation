@@ -948,10 +948,58 @@
     ]
   },
   {
-    "path": "numerical_sim/data/vessels/aorta_centerline.json",
-    "sha256": "0202791ac7a5170cbf77e0f7d859c659274c4b29c3a8d1cfff3c802bbe3f320b",
-    "size": 63571,
-    "source": "Created by Przemyslaw Korzeniowski",
+    "path": "numerical_sim/data/vessels/aorta_centreline/centerline_edges.npy",
+    "sha256": "2aff727b9f3df59065589ee1df1a0c686ccf9a25e80b62e4aaea6f95c5152f9a",
+    "size": 4192,
+    "source": "Created by Przemyslaw Korzeniowski; converted from aorta_centerline.json to i4h-digital-twin centreline arrays",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
+    "evidence": [
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/vessels/aorta_centreline/centerline_points.npy",
+    "sha256": "c825b080c20a7ad7934627782759d55de4a3e948e1e4068e79b3e05f27c3217a",
+    "size": 6512,
+    "source": "Created by Przemyslaw Korzeniowski; converted from aorta_centerline.json to i4h-digital-twin centreline arrays",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
+    "evidence": [
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/vessels/aorta_centreline/centerline_radii.npy",
+    "sha256": "eec2bf9fdcbf65a10801a7fcc37abb8bb763117582061f305cceedef9723ce04",
+    "size": 2256,
+    "source": "Created by Przemyslaw Korzeniowski; converted from aorta_centerline.json to i4h-digital-twin centreline arrays",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
+    "evidence": [
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/vessels/aorta_centreline/centerline_regions.npy",
+    "sha256": "1fd69467ec39f088bed59188ac092d3992fd819ecec12c04f59cbfe3867cc2fc",
+    "size": 1144,
+    "source": "Created by Przemyslaw Korzeniowski; converted from aorta_centerline.json to i4h-digital-twin centreline arrays",
+    "owner": "Przemyslaw Korzeniowski",
+    "license": "Apache-2.0",
+    "redistribution_status": "approved",
+    "evidence": [
+      "Creator confirmation: original asset approved for publication under Apache-2.0 on 2026-10-20."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/vessels/aorta_centreline/vessel_regions.yaml",
+    "sha256": "246c4cc062acfd1af73d165121614c880b2656adf2681beb9fa6a64ff3189a71",
+    "size": 279,
+    "source": "Created by Przemyslaw Korzeniowski; converted from aorta_centerline.json to i4h-digital-twin centreline arrays",
     "owner": "Przemyslaw Korzeniowski",
     "license": "Apache-2.0",
     "redistribution_status": "approved",

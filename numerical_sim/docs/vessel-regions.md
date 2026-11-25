@@ -5,9 +5,13 @@ aortic trunk (1), left iliac/femoral (2), and arch outlets (3–11). The configu
 right-femoral entry identifies branch 0. Arch outlets deliberately carry no more
 specific arterial labels. These groups cover all 254 original edges.
 
-The `assets.aorta.centreline.regions` value accepts an inline mapping or a YAML
-file path. File paths are relative to the process working directory, not the case;
-`${DATA}` expands from explicit `--data` or `I4H_DATA`. An equivalent sidecar is:
+The centreline asset `data/vessels/aorta_centreline/` uses the i4h-digital-twin
+array layout (see the [endoluminal README](../endoluminal/README.md#vessel-centrelines-from-i4h-digital-twin)):
+`centerline_regions.npy` holds each edge's region ID (here its VMTK branch) and
+`vessel_regions.yaml` names the regions. The centreline's `vessel_regions.yaml` is
+the default; `assets.aorta.centreline.regions` may replace it with an inline mapping
+or a YAML file path. File paths are relative to the process working directory, not
+the case; `${DATA}` expands from explicit `--data` or `I4H_DATA`. The shipped sidecar is:
 
 ```yaml
 schema_version: 1
@@ -28,11 +32,11 @@ branches:
 ```
 
 Version 1 allows only `schema_version`, `default`, `branches` and the optional
-`young_modulus_kpa` (below). Region names
-must be nonempty strings. `default` is optional and defaults to `unassigned`;
-`branches` defaults to an empty mapping. Keys match the source JSON's `branch_id`
-(or its list index when omitted), including their type: integer 0 differs from
-string "0". Unknown branch IDs fail. Unlisted branches use the default region.
+`young_modulus_kpa` (below). Region names must be nonempty strings. `default` is
+optional and defaults to `unassigned`; `branches` defaults to an empty mapping.
+Keys are the integer region IDs of `centerline_regions.npy` (the string "0"
+differs from 0); a bundle's own sidecar may also list vessels without centreline
+edges. Other unknown branch IDs fail. Unlisted branches use the default region.
 Welding preserves source provenance; conflicting assignments on a deduplicated
 edge fail. Artificial stitching edges use the default region.
 
