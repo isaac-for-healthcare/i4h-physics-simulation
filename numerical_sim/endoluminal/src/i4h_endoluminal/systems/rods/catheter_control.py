@@ -166,10 +166,10 @@ class CatheterControl(System):
         for value, target, width, dtype in ((positions, self.root_positions, 3, wp.vec3),
                                             (rotations, self.root_rotations, 4, wp.quat)):
             if type(value).__module__.split(".")[0] == "torch":
-                from i4h_physics.stepper import _warp_after_torch
+                from i4h_physics.stepper import warp_after_torch
                 if tuple(value.shape) != (self.scene.envs, width):
                     raise ValueError(f"root pose must have shape ({self.scene.envs}, {width})")
-                _warp_after_torch(value, self.scene.device)
+                warp_after_torch(value, self.scene.device)
                 source = wp.from_torch(value, dtype=dtype)
             elif isinstance(value, wp.array):
                 source = value
