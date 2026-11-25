@@ -89,3 +89,6 @@ bounds are copied unchanged from the prior mechanics campaign.
 Workflow migration and default promotion require separate native-host,
 production-patient, recording/replay and policy-update qualification. Historical
 physics and workflow failures remain evidence; these APIs do not waive them.
+
+The [2026-11-25 qualification report](catheter-runtime-qualification.md) records
+the complete-suite result, focused corrections and outstanding consumer gates.
