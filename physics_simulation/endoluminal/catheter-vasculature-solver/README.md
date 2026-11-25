@@ -10,7 +10,7 @@ This package is designed to run independently: it contains its own solver module
 - Includes vessel-aware catheter extensions (track guidance + mesh containment).
 - Vendors the `SolverXPBDRod` rod solver in-tree and exposes an optional Newton bridge to it (see [Optional Newton bridge](#optional-newton-bridge)).
 - Exposes the rod through Newton's `SolverBase` interface, so it runs under Isaac Lab's Newton Manager.
-- Keeps solver logic self-contained in package modules (no cross-package imports into `vasculature-digital-twin`).
+- Keeps solver logic self-contained in package modules (no imports from the digital twin packages).
 
 ## Package layout
 
@@ -147,40 +147,61 @@ On the pinned Isaac Lab `ffff603` revision, the scene's reset callback must expl
 
 Use `NewtonXPBDRodManager.reset_rod(...)` for rod-only scenes and `NewtonCoupledMJWarpXPBDRodManager.reset_rod(...)` for coupled scenes. Both publish only the selected rod particles and preserve other environments' queued rate or pose commands. The coupled entry point also clears only selected feedback history and resets rigid-solver internals when that solver exposes a reset method, preserving scene-authored body and joint state with `flags=0`. Newer Isaac Lab revisions invoke the managers' `_reset_solver_internals` hooks automatically, so their normal reset path needs no additional explicit call.
 
-## Inter-package integration (with `vasculature-digital-twin`)
+## Inter-package integration (with `patient_digital_twin`)
 
-Use the digital twin package to generate patient-specific CT artifacts, then initialize solver constraints from those artifacts.
+Use the digital twin package to build a patient twin from CT, then initialize solver constraints from its bundle.
 
-These packages ship in the [Isaac for Healthcare digital twin repository](https://github.com/isaac-for-healthcare/i4h-digital-twin) under `patient-digital-twin`. Two pieces matter for interoperability: `vasculature_digital_twin` provides the `vdt-*` commands used below, and `imaging_to_mesh` converts a vessel mask into the vessel USD (`convert_mask_to_usd`) that carries the lumen geometry into simulation.
+`patient_digital_twin` ships in the [Isaac for Healthcare digital twin repository](https://github.com/isaac-for-healthcare/i4h-digital-twin) under `patient-digital-twin`. A patient-twin bundle holds the CT (`volume.npy`), a vessel mask on the CT grid (`vessel_mask.npy`), a navigation centerline graph (`centerline_points.npy`, `centerline_edges.npy`, `centerline_radii.npy`), and the anatomy USD (`patient_anatomy.usdc`). Points are in the scan's physical frame and unit, which `patient_twin.yaml` declares along with `meters_per_unit`; read it rather than assuming millimeters.
 
-1) Generate CT cache + vessel artifacts:
+1) Build a bundle from CT. NV-Segment segments the requested vessels; to start from existing labels instead, see the digital twin README:
 
 ```bash
-vdt-preprocess-ct --nifti /path/to/ct.nii.gz --output-dir /tmp/ct_cache
-vdt-segment-vessels --ct-dir /tmp/ct_cache
+python -m patient_digital_twin \
+  --source nvsegment --input /path/to/ct.nii.gz \
+  --bundle-root /path/to/NV-Segment-CTMR/NV-Segment-CTMR \
+  --classes aorta --format bundle --output /tmp/patient_bundle
 ```
 
-1) Load centerline artifacts and derive an insertion track:
+1) Load the navigation centerline and derive an insertion track:
 
 ```python
+from pathlib import Path
+
 import numpy as np
+import yaml
 
-pts_mm = np.load("/tmp/ct_cache/centerline_points_mm.npy")  # (N, 3), millimeters
-track_start = pts_mm[0] / 1000.0  # convert to meters
-track_dir = pts_mm[1] - pts_mm[0]
+bundle = Path("/tmp/patient_bundle")
+manifest = yaml.safe_load((bundle / "patient_twin.yaml").read_text())
+artifacts, to_meters = manifest["artifacts"], manifest["meters_per_unit"]
+points = np.load(bundle / artifacts["centerline_points"]) * to_meters  # (N, 3), meters
+edges = np.load(bundle / artifacts["centerline_edges"])  # (E, 2) point-index pairs
+
+# Insert from a graph endpoint (choose the one at your access site) along its edge.
+start = int(np.flatnonzero(np.bincount(edges.ravel(), minlength=len(points)) == 1)[0])
+edge = edges[(edges == start).any(axis=1)][0]
+track_start = points[start]
+track_dir = points[edge[edge != start][0]] - track_start
 track_dir = track_dir / (np.linalg.norm(track_dir) + 1e-12)
-track_length = float(np.linalg.norm((pts_mm[-1] - pts_mm[0]) / 1000.0))
+track_length = float(np.linalg.norm(points - track_start, axis=1).max())
 ```
 
-1) (Optional) Build a vessel collision mesh from the digital twin mask:
+1) (Optional) Build a vessel collision mesh from the bundle's vessel mask, in the same frame:
 
 ```python
-from vasculature_digital_twin.vasculature import extract_vessel_mesh
+import warp as wp
+from patient_digital_twin.geometry import mask_to_mesh, transform_points
 
-vessel_mask = np.load("/tmp/ct_cache/vessel_mask.npy")
-vessel_mesh = extract_vessel_mesh(
-    vessel_mask=vessel_mask,
-    spacing_zyx_mm=(1.0, 1.0, 1.0),  # replace with metadata spacing for accurate scale
+volume = yaml.safe_load((bundle / artifacts["volume_metadata"]).read_text())
+axes = volume["output"]["array_axes"]  # array order of the CT and masks, e.g. "ijk"
+mask = np.load(bundle / artifacts["vessel_mask"]).transpose([axes.index(c) for c in "kji"])
+voxels, faces = mask_to_mesh(mask)  # closed surface in voxel (i, j, k) coordinates
+voxel_to_scan = np.asarray(manifest["transforms"]["voxel_to_scan"])
+verts = transform_points(voxels, voxel_to_scan) * to_meters
+if np.linalg.det(voxel_to_scan[:3, :3]) < 0:
+    faces = faces[:, ::-1]  # keep normals outward on a mirrored grid
+vessel_mesh = wp.Mesh(
+    points=wp.array(verts.astype(np.float32), dtype=wp.vec3, device="cuda"),
+    indices=wp.array(faces.flatten(), dtype=int, device="cuda"),
 )
 ```
 
