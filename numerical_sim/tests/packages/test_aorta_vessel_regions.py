@@ -8,7 +8,7 @@ from tissue_helpers import aorta
 
 
 def test_shipped_aorta_regions_assign_every_edge():
-    cfg, authoring, _ = aorta("cuda:0", envs=1)
+    cfg, authoring, _ = aorta("cpu", envs=1)
     regions = authoring.scene.body("aorta").regions
     assert regions.names[0] == "unassigned"
     assert set(regions.names[1:]) == {"aortic_trunk", "right_iliac_femoral", "left_iliac_femoral", "arch_outlets"}
