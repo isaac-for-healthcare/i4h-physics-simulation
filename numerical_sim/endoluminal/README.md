@@ -32,7 +32,7 @@ body.export_patient_twin("patient_bundle", vessel_names=["aorta", "iliac_artery_
 | `centerline_edges.npy` | (E, 2) point-index pairs |
 | `centerline_radii.npy` | (N,) lumen radius per point |
 | `centerline_regions.npy` | Optional (E,) region ID per edge; every edge is region 0 without it |
-| `vessel_regions.yaml` | Optional region names and wall moduli ([vessel regions](../docs/vessel-regions.md)) |
+| `vessel_regions.yaml` | Optional region names and wall moduli ([vessel regions](vessel-regions.md)) |
 
 Start from the `aorta_centreline` case and point its vessel at the bundle:
 

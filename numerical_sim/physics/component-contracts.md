@@ -105,7 +105,7 @@ They come from the feasibility spike recorded at the end, and every test of thos
 - The catheter's reaction is the root's hold plus the guide's snaps:
   - **Root hold.** With `rod_direct`, the root's hold is the negated stretch multipliers of the first edge: the impulse the rod's constraints would give the locked root. `rod_pbd` has no multipliers, so `two_way` with it is rejected.
   - **Guide snaps.** The guide's contribution is `Σ m·Δx` of its snaps, with their moment about the root.
-  - **The root's bending and twisting moment:** the rotational Jacobian contraction of the first edge's multipliers, as the reference's `proximal_wrench` does. It is meaningful only with `rod_direct.inertia: physical`: with the unit inertia, a light rod's frames carry its weight's torque instead of the root (F5, docs/catheter-parity.md).
+  - **The root's bending and twisting moment:** the rotational Jacobian contraction of the first edge's multipliers, as the reference's `proximal_wrench` does. It is meaningful only with `rod_direct.inertia: physical`: with the unit inertia, a light rod's frames carry its weight's torque instead of the root (F5, [catheter parity](../endoluminal/catheter-parity.md)).
   - **Checks.** The tests check the hold against the weight of a cantilever, and the PBD momentum identity step by step.
 - `one_way` drives the mounts only; `two_way` also writes the reactions.
 
@@ -199,7 +199,7 @@ The source contains conflicting physical-unit descriptions: `aorta_centreline.ya
 says the source mesh is in mm, uses `scale: 0.01`, and describes one scene unit as
 about 10 cm. `aorta_static.yaml` loads the same vessel at `scale: 0.01` but labels
 its coordinates as metres and its 192-node, 0.05-unit-segment catheter as 9.55 m.
-`docs/xr.md` also describes the chole XR scale as one scene unit per metre.
+The [historical XR guide](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/xr.md) also describes the chole XR scale as one scene unit per metre.
 The loader applies configured scale/rotation/translation numerically. These
 case-specific comments do not establish a common physical conversion across assets
 or settle QA's physical-unit concern. Report **case-coordinate units**; no definitive
@@ -301,5 +301,100 @@ The coupled wrapper routes custom arrays to i4h and native `CONTACT_F` to
 MuJoCo-Warp, including subset selection. Pure i4h continues to reject native
 `CONTACT_F`. Surgical export must not be interpreted as native rigid contacts.
 
-See [vessel regions](vessel-regions.md) for the aorta branch mapping, sidecar schema
-and multiplier semantics. Territory calibration remains deferred.
+See [vessel regions](../endoluminal/vessel-regions.md) for the aorta branch mapping,
+sidecar schema and material multiplier calculations. Territory calibration remains deferred.
+
+## Historical Stage C acceptance and verification limits
+
+Stage C was accepted on 2026-11-16 under the rule allowing only `aorta_shell`
+catheter-impulse reference failures. The final frozen campaign passed 35/36
+reference groups and 17/18 chole trials (each group at least 2/3).
+That acceptance is historical; it does not verify today's source or fix the deferred
+defects below. The ownership and continuation rules remain the maintained contract.
+See the [closure report](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/stage-c-closure.md) and
+[final checkpoint](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/stage-c44.md) for exact stack and endpoints.
+
+## Storage ownership and lifecycle
+
+Newton Model, State and Control hold the fields below, declared on the builder before finalize. Systems hold views of them. The table is by data family, not per system. Its chole rows were checked against the declarations of a bound `chole_tet_med` runtime; the rod and catheter row is taken from the C3.2 report.
+
+| Data | Owner | Since |
+| --- | --- | --- |
+| Particle positions, velocities, forces, previous positions and live flags | State | C2.1 |
+| Tet mechanics storage and topology masks | State | C2.3 |
+| Surface live topology and support counters | State | C2.4 |
+| Fluid pool particles | State | C2.2 |
+| Instrument poses, jaw state and commands | State and Control | C3.1 |
+| Rod frames, angular velocity, material tables; catheter commands | State, Model and Control | C3.2 |
+| Mount flags and transforms | Model and Control | C3.3 |
+| Centreline positions and counts; Hook, Grasp, VolumetricGrasp and Clipping slots; the six tool residue arrays | State | C4.1 |
+| Heat, burn, coagulation, surface colour; fluid, bleeding, emitter, smoke and suction counters; graph containment candidates | State | C4.2 |
+| Rest geometry, per-variant tables, parameters, initialization templates | Model | C2 onward |
+
+Not Newton-owned, by decision or by kind:
+
+- **TipEvidence and Procedure state** are host-owned assessment state (user decision, C4.2).
+- **Scratch** rewritten before it is read inside a step: constraint deltas, contact records, containment `sides`, fluid neighbour lists and the hash grid, `heat_next`.
+- **Outputs** of a completed step: impulses, moments, ToolForce force and jaw load, observables.
+- **Search trees** of FluidContact, PartContact, ShellContainment and TetContainment: built at binding, refit while stepping, rebuilt by save and restore.
+
+The [historical allocation inventory](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/stage-c-inventory.json) records the reviewed source at its checkpoint. It is not a census or verification of the current tree.
+
+## Three reset-like operations
+
+| Operation | Call | Guarantee |
+| --- | --- | --- |
+| Episode reset | `Stepper.reset`, `PhysicsBinding.reset`, `I4hSolver.restore_episode` | Selected worlds return to authored state, history and command defaults; unselected worlds are bitwise unchanged; an empty selection does nothing |
+| Cache reset | `I4hSolver.reset(state, mask, flags=0)` | Derived caches are refreshed from current state; history is kept |
+| Continuation | `save_i4h` / `restore_i4h` and their binding and component forms | Every declared State and Control field and the scene's own particle rows are copied between containers of one Model; no reset or preparation runs |
+
+Each system's reset keeps its exact earlier behaviour, including what it leaves alone: stale Grasp, VolumetricGrasp and Hook slot bytes, the drag node and target, mounted flags and the instrument's current pose. Three lifecycle writes outside episode reset remain as named exceptions: Hook's disabled `prepare` zeroes `active`, GraphContainment's `prepare` forces a rebuild, and Centreline rewrites its positions and counts from the current particles at binding.
+
+## Continuation contract
+
+- **Recipe:** bind, prepare, then restore.
+- **Hosted order:** write the host's own state, call the simulation's `forward()`, and restore the i4h rows last. Otherwise Isaac Lab's cache reset follows the restore and replaces graph containment's saved rebuild request.
+- **Side effect:** save and restore rebuild the contact search trees. A runtime that saves differs at rounding level from one that never saved.
+- **Masks:** a masked call leaves unselected worlds' State and Control bytes unchanged. Bitwise resume is claimed for unmasked calls only.
+- **Bitwise resume, tested:** on the CPU for the rod, mount, chole, `aorta_centreline` and `aorta_shell` cases; on CUDA for the rod and mount fixtures only. Chole and both aorta cases are not repeatable on CUDA, so there the tests check copy exactness.
+- **Excluded:** a rigid solver's own history (including MuJoCo-Warp's), host time and episode counters, assessment, procedure and tip evidence, renderer state, and HDF5 recordings. With a rigid solver the host restores body state itself.
+
+## Retained failures
+
+None of these was attributed; the user declined attribution work for the first.
+
+| Failure | Where seen | Evidence |
+| --- | --- | --- |
+| `aorta_shell` catheter impulse above three times its noise floor | Zero to two of six groups per campaign (none in C4.0 and C4.2; two in C4.1 and C4.3; Lab 3.0 eager in C4.4) | exact endpoints for C3.1 to C4.4 in the C4.4 certificate |
+| Chole trial failures within the 2-of-3 rule | One to four of 18 trials per campaign; four in C4.3, with eight products not seen before or since | each certificate's `failures` list |
+| Clipping count intermittent (`test_tracker_and_clip`) | Earlier campaigns; did not recur in C4.2 to C4.4 | [C3.0](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/stage-c30.md) through [C4.1](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/stage-c41.md) |
+| `two_worlds` fluid count intermittent | Earlier campaigns; did not recur in C4.2 to C4.4 | same |
+| `test_chole_batched_matches_single` over its 0.2 limit | Once in the C4.3 development selection; single trials over the limit in C4.0 and C4.1 | [C4.3](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/stage-c43.md) |
+
+Raw certificates and approved references are in git-ignored `.tmp_tests`, separate from tracked reports. Historical hash lists are retained only in [Git](https://github.com/isaac-for-healthcare/i4h-physics-simulation/tree/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/qualification/); those hashes do not publish the raw evidence.
+
+## Unverified
+
+- **HDF5 recording and replay**: deferred by user choice; `h5py` is absent from the retained environments.
+- **Tet containment** resume through a fresh runtime: no authored case uses it.
+- **CUDA bitwise resume** for chole and the aorta cases.
+- **Physical calibration**: forces, lengths and rod stiffness are in case units.
+- **Devices, haptics, XR and rendering** are outside every Stage C campaign.
+
+## Known limits of the code
+
+- **Third-party private access** remains in the Isaac Lab 3.0 bridge, the env hooks, the storage layer (Newton custom-attribute internals) and Warp array views. Each is tied to a pinned revision; `scripts/check_private_reaches.py` lists them.
+- **The standalone renderer** shares private names inside its own package.
+- **Construction time** at 64 worlds is about 15 s for chole, of which about 12 s is authoring custom rows.
+- **Memory:** chole retains 1.36 GB of Warp memory at 64 worlds, including initialization templates.
+
+## Deferred beyond Stage C
+
+- **P2: standalone binding settings bypass capture invalidation** (`src/i4h_physics/bindings.py`). Setting `sim.physics.substeps`, `iterations` or `debug` writes the solver's value rather than the Stepper's. After preparing four substeps, setting `sim.physics.substeps = 5` permits stepping without recapture: a gravity-only probe produced `z=-0.006` eagerly and `z=-0.00625` captured, although both reported five substeps. Calling `prepare()` reverts the setting. Until fixed, change settings on the standalone Stepper (`sim.substeps`, `sim.iterations`, `sim.debug`) and call `sim.prepare()`.
+- **P2: observable publishing retains removed systems** (`src/i4h_physics/observables.py`). The publisher caches source instances when allocated. Removing an instrument-contact system and its force consumer, then calling `prepare()` and `step()`, still exported the removed source's stale force (approximately `-14,400` in the review probe). Until fixed, reconstruct the runtime when changing system membership. The fix should reject membership changes after binding or rebuild and validate the publisher's sources.
+- External `particle_f` consumption.
+- Contact geometry export and `soft_contact_capacity`.
+- Physical rod units.
+- Native Rod and VBD mechanics, and migration to Newton's coupled solver.
+- A bulk-authoring request to Newton for the 64-world construction time.
+- An archive location for the references and certificates.
