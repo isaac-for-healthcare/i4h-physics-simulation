@@ -55,5 +55,6 @@ systems:
 render:                           # noop by default; --render slang or gl shows env 0 (Z-up)
   backend: noop
   env: 0
-  tip: {body: catheter}          # C in the window: the endoscope view from the catheter tip (render/rig.py)
+  tip: {body: catheter, distance: 0.0}   # C in the window: the endoscope view from the catheter tip (render/rig.py); the eye at
+                                         # the tip: the default 0.04 behind it is inside the catheter's own 0.02-radius tube
   camera: {position: [9.8, -9.0, 3.0], pitch: -14.8, yaw: 0.0, up: [0.0, 0.0, 1.0], near: 0.05, far: 100.0}   # looks at the aorta from -y

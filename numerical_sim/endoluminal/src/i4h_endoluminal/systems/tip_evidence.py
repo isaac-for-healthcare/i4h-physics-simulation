@@ -24,7 +24,7 @@ class TipEvidence(System):
     structural = ("enabled", "capacity", "node")
 
     def __init__(self, owner, catheter, capacity):
-        super().__init__(owner.sim.scene)
+        super().__init__(owner.scene)
         self.owner = owner
         self.body = catheter.body
         self.node = catheter.distal_node

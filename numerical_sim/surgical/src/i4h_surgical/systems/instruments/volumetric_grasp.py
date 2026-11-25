@@ -47,6 +47,15 @@ class VolumetricGrasp(System):
     refs = ("instruments",)
     structural = System.structural + ("body", "capacity")
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_volumetric_grasp
+        body = authoring.scene.body(spec["body"])
+        return publish_volumetric_grasp(
+            authoring.scene, declarations, spec.get("id", spec["type"]), instruments=spec["instruments"], body=body,
+            capacity=check_int("volumetric_grasp.capacity", spec.get("capacity", cls.capacity), 1),
+            starts=lambda: authoring.particle_starts(body))
+
     def __post_init__(self):
         scene = self.scene
         if not isinstance(self.instruments, InstrumentControl):
@@ -71,17 +80,14 @@ class VolumetricGrasp(System):
         self.register_live("stiffness")
         self.freeze("body", "capacity")
         scene.check_memory({"slots": E * n * G * 24, "delta": E * b.count * 16, "delta_k": E * b.count * max(n, 1) * 24})
-        self.particle = wp.full((E, n, G), -1, dtype=wp.int32, device=dev)  # body-local particle per slot
-        self.sphere = wp.zeros((E, n, G), dtype=wp.int32, device=dev)  # its jaw sphere (global index)
-        self.rest = wp.zeros((E, n, G), dtype=wp.vec3, device=dev)  # particle - sphere at capture
-        self.active = wp.zeros((E, n, G), dtype=wp.int32, device=dev)
-        self.count = wp.zeros((E, n), dtype=wp.int32, device=dev)  # product: held particles
-        self.pending = wp.zeros((E, n), dtype=wp.int32, device=dev)  # armed capture
-        self.claim = wp.zeros((E, n), dtype=wp.int32, device=dev)  # slot cursor of the capture launch
+        # Newton State. Slots (E, n, G): particle (body-local, -1 when free), sphere (its jaw sphere, global index),
+        # rest (particle - sphere at capture), active. Per instrument (E, n): count (product: held particles),
+        # pending (armed capture), claim (slot cursor of the capture launch). delta_k / delta_jaw
+        # (E * count, max(n, 1)): the per-tool share of delta and the same share signed by the jaw side.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "volumetric_grasp", slots=G, body=b, tools=n)
         self.delta = wp.zeros(E * b.count, dtype=wp.vec3, device=dev)
         self.delta_count = wp.zeros(E * b.count, dtype=wp.int32, device=dev)
-        self.delta_k = wp.zeros((E * b.count, max(n, 1)), dtype=wp.vec3, device=dev)  # per-tool share of delta
-        self.delta_jaw = wp.zeros((E * b.count, max(n, 1)), dtype=wp.vec3, device=dev)  # signed by the jaw side
         self.impulse = wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)  # product: sum of m * dx the hold imposed this step
         self.jaw_impulse = wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)  # product: left minus right jaw share
         self.moment = wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)  # product: the impulse's moment about the tool root (coupling)

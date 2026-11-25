@@ -57,6 +57,12 @@ class Smoke(System):
     refs = ("instruments", "contacts", "thermal")
     structural = System.structural + ("instrument", "count", "max_spawn")
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_smoke
+        return publish_smoke(authoring.scene, declarations, spec.get("id", spec["type"]),
+                             count=check_int("smoke.count", spec.get("count", cls.count), 1))
+
     def __post_init__(self):
         scene = self.scene
         ic, cc, th = self.instruments, self.contacts, self.thermal
@@ -77,12 +83,9 @@ class Smoke(System):
         self.up = wp.vec3(*(-scene.down).tolist())
         self._live("rate", "lifetime", "speed", "upward", "spawn_radius")
         E, n, dev = scene.envs, int(self.count), scene.device
-        scene.check_memory({"smoke": E * n * 32})
-        self.pos_age = wp.zeros(E * n, dtype=wp.vec4f, device=dev)
-        self.vel_life = wp.zeros(E * n, dtype=wp.vec4f, device=dev)  # lifetime 0: a dead slot
-        self.cursor = wp.zeros(E, dtype=wp.int32, device=dev)
-        self.acc = wp.zeros(E, dtype=wp.float32, device=dev)
-        self.serial = wp.zeros(E, dtype=wp.int32, device=dev)
+        # Newton State: pos_age, vel_life (E * count,) vec4 (lifetime 0: a dead slot); cursor, acc, serial (E,).
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "smoke", count=n)
         self.hot = wp.zeros(E, dtype=wp.int32, device=dev)  # a source exists this step
         self.centre = wp.zeros(E, dtype=wp.vec3, device=dev)
         self.alive_count = wp.zeros(E, dtype=wp.int32, device=dev)

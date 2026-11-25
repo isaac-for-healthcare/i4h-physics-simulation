@@ -15,17 +15,17 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 
 SEG, R, N = 0.4 / 120, 5.0e-4, 121
 MASS = 7800.0 * math.pi * R * R * SEG  # the workflow's 0.5 mm steel-like wire, 2e-5 kg per node
 
 
-def case(inertia="unit", tip_mapping="per_edge", gravity=(0.0, 0.0, -9.81), tip_edges=8):
-    return {"sim": {"device": "cuda:0", "envs": 1, "dt": 1.0 / 120, "substeps": 1, "iterations": 1, "cuda_graph": False,
+def case(inertia="unit", tip_mapping="per_edge", gravity=(0.0, 0.0, -9.81), tip_edges=8, envs=1, mass=MASS):
+    return {"sim": {"device": "cuda:0", "envs": envs, "dt": 1.0 / 120, "substeps": 1, "iterations": 1, "cuda_graph": False,
                     "gravity": list(gravity)},
             "assets": {"catheter": {"type": "rod", "start": [0.0, 0.0, 0.5], "direction": [1.0, 0.0, 0.0], "count": N,
-                                    "segment_length": SEG, "radius": R, "mass": MASS}},
+                                    "segment_length": SEG, "radius": R, "mass": mass}},
             "systems": [{"type": "particles", "damping": 0.99},
                         {"type": "rod_direct", "id": "rod", "body": "catheter", "young": 1.0e9, "torsion": 3.846e8,
                          "bend": 4 * 0.1 * (math.pi * R**4 / 4) / SEG**2, "twist": 4 * 0.4 * (math.pi * R**4 / 2) / SEG**2,
@@ -125,3 +125,43 @@ def test_parity_tube_bend_keeps_ours_in_the_lumen():
     gap = np.linalg.norm(q[:, None] - (lumen[None, :-1] + t[..., None] * seg[None]), axis=-1).min(axis=1)
     assert gap.max() <= parity.TUBE_RADIUS - rod.radius + 2e-4, gap.max()
     assert q[-1, 1] > 0.05, "the tip turned into the +y leg"
+
+
+@pytest.mark.parametrize("captured", [False, True])
+@pytest.mark.parametrize("field,factor", [("inv_mass", 0.1), ("radius", 1.5)])
+def test_physical_inertia_follows_each_envs_parameters(captured, field, factor):
+    """Preparation refreshes per-env model inertia after mass or radius edits.
+
+    Both the changed environment and its peer match independent rods, including
+    graph recapture after an already prepared runtime's parameters change.
+    """
+    batch = load_case(case("physical", envs=2))
+    batch.cuda_graph = captured
+    batch.prepare()
+    body = batch.scene.body("catheter")
+    rod = system(batch, "RodDirect")
+    pointer = rod.inertia_local.ptr
+    parameter = batch.scene.field(field, body)
+    rows = parameter.numpy()
+    rows[1] *= factor
+    parameter.assign(rows)
+    batch.prepare()
+    assert rod.inertia_local.ptr == pointer
+    reference = load_case(case("physical"))
+    changed_cfg = case("physical", mass=MASS / factor if field == "inv_mass" else MASS)
+    if field == "radius":
+        changed_cfg["assets"]["catheter"]["radius"] *= factor
+    changed = load_case(changed_cfg)
+    for sim in (reference, changed):
+        sim.cuda_graph = captured
+        sim.prepare()
+    for _ in range(120):
+        batch.step()
+        reference.step()
+        changed.step()
+    positions = batch.scene.field("q", body).numpy()
+    for env, sim in enumerate((reference, changed)):
+        np.testing.assert_allclose(positions[env], sim.scene.field("q", sim.scene.body("catheter")).numpy()[0], atol=1e-5)
+    local = rod.inertia_local.numpy().reshape(2, N, 3)
+    for env, sim in enumerate((reference, changed)):
+        np.testing.assert_allclose(local[env], system(sim, "RodDirect").inertia_local.numpy().reshape(N, 3), rtol=1e-5)

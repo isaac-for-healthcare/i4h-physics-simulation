@@ -38,6 +38,12 @@ class Grasp(System):
 
     refs = ("instruments", "contacts")
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_grasp
+        return publish_grasp(authoring.scene, declarations, spec.get("id", spec["type"]), instruments=spec["instruments"],
+                             contacts=spec["contacts"])
+
     def __post_init__(self):
         scene = self.scene
         if not isinstance(self.instruments, InstrumentControl) or not isinstance(self.contacts, InstrumentContact):
@@ -56,24 +62,15 @@ class Grasp(System):
         self.grasps = wp.array(np.int32([r.kind == "grasper" for r in scene.instruments.values()]).reshape(n), dtype=wp.int32, device=dev)
         self.delta = wp.zeros(E * self.body.count, dtype=wp.vec3, device=dev)
         self.delta_count = wp.zeros(E * self.body.count, dtype=wp.int32, device=dev)
-        self.delta_k = wp.zeros((E * self.body.count, max(n, 1)), dtype=wp.vec3, device=dev)  # per-tool share of delta
-        self.delta_jaw = wp.zeros((E * self.body.count, max(n, 1)), dtype=wp.vec3, device=dev)  # signed by the jaw side
         self.impulse = wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)  # product: sum of m * dx the hold imposed this step
         self.jaw_impulse = wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)  # product: left minus right jaw share
         self.moment = wp.zeros((E, max(n, 1)), dtype=wp.vec3, device=dev)  # product: the impulse's moment about the tool root (coupling)
         # Slots (E, n, G): capsule, coordinate along it, radial direction, previous axis, triangle (vertices and
         # owning tet), barycentric, gap.
-        self.prim = wp.full((E, n, G), -1, dtype=wp.int32, device=dev)
-        self.tet = wp.full((E, n, G), -1, dtype=wp.int32, device=dev)
-        self.t = wp.zeros((E, n, G), dtype=wp.float32, device=dev)
-        self.radial = wp.zeros((E, n, G), dtype=wp.vec3, device=dev)
-        self.prev_axis = wp.zeros((E, n, G), dtype=wp.vec3, device=dev)
-        self.verts = wp.zeros((E, n, G), dtype=wp.vec3i, device=dev)
-        self.bary = wp.zeros((E, n, G), dtype=wp.vec3, device=dev)
-        self.gap = wp.zeros((E, n, G), dtype=wp.float32, device=dev)
-        self.active = wp.zeros((E, n, G), dtype=wp.int32, device=dev)
-        self.count = wp.zeros((E, n), dtype=wp.int32, device=dev)
-        self.pending = wp.zeros((E, n), dtype=wp.int32, device=dev)  # armed capture per instrument
+        # These slot fields, count and pending (the armed capture per instrument) (E, n), and the per-tool shares
+        # delta_k / delta_jaw (E * count, max(n, 1)) are Newton State; prim and tet start at -1.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "grasp", slots=G, body=self.body, tools=n)
         self._substep, self._substeps = 0, 1
 
 
@@ -98,7 +95,7 @@ class Grasp(System):
         wp.launch(
             hold_grasps,
             dim=(scene.envs, ic.count * self.slots),
-            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.active, ic.prim_a,
+            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.tet_fields.active, ic.prim_a,
                     ic.prim_b, ic.sphere_q_prev, ic.sphere_q, ic.sphere_radius, ic.sphere_jaw_sign, self.stiffness, alpha, iterations,
                     self.slots, b.count, self.tet,
                     self.prim, self.t, self.verts, self.bary, self.gap],
@@ -117,7 +114,7 @@ class Grasp(System):
         wp.launch(
             revalidate_grasps,
             dim=(scene.envs, ic.count * self.slots),
-            inputs=[cc.record_count, cc.rec_verts, cc.rec_normal, cc.rec_pen, self.surface.active, self.prim, self.verts,
+            inputs=[cc.record_count, cc.rec_verts, cc.rec_normal, cc.rec_pen, self.surface.tet_fields.active, self.prim, self.verts,
                     self.tet, self.radial, self.slots],
             outputs=[self.active],
             device=scene.device,
@@ -127,7 +124,7 @@ class Grasp(System):
         wp.launch(
             capture_grasps,
             dim=(scene.envs, ic.count),
-            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.active, self.grasps,
+            inputs=[scene.field("q", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.tet_fields.active, self.grasps,
                     ic.grasp_pending, ic.prim_start,
                     ic.prim_counts, ic.prim_kind, ic.prim_a, ic.prim_b, ic.sphere_q, ic.sphere_radius, ic.sphere_active,
                     cc.margin, cc.record_count, cc.rec_tri, cc.rec_tet, cc.rec_verts, cc.rec_bary, cc.rec_pen, cc.rec_normal,

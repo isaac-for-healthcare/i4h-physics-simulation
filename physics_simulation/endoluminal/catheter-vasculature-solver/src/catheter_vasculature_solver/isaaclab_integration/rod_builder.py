@@ -69,19 +69,20 @@ def rod_config_from_solver_cfg(solver_cfg: Any, *, device: str) -> RodConfig:
     )
 
 
-def particle_mass_from_rod_config(config: RodConfig) -> float:
+def particle_mass_from_rod_config(config: RodConfig, segment_length: float | None = None) -> float:
     """Uniform per-particle mass [kg] from cylinder segment density.
 
     Mirrors the rod solver's own mass computation so Newton and the rod agree.
     Clamped away from zero because a zero mass marks a particle kinematic in
-    Newton, which is reserved for the locked root.
+    Newton, which is reserved for the locked root. ``segment_length`` overrides
+    the config's, for a rod whose length differs per environment.
     """
     r = (
         float(config.geometry.radius)
         if not isinstance(config.geometry.radius, list)
         else float(config.geometry.radius[0])
     )
-    length = float(config.geometry.segment_length)
+    length = float(config.geometry.segment_length if segment_length is None else segment_length)
     density = float(config.material.density)
     return max(math.pi * r * r * length * density, 1.0e-9)
 
@@ -100,6 +101,7 @@ def initial_rod_positions(
     initial_height: float = 0.5,
     start: np.ndarray | None = None,
     direction: np.ndarray | None = None,
+    segment_length: float | None = None,
 ) -> np.ndarray:
     """Build the rod's rest particle positions.
 
@@ -116,12 +118,14 @@ def initial_rod_positions(
         start: Optional world-space origin ``(3,)``.
         direction: Optional unit insertion direction ``(3,)``. Defaults to +X,
             matching the solver's rest orientation.
+        segment_length: Optional particle spacing overriding the config's, for
+            an env whose rod length differs.
 
     Returns:
         ``(num_segments + 1, 3)`` float32 particle positions.
     """
     num_points = int(config.geometry.num_segments) + 1
-    length = float(config.geometry.segment_length)
+    length = float(config.geometry.segment_length if segment_length is None else segment_length)
 
     if start is None:
         origin = np.array([0.0, 0.0, float(initial_height)], dtype=np.float32)
@@ -141,6 +145,37 @@ def initial_rod_positions(
     return (origin[None, :] + axis[None, :] * offsets).astype(np.float32)
 
 
+def _per_env_vectors(value, num_envs: int, name: str) -> list:
+    """``value`` as one ``(3,)`` vector (or ``None``) per env."""
+    if value is None:
+        return [None] * num_envs
+    vectors = np.asarray(value, dtype=np.float32)
+    if vectors.ndim == 1:
+        return [vectors] * num_envs
+    if vectors.shape != (num_envs, 3):
+        raise ValueError(f"{name} must have shape (3,) or ({num_envs}, 3), got {vectors.shape}")
+    return list(vectors)
+
+
+# Chords along a curved seed route are shorter than the arc they span, so a
+# spacing check needs slack; a wrong per-env length is off by far more.
+_SPACING_RTOL = 0.25
+
+
+def _check_env_spacing(positions: np.ndarray, lengths: np.ndarray) -> None:
+    """Require each env's explicit particle spacing to match its segment length."""
+    edges = np.linalg.norm(np.diff(positions.astype(np.float64), axis=1), axis=-1)
+    ratios = edges / lengths[:, None]
+    bad = np.flatnonzero(np.any(np.abs(ratios - 1.0) > _SPACING_RTOL, axis=1))
+    if bad.size:
+        env = int(bad[0])
+        raise ValueError(
+            f"positions for env {env} are spaced {edges[env].min():.4g}-{edges[env].max():.4g} m but "
+            f"env_segment_lengths[{env}] is {lengths[env]:.4g} m; the rod would snap to its rest "
+            "length on the first step"
+        )
+
+
 def add_catheter_rod_to_builder(
     builder: Any,
     config: RodConfig,
@@ -151,20 +186,30 @@ def add_catheter_rod_to_builder(
     direction: np.ndarray | None = None,
     lock_root: bool = True,
     num_envs: int = 1,
+    env_segment_lengths: Any = None,
 ) -> RodParticleRange:
     """Add one rod's particles (or ``num_envs`` replicas) to a Newton builder.
 
     Args:
         builder: Newton ``ModelBuilder`` being populated before finalize.
         config: Rod geometry / material config, also used by the solver.
-        positions: Optional explicit ``(num_segments + 1, 3)`` rest positions.
-            Defaults to :func:`initial_rod_positions`.
+        positions: Optional explicit rest positions: ``(num_segments + 1, 3)``
+            shared by every replica, or ``(num_envs, num_segments + 1, 3)`` with
+            one shape per env (each env's own route into its own anatomy).
+            Defaults to :func:`initial_rod_positions`. With
+            ``env_segment_lengths``, each env's spacing must match its length.
         initial_height: Forwarded to :func:`initial_rod_positions`.
-        start: Forwarded to :func:`initial_rod_positions`.
-        direction: Forwarded to :func:`initial_rod_positions`.
+        start: Forwarded to :func:`initial_rod_positions`; ``(3,)`` or
+            ``(num_envs, 3)``.
+        direction: Forwarded to :func:`initial_rod_positions`; ``(3,)`` or
+            ``(num_envs, 3)``.
         lock_root: Give the root particle zero mass so Newton treats it as
             kinematic, matching the rod solver's locked root.
         num_envs: Number of rods to replicate into the same model.
+        env_segment_lengths: Optional ``(num_envs,)`` segment length per env,
+            matching the solver's ``env_segment_lengths`` so each env's particle
+            spacing and mass agree with its rod. Defaults to the config's
+            segment length.
 
     Returns:
         The :class:`~catheter_vasculature_solver.newton_rod_bridge.RodParticleRange`
@@ -175,29 +220,49 @@ def add_catheter_rod_to_builder(
         raise ValueError(f"num_envs must be >= 1, got {num_envs}")
 
     num_points = int(config.geometry.num_segments) + 1
+    lengths = None
+    if env_segment_lengths is not None:
+        lengths = np.asarray(env_segment_lengths, dtype=np.float64).reshape(-1)
+        if lengths.shape != (num_envs,):
+            raise ValueError(f"env_segment_lengths must have shape ({num_envs},), got {lengths.shape}")
+        if not np.all(np.isfinite(lengths)) or np.any(lengths <= 0.0):
+            raise ValueError("env_segment_lengths must be finite and positive")
+
     if positions is None:
-        positions = initial_rod_positions(
-            config, initial_height=initial_height, start=start, direction=direction
-        )
+        starts = _per_env_vectors(start, num_envs, "start")
+        directions = _per_env_vectors(direction, num_envs, "direction")
+        env_lengths = [None] * num_envs if lengths is None else [float(length) for length in lengths]
+        positions = np.stack([
+            initial_rod_positions(
+                config, initial_height=initial_height, start=s, direction=d, segment_length=length
+            )
+            for s, d, length in zip(starts, directions, env_lengths, strict=True)
+        ])
     else:
         positions = np.asarray(positions, dtype=np.float32)
-    if positions.shape != (num_points, 3):
+        if positions.ndim == 2:
+            positions = np.broadcast_to(positions, (num_envs,) + positions.shape)
+    if positions.shape != (num_envs, num_points, 3):
         raise ValueError(
-            f"positions must have shape ({num_points}, 3) to match num_segments + 1, "
-            f"got {positions.shape}"
+            f"positions must have shape ({num_points}, 3) or ({num_envs}, {num_points}, 3) "
+            f"to match num_segments + 1, got {positions.shape}"
         )
 
     radius = config.geometry.radius
     radius = float(radius[0]) if isinstance(radius, list) else float(radius)
-    particle_mass = particle_mass_from_rod_config(config)
+    if lengths is None:
+        particle_masses = [particle_mass_from_rod_config(config)] * num_envs
+    else:
+        _check_env_spacing(positions, lengths)
+        particle_masses = [particle_mass_from_rod_config(config, float(length)) for length in lengths]
     zero_velocity = (0.0, 0.0, 0.0)
 
     offset = int(builder.particle_count)
-    for _ in range(num_envs):
+    for env in range(num_envs):
         for index in range(num_points):
-            mass = 0.0 if (lock_root and index == 0) else particle_mass
+            mass = 0.0 if (lock_root and index == 0) else particle_masses[env]
             builder.add_particle(
-                pos=tuple(float(v) for v in positions[index]),
+                pos=tuple(float(v) for v in positions[env, index]),
                 vel=zero_velocity,
                 mass=mass,
                 radius=radius,

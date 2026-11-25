@@ -8,9 +8,7 @@ from importlib.util import find_spec
 import gymnasium as gym
 import i4h_isaaclab.tasks as tasks
 import torch
-from i4h_isaaclab.newton_manager import I4hNewtonManager
 from isaaclab.sim import SimulationContext
-from isaaclab_newton.physics import NewtonManager
 
 owning = sys.argv[1]
 other = "i4h_surgical" if owning == "endoluminal" else "i4h_endoluminal"
@@ -35,7 +33,4 @@ for task in selected:
         env.close()
         if SimulationContext.instance() is not None:
             SimulationContext.clear_instance()
-        I4hNewtonManager.on_solver.clear()
-        I4hNewtonManager.simulator = None
-        NewtonManager.clear()
 print(f"{len(selected)} installed {owning} gym IDs passed")

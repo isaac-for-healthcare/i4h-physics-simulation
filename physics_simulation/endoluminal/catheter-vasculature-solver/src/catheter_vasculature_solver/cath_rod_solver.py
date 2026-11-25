@@ -318,8 +318,8 @@ def _segment_segment_barycentric(a0: wp.vec3, a1: wp.vec3, b0: wp.vec3, b1: wp.v
 def _track_sliding_kernel(
     predicted_positions: wp.array(dtype=wp.vec3),
     inv_masses: wp.array(dtype=wp.float32),
-    track_start: wp.vec3,
-    track_dir: wp.vec3,
+    track_starts: wp.array(dtype=wp.vec3),
+    track_dirs: wp.array(dtype=wp.vec3),
     track_length: float,
     track_stiffness: float,
     end_idx: int,
@@ -329,7 +329,8 @@ def _track_sliding_kernel(
 
     ``points_per_env`` makes the non-tip test env-local, so one launch covers a
     whole batch. Single-env callers pass ``num_points``, for which the modulo is
-    the identity and behaviour is unchanged.
+    the identity and behaviour is unchanged. ``track_starts`` and ``track_dirs``
+    hold one axis per env, or a single axis every env shares.
     """
     i = wp.tid()
     if i % points_per_env >= end_idx:
@@ -337,6 +338,9 @@ def _track_sliding_kernel(
     if inv_masses[i] <= 0.0:
         return
 
+    track = wp.min(i // points_per_env, track_starts.shape[0] - 1)
+    track_start = track_starts[track]
+    track_dir = track_dirs[track]
     p = predicted_positions[i]
     t = wp.clamp(wp.dot(p - track_start, track_dir), 0.0, track_length)
     proj = track_start + track_dir * t
@@ -348,7 +352,7 @@ def _track_polyline_kernel(
     predicted_positions: wp.array(dtype=wp.vec3),
     inv_masses: wp.array(dtype=float),
     track_path: wp.array(dtype=wp.vec3),
-    path_count: int,
+    path_offsets: wp.array(dtype=wp.int32),
     track_stiffness: float,
     end_idx: int,
     points_per_env: int,
@@ -373,9 +377,10 @@ def _track_polyline_kernel(
     solve instead of overruling it, and ``end_idx`` leaves the distal tip free to
     deform and steer.
 
-    ``path_count`` is the number of points in ``track_path``, which is shared
-    across environments; ``points_per_env`` makes the non-tip test env-local so
-    one launch covers a whole batch.
+    ``track_path`` holds every route back to back: route ``r`` is the points
+    ``[path_offsets[r], path_offsets[r + 1])``. There is one route per env, or a
+    single route every env shares. ``points_per_env`` makes the non-tip test and
+    the route lookup env-local so one launch covers a whole batch.
     """
     i = wp.tid()
     if i % points_per_env >= end_idx:
@@ -384,16 +389,19 @@ def _track_polyline_kernel(
     # zeroed. Guidance must not fight the pose the holder asked for.
     if inv_masses[i] <= 0.0:
         return
-    if path_count < 2:
+    route = wp.min(i // points_per_env, path_offsets.shape[0] - 2)
+    first = path_offsets[route]
+    last = path_offsets[route + 1]
+    if last - first < 2:
         return
 
     p = predicted_positions[i]
-    closest = track_path[0]
+    closest = track_path[first]
     best = wp.dot(p - closest, p - closest)
     # Brute force over segments, as the containment kernel does over centerline
     # edges: a centerline resampled for a catheter is hundreds of points, and a
     # BVH would have to be refit every step once the vessel deforms.
-    for segment in range(path_count - 1):
+    for segment in range(first, last - 1):
         a = track_path[segment]
         ab = track_path[segment + 1] - a
         span = wp.dot(ab, ab)
@@ -1167,18 +1175,25 @@ class CathRodSolver(XPBDRodSolver):
         *args: Positional arguments forwarded to :class:`XPBDRodSolver`.
         collision_mesh: Closed triangle mesh defining the vessel interior.
             Pass ``None`` to disable collision (track guidance still runs).
-        track_start: World-space origin of the insertion axis, shape ``(3,)``.
-        track_dir: Unit direction of the insertion axis, shape ``(3,)``.
+        track_start: World-space origin of the insertion axis, shape ``(3,)``
+            shared by every env, or ``(num_envs, 3)`` with one origin per env.
+        track_dir: Direction of the insertion axis, ``(3,)`` or
+            ``(num_envs, 3)`` like ``track_start``; normalized here.
         track_length: Maximum insertion distance along the axis (metres).
         tip_num_edges: Number of distal rod edges treated as the free tip;
             particles beyond index ``num_points - tip_num_edges`` are *not*
             snapped to the track.
         particle_radius: Effective rod radius for collision detection (metres).
         segment_length: Rest length of a single rod segment (metres).  Used
-            to set the default ``max_dist`` BVH search radius.
+            to set the default ``max_dist`` BVH search radius, together with
+            the longest of ``env_segment_lengths`` when that is given.
         track_stiffness: Blend factor for track snapping (``0`` = free,
             ``1`` = perfectly locked to axis).
         track_enabled: Toggle track guidance on/off.
+        track_path: Optional ordered route, proximal to distal, that replaces the
+            straight axis: one ``(N, 3)`` route shared by every env, a
+            ``(num_envs, N, 3)`` array, or a sequence of ``(N_e, 3)`` routes,
+            one per env, whose lengths may differ.
         proximal_feed_span: How many nodes ahead of the root supply the
             insertion direction. One is the rod's own first-segment tangent,
             which a fold at the root turns -- and the push then drives further
@@ -1283,18 +1298,11 @@ class CathRodSolver(XPBDRodSolver):
     ):
         super().__init__(*args, **kwargs)
 
-        track_start = np.asarray(track_start, dtype=np.float32)
-        track_dir = np.asarray(track_dir, dtype=np.float32)
-        norm = np.linalg.norm(track_dir)
-        if norm <= 0.0:
-            raise ValueError("track_dir must be non-zero")
-        track_dir = track_dir / norm
+        self.set_track_axes(track_start, track_dir)
 
         self.collision_mesh = collision_mesh
         self.collision_mesh_normals = collision_mesh_normals
         self.smooth_collision_normals_enabled = bool(smooth_collision_normals_enabled)
-        self.track_start = wp.vec3(float(track_start[0]), float(track_start[1]), float(track_start[2]))
-        self.track_dir = wp.vec3(float(track_dir[0]), float(track_dir[1]), float(track_dir[2]))
         self.track_length = float(track_length)
         self.tip_num_edges = int(tip_num_edges)
         # Rest curvature as authored, snapshotted the first time a tip bend is
@@ -1316,8 +1324,7 @@ class CathRodSolver(XPBDRodSolver):
         # Kept on the host and uploaded per device on first use, matching how the
         # collision-normal buffers are handled: the workspace device is not known
         # until a step runs.
-        self._track_path_host = self._validated_track_path(track_path)
-        self._track_path_device: dict[str, wp.array] = {}
+        self.set_track_path(track_path)
         # Defaults to post for the straight rail, which is where it has always
         # run. A curved track wants pre instead, so that the distance
         # constraints are what finally set the chord lengths.
@@ -1358,9 +1365,8 @@ class CathRodSolver(XPBDRodSolver):
             self.set_collision_projection_stage(collision_projection_stage)
         self.sign_scale = float(sign_scale)
         self.target_phi = float(target_phi) if target_phi is not None else -float(particle_radius)
-        self.max_dist = (
-            float(max_dist) if max_dist is not None else 2.0 * float(particle_radius) + float(segment_length)
-        )
+        longest_segment = max(float(segment_length), *self.env_segment_lengths)
+        self.max_dist = float(max_dist) if max_dist is not None else 2.0 * float(particle_radius) + longest_segment
 
         # Centerline Cosserat vessel (optional). The centerline is its own
         # collision path, so it carries its own stage rather than reusing the
@@ -1404,8 +1410,87 @@ class CathRodSolver(XPBDRodSolver):
             collision_mesh_normals: Optional pre-computed smooth vertex normals
                 on the solver device.
         """
+        self._require_single_anatomy_for_mesh(mesh=collision_mesh)
         self.collision_mesh = collision_mesh
         self.collision_mesh_normals = collision_mesh_normals
+
+    @property
+    def track_starts(self) -> np.ndarray:
+        """Insertion-axis origins, ``(T, 3)`` with ``T`` 1 or ``num_envs``. Read-only."""
+        return self._track_starts
+
+    @property
+    def track_dirs(self) -> np.ndarray:
+        """Unit insertion directions matching :attr:`track_starts`. Read-only."""
+        return self._track_dirs
+
+    @property
+    def track_start(self) -> wp.vec3:
+        """The first env's insertion origin, for callers that read a single track."""
+        return wp.vec3(*(float(v) for v in self._track_starts[0]))
+
+    @property
+    def track_dir(self) -> wp.vec3:
+        """The first env's insertion direction, for callers that read a single track."""
+        return wp.vec3(*(float(v) for v in self._track_dirs[0]))
+
+    def set_track_axes(self, track_start, track_dir) -> None:
+        """Replace the insertion axes, one shared or one per env.
+
+        The axes are uploaded to each device once, so they are read-only
+        attributes and change only through here, which drops the uploads.
+        """
+        starts, dirs = self._validated_track_axes(track_start, track_dir)
+        starts = starts.copy()
+        starts.flags.writeable = False
+        dirs.flags.writeable = False
+        self._track_starts, self._track_dirs = starts, dirs
+        self._track_axes_device: dict[str, tuple[wp.array, wp.array]] = {}
+
+    def set_track_path(self, track_path) -> None:
+        """Replace the guidance routes, or pass ``None`` for the straight rail.
+
+        Accepts the same forms as the ``track_path`` constructor argument and
+        drops the per-device uploads of the previous routes.
+        """
+        path = self._validated_track_path(track_path)
+        self._require_single_anatomy_for_mesh(path=path)
+        self._track_path_host = path
+        self._track_path_device: dict[str, tuple[wp.array, wp.array]] = {}
+
+    @staticmethod
+    def _routes_differ(points: np.ndarray, offsets: np.ndarray) -> bool:
+        routes = [points[offsets[i] : offsets[i + 1]] for i in range(len(offsets) - 1)]
+        return any(route.shape != routes[0].shape or not np.array_equal(route, routes[0]) for route in routes[1:])
+
+    _UNSET = object()
+
+    def _require_single_anatomy_for_mesh(self, *, mesh=_UNSET, runtime=_UNSET, path=_UNSET) -> None:
+        """Refuse a vessel mesh alongside per-env anatomy.
+
+        ``collision_mesh`` is one ``wp.Mesh`` queried by every env, so it can
+        only describe a batch that shares one anatomy. Combined with per-env
+        vessels or routes, each env would be contained by the wrong patient.
+        Arguments default to the solver's current state.
+        """
+        if mesh is self._UNSET:
+            mesh = getattr(self, "collision_mesh", None)
+        if mesh is None:
+            return
+        if runtime is self._UNSET:
+            runtime = getattr(self, "centerline_runtime", None)
+        if path is self._UNSET:
+            path = getattr(self, "_track_path_host", None)
+        if runtime is not None and bool(getattr(runtime, "per_env_vessels", False)):
+            source = "a centerline runtime with per-env vessels"
+        elif path is not None and self._routes_differ(*path):
+            source = "different track_path routes per env"
+        else:
+            return
+        raise ValueError(
+            f"collision_mesh supports a single anatomy shared by every env, but the solver has {source}. "
+            "Pass collision_mesh=None and rely on centerline containment for per-env anatomy."
+        )
 
     def set_collision_projection_stage(self, stage: str) -> None:
         """Configure whether containment runs before or after rod constraints.
@@ -1644,9 +1729,35 @@ class CathRodSolver(XPBDRodSolver):
             self._mesh_edge_corrections = wp.zeros(max(1, n_points), dtype=wp.vec3, device=dev)
         return self._mesh_edge_corrections
 
-    @staticmethod
-    def _validated_track_path(track_path: "np.ndarray | None") -> "np.ndarray | None":
-        """Normalize an ordered guidance path, or ``None`` for the straight rail.
+    def _track_count_ok(self, count: int) -> bool:
+        """A per-env track input must have one entry, or one per env."""
+        return count == 1 or count == int(self._num_envs)
+
+    def _validated_track_axes(self, track_start, track_dir) -> tuple[np.ndarray, np.ndarray]:
+        """Insertion axes as ``(T, 3)`` origins and unit directions, ``T`` 1 or ``num_envs``."""
+        starts = np.asarray(track_start, dtype=np.float32).reshape(-1, 3)
+        dirs = np.asarray(track_dir, dtype=np.float32).reshape(-1, 3)
+        for name, values in (("track_start", starts), ("track_dir", dirs)):
+            if not self._track_count_ok(len(values)):
+                raise ValueError(
+                    f"{name} needs one axis or one per env ({self._num_envs}), got {len(values)}"
+                )
+        if len(starts) != len(dirs):
+            if len(starts) == 1:
+                starts = np.repeat(starts, len(dirs), axis=0)
+            else:
+                dirs = np.repeat(dirs, len(starts), axis=0)
+        norms = np.linalg.norm(dirs, axis=1, keepdims=True)
+        if np.any(norms <= 0.0):
+            raise ValueError("track_dir must be non-zero")
+        return starts, (dirs / norms).astype(np.float32)
+
+    def _validated_track_path(self, track_path) -> "tuple[np.ndarray, np.ndarray] | None":
+        """Normalize ordered guidance routes, or ``None`` for the straight rail.
+
+        Accepts one ``(N, 3)`` route shared by every env, a ``(num_envs, N, 3)``
+        array, or a sequence of ``(N_e, 3)`` routes, one per env, whose lengths
+        may differ. Returns the routes back to back with their start offsets.
 
         Ordering is the caller's responsibility and cannot be checked here: the
         points have to run proximal to distal along the route the wire takes,
@@ -1655,20 +1766,45 @@ class CathRodSolver(XPBDRodSolver):
         """
         if track_path is None:
             return None
-        path = np.asarray(track_path, dtype=np.float32).reshape(-1, 3)
-        if len(path) < 2:
-            raise ValueError(f"track_path needs at least 2 points to form a segment, got {len(path)}")
-        if not np.all(np.isfinite(path)):
-            raise ValueError("track_path contains non-finite coordinates")
-        return path
+        if isinstance(track_path, (list, tuple)) and track_path and all(
+            np.asarray(route).ndim == 2 for route in track_path
+        ):
+            routes = [np.asarray(route, dtype=np.float32).reshape(-1, 3) for route in track_path]
+        else:
+            path = np.asarray(track_path, dtype=np.float32)
+            routes = list(path) if path.ndim == 3 else [path.reshape(-1, 3)]
+        if not self._track_count_ok(len(routes)):
+            raise ValueError(f"track_path needs one route or one per env ({self._num_envs}), got {len(routes)}")
+        for route in routes:
+            if len(route) < 2:
+                raise ValueError(f"track_path needs at least 2 points to form a segment, got {len(route)}")
+            if not np.all(np.isfinite(route)):
+                raise ValueError("track_path contains non-finite coordinates")
+        offsets = np.cumsum([0] + [len(route) for route in routes]).astype(np.int32)
+        return np.concatenate(routes, axis=0), offsets
 
-    def _track_path_for_device(self, dev: str) -> "wp.array | None":
-        """Upload the guidance path to ``dev`` once and reuse it thereafter."""
+    def _track_axes_for_device(self, dev: str) -> "tuple[wp.array, wp.array]":
+        """Upload the insertion axes to ``dev`` once and reuse them thereafter."""
+        cached = self._track_axes_device.get(dev)
+        if cached is None:
+            cached = (
+                wp.array(self.track_starts, dtype=wp.vec3, device=dev),
+                wp.array(self.track_dirs, dtype=wp.vec3, device=dev),
+            )
+            self._track_axes_device[dev] = cached
+        return cached
+
+    def _track_path_for_device(self, dev: str) -> "tuple[wp.array, wp.array] | None":
+        """Upload the guidance routes and their offsets to ``dev`` once."""
         if self._track_path_host is None:
             return None
         cached = self._track_path_device.get(dev)
         if cached is None:
-            cached = wp.array(self._track_path_host, dtype=wp.vec3, device=dev)
+            points, offsets = self._track_path_host
+            cached = (
+                wp.array(points, dtype=wp.vec3, device=dev),
+                wp.array(offsets, dtype=wp.int32, device=dev),
+            )
             self._track_path_device[dev] = cached
         return cached
 
@@ -1781,54 +1917,28 @@ class CathRodSolver(XPBDRodSolver):
 
     def _project_track_guidance(self, ws: _Workspace, dev: str) -> None:
         """Project non-tip particles onto the insertion axis or path."""
-        end_idx = self._track_end_index(ws.num_points)
-        path = self._track_path_for_device(dev)
-        if path is not None:
-            wp.launch(
-                _track_polyline_kernel,
-                dim=ws.num_points,
-                inputs=[
-                    ws.predicted_positions,
-                    ws.inv_masses,
-                    path,
-                    int(path.shape[0]),
-                    float(self.track_stiffness),
-                    int(end_idx),
-                    int(ws.num_points),
-                ],
-                device=dev,
-            )
-            return
-        wp.launch(
-            _track_sliding_kernel,
-            dim=ws.num_points,
-            inputs=[
-                ws.predicted_positions,
-                ws.inv_masses,
-                self.track_start,
-                self.track_dir,
-                float(self.track_length),
-                float(self.track_stiffness),
-                int(end_idx),
-                int(ws.num_points),
-            ],
-            device=dev,
-        )
+        self._launch_track_guidance(ws.predicted_positions, ws.inv_masses, int(ws.num_points),
+                                    int(ws.num_points), dev)
 
     def _project_track_guidance_batched(self, bws, dev: str) -> None:
-        """Track guidance for every env in one launch (the track is shared)."""
-        points_per_env = int(bws.num_points_per_rod)
+        """Track guidance for every env in one launch, each on its own track."""
+        self._launch_track_guidance(bws.predicted_positions, bws.inv_masses, int(bws.np_total),
+                                    int(bws.num_points_per_rod), dev)
+
+    def _launch_track_guidance(self, predicted_positions, inv_masses, total_points: int,
+                               points_per_env: int, dev: str) -> None:
         end_idx = self._track_end_index(points_per_env)
         path = self._track_path_for_device(dev)
         if path is not None:
+            points, offsets = path
             wp.launch(
                 _track_polyline_kernel,
-                dim=bws.np_total,
+                dim=total_points,
                 inputs=[
-                    bws.predicted_positions,
-                    bws.inv_masses,
-                    path,
-                    int(path.shape[0]),
+                    predicted_positions,
+                    inv_masses,
+                    points,
+                    offsets,
                     float(self.track_stiffness),
                     int(end_idx),
                     points_per_env,
@@ -1836,14 +1946,15 @@ class CathRodSolver(XPBDRodSolver):
                 device=dev,
             )
             return
+        starts, dirs = self._track_axes_for_device(dev)
         wp.launch(
             _track_sliding_kernel,
-            dim=bws.np_total,
+            dim=total_points,
             inputs=[
-                bws.predicted_positions,
-                bws.inv_masses,
-                self.track_start,
-                self.track_dir,
+                predicted_positions,
+                inv_masses,
+                starts,
+                dirs,
                 float(self.track_length),
                 float(self.track_stiffness),
                 int(end_idx),
@@ -2148,6 +2259,7 @@ class CathRodSolver(XPBDRodSolver):
         """
         if runtime is None:
             return
+        self._require_single_anatomy_for_mesh(runtime=runtime)
         vessel_envs = int(getattr(runtime, "num_envs", 1))
         if vessel_envs != self._num_envs:
             raise ValueError(

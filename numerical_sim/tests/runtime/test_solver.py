@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import warp as wp
 from helpers import find, push_actions, run
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics import I4hSolver
 from i4h_physics.scene import ACTIVE_INT
 from i4h_physics.systems.mechanics.tet import Tet
@@ -28,8 +28,9 @@ def test_main_block_is_the_newton_state():
     scene, model, state = sim.scene, sim.model, sim.state
     assert isinstance(sim.solver, I4hSolver) and isinstance(sim.solver, newton.solvers.SolverBase)
     assert scene.q.ptr == state.particle_q.ptr and scene.qd.ptr == state.particle_qd.ptr
-    assert scene.q0.ptr == model.particle_q.ptr and scene.flags.ptr == model.particle_flags.ptr
-    assert scene.inv_mass.ptr == model.particle_inv_mass.ptr and scene.radius.ptr == model.particle_radius.ptr
+    assert scene.q0 is model.particle_q and scene.flags.ptr == state.i4h.particle_flags.ptr
+    np.testing.assert_array_equal(scene.q0.numpy(), model.particle_q.numpy())
+    assert scene.inv_mass.ptr != model.particle_inv_mass.ptr and scene.radius.ptr == model.particle_radius.ptr
     assert scene.gravity.ptr == model.gravity.ptr and scene.gravity.shape == (scene.envs,)
     assert model.world_count == scene.envs and model.particle_count == scene.particle_count
     starts = model.particle_world_start.numpy()
@@ -49,16 +50,21 @@ def test_newton_model_rows_are_consistent():
     assert (scene.field("flags", block).numpy()[0] != 0).sum() == 125 and (scene.field("flags", block).numpy()[1] != 0).sum() == 64
 
 
-def test_cuts_are_visible_in_the_newton_model():
-    """Particle flags are model arrays mutated in place: a burn in the scene is a flag change Newton sees."""
+def test_cuts_mutate_only_the_selected_newton_state():
+    """A burn mutates State flags while preserving native Model defaults."""
     sim = load_case("two_worlds")
     scene, surface = sim.scene, find(sim, Surface)
     control = find(sim, InstrumentControl)
+    native_flags = sim.model.particle_flags.numpy().copy()
+    other = sim.model.state()
+    other_flags = other.i4h.particle_flags.numpy().copy()
     actions = push_actions(control, scene.envs)
     actions[0, :, 8] = 1.0  # energy on the pushing probe of env 0
     run(sim, 40, actions)
     assert surface.deleted.numpy()[0] > 0
-    assert np.array_equal(sim.model.particle_flags.numpy(), scene.flags.numpy())
+    np.testing.assert_array_equal(sim.model.particle_flags.numpy(), native_flags)
+    np.testing.assert_array_equal(other.i4h.particle_flags.numpy(), other_flags)
+    assert not np.array_equal(scene.flags.numpy(), native_flags)
 
 
 def test_solver_accepts_only_its_bound_state_and_dt():
@@ -116,6 +122,8 @@ def test_reset_flag_table(flags):
         return scene.field(name, block).numpy().copy()
     q, qd, f = field("q"), field("qd"), state.particle_f.numpy().reshape(scene.envs, -1, 3)[:, block.offset : block.offset + block.count].copy()
     active_before = tet.active.numpy().copy()
+    flags_before, previous_before = field("flags"), field("q_prev")
+    deleted_before = surface.deleted.numpy().copy()
     sim.solver.reset(state, world_mask(scene, [1]), flags)
     wp.synchronize()
     fl = int(newton.StateFlags.ALL) if flags is None else flags
@@ -130,10 +138,11 @@ def test_reset_flag_table(flags):
     np.testing.assert_array_equal(q1[1], q0[1] if fl & newton.StateFlags.PARTICLE_Q else q[1])
     np.testing.assert_array_equal(qd1[1], 0.0 if fl & newton.StateFlags.PARTICLE_QD else qd[1])
     np.testing.assert_array_equal(f1[1], 0.0 if fl & newton.StateFlags.PARTICLE_F else f[1])
-    np.testing.assert_array_equal(qp1[1], q1[1])  # q_prev follows q in every mode
-    # topology and flags come back together in every mode
-    assert tet.active.numpy()[1].sum() > active_before[1].sum() and surface.deleted.numpy()[1] == 0
-    np.testing.assert_array_equal(field("flags")[1], field("flags0")[1])
+    np.testing.assert_array_equal(qp1[1], q1[1] if fl & newton.StateFlags.PARTICLE_Q else previous_before[1])
+    # Particle flags never imply surgical episode restoration.
+    np.testing.assert_array_equal(tet.active.numpy(), active_before)
+    np.testing.assert_array_equal(surface.deleted.numpy(), deleted_before)
+    np.testing.assert_array_equal(field("flags"), flags_before)
 
 
 def test_repeated_and_full_resets():
@@ -150,12 +159,12 @@ def test_repeated_and_full_resets():
 
 
 def test_flags_restore_matches_topology_after_cut():
-    """A burnt particle marked inactive comes back ACTIVE with its tets even under flags=0."""
+    """Episode restoration brings topology and particle flags back together."""
     sim = disturbed()
     scene, block = sim.scene, sim.scene.body("block")
     flags = scene.field("flags", block).numpy()
     dead = (scene.field("flags0", block).numpy()[0] & ACTIVE_INT) & ~(flags[0] & ACTIVE_INT)
-    sim.solver.reset(sim.state, world_mask(scene, [0]), 0)
+    sim.solver.restore_episode(sim.state, sim.control, world_mask(scene, [0]))
     wp.synchronize()
     assert ((scene.field("flags", block).numpy()[0] & ACTIVE_INT)[dead != 0] != 0).all()
 
@@ -171,9 +180,9 @@ def test_per_world_builder_matches_replicate():
     """add_env_particles inside each world (Isaac Lab's per-world hook form) lays the main block out exactly like the
     replicate fast path, and an owner's finalized model plus its early state end with every env's own rows."""
     import newton
-    from i4h_isaaclab.composition import load_scene, read_case
+    from i4h_host.composition import load_scene, read_case
     from i4h_physics import Scene
-    from i4h_physics.newton_model import add_env_particles, build_builder
+    from i4h_physics.newton_model import add_env_particles, build_builder, complete_scene
 
     scene = load_scene(read_case("two_worlds"), envs=3)  # mesh variants 0, 1, 0
     per_world = newton.ModelBuilder()
@@ -181,6 +190,7 @@ def test_per_world_builder_matches_replicate():
         per_world.begin_world()
         add_env_particles(per_world, scene, e)
         per_world.end_world()
+    complete_scene(per_world, scene)
     a = per_world.finalize(device=scene.device)
     b = build_builder(scene).finalize(device=scene.device)
     assert a.world_count == b.world_count == 3 and a.particle_count == b.particle_count
@@ -191,3 +201,34 @@ def test_per_world_builder_matches_replicate():
     np.testing.assert_array_equal(b.particle_flags.numpy(), a.particle_flags.numpy())
     np.testing.assert_allclose(b.particle_inv_mass.numpy(), a.particle_inv_mass.numpy(), rtol=1e-6)
     assert scene.q.ptr == state.particle_q.ptr and isinstance(scene, Scene)
+
+
+def test_cache_reset_preserves_physical_history_commands_and_parameters():
+    """A cache-only host reset cannot undo a cut, command, slot, reaction or rod frame."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location("baseline_fields", Path(__file__).parents[2] / "scripts/record_baseline.py")
+    recorder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(recorder)
+    sim = disturbed()
+    control = find(sim, InstrumentControl)
+    control.max_velocity.fill_(1.234)
+    before = recorder.snapshot(sim)
+    sim.solver.reset(sim.state, world_mask(sim.scene, [1]), flags=0)
+    after = recorder.snapshot(sim)
+    for key in before:
+        np.testing.assert_array_equal(after[key], before[key], err_msg=key)
+    np.testing.assert_array_equal(control.max_velocity.numpy(), np.float32([1.234, 1.234]))
+    sim.reset([1])
+    np.testing.assert_array_equal(control.max_velocity.numpy(), np.float32([1.234, 1.234]))
+
+
+def test_pure_reset_rejects_rigid_flags_and_empty_episode_selection_is_noop():
+    sim = disturbed()
+    for flags in (newton.StateFlags.BODY_Q, newton.StateFlags.JOINT_Q, newton.StateFlags.ALL):
+        with pytest.raises(ValueError, match="particle flags only"):
+            sim.solver.reset(sim.state, flags=flags)
+    before = sim.scene.q.numpy().copy()
+    sim.solver.restore_episode(sim.state, sim.control, world_mask(sim.scene, []))
+    np.testing.assert_array_equal(sim.scene.q.numpy(), before)

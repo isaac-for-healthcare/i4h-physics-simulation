@@ -25,3 +25,11 @@ def case():
 def env_slice(scene, arr, body, env) -> np.ndarray:
     """Host copy of one env's slice of a per-particle array."""
     return scene.view(arr, body).numpy()[env].copy()
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    result = yield
+    report = result.get_result()
+    if report.when == "call":
+        item.rep_call = report

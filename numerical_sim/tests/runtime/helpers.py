@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import warp as wp
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import data_dir
+from i4h_host.composition import data_dir
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_rod
 from i4h_physics.scene import ACTIVE_INT
@@ -87,12 +87,19 @@ def run_rates(sim, steps, rates):
         sim.step()
 
 
-def free_rod(envs=2, backend=RodDirect, tip_edges=8):
+def free_rod(envs=2, backend=RodDirect, tip_edges=8, **control):
     scene = Scene("cuda:0", envs, (0.0, 0.0, 0.0))
     add_rod(scene, "rod", [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], 33, 0.05, 0.02, mass=1.0)
+    from i4h_endoluminal.rod_storage import declare_catheter_control
+    from i4h_physics.rod_storage import declare_rod_direct, declare_rod_pbd
+    if backend is RodPbd:
+        declare_rod_pbd(scene, 'rod')
+    else:
+        declare_rod_direct(scene, 'rod', torsion=1.0e9, bend=0.1)
+    declare_catheter_control(scene, 'rod_pbd' if backend is RodPbd else 'rod_direct', track_length=1.0, tip_edges=tip_edges)
     scene.allocate()
     rod = backend(scene, body="rod") if backend is RodPbd else backend(scene, body="rod", torsion=1.0e9, bend=0.1)
-    ctl = CatheterControl(scene, rod=rod, track_length=1.0, tip_edges=tip_edges)
+    ctl = CatheterControl(scene, rod=rod, track_length=1.0, tip_edges=tip_edges, **control)
     return Stepper.create(scene, [Particles(scene, damping=0.99), rod, ctl], dt=1 / 60, substeps=8, iterations=1), rod, ctl
 
 
@@ -119,7 +126,7 @@ def haptic_case(tmp_path, envs=2, handle=False, **haptics):
     """A two_worlds copy whose probe is driven by a fake device pressing into the block, with a haptics: block; with ``handle``
     an instrument box (listed first) whose channel 0 the pad mounts."""
     import yaml
-    from i4h_isaaclab.composition import resolve_case
+    from i4h_host.composition import resolve_case
 
     cfg = yaml.safe_load(resolve_case("two_worlds").read_text())
     cfg["sim"]["envs"] = envs
@@ -142,7 +149,7 @@ def regional_case(tmp_path):
     """An aorta_centreline copy with regional catheter and vessel materials and a region workspace: the catheter uses
     the shared instrument regions, the vessel tree names branches 0-2 (the other branches stay unassigned)."""
     import yaml
-    from i4h_isaaclab.composition import resolve_case
+    from i4h_host.composition import resolve_case
 
     cfg = yaml.safe_load(resolve_case("aorta_centreline").read_text())
     sidecar = tmp_path / "aorta_regions.yaml"
@@ -256,3 +263,21 @@ def live_surface_is_consistent(sim, env):
     assert (tris[~live][:, 0] == tris[~live][:, 1]).all()
     support = surface.support.numpy().reshape(scene.envs, -1)[env]
     assert support.sum() == 4 * active.sum() and np.array_equal(support > 0, (flags & ACTIVE_INT) != 0)
+
+
+def lab_runtime():
+    """Native host allocation on either qualified Lab release (test introspection only)."""
+    from types import SimpleNamespace
+
+    from isaaclab.sim import SimulationContext
+
+    sim = SimulationContext.instance()
+    manager = sim.backend_manager if hasattr(sim, "backend_manager") else sim.physics_manager
+    backend = manager.backend
+    main = hasattr(backend, "solver")
+    return SimpleNamespace(model=backend.model, state_0=backend.state_0, control=backend.control,
+                           solver=backend.solver if main else manager._solver,
+                           contacts=backend.contacts if main else manager._contacts,
+                           graph=next(iter(backend.graphs.values()), None) if main else manager._graph,
+                           capture_pending=(not backend.graphs and backend.capture is not None) if main
+                           else manager._graph_capture_pending)

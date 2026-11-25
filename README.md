@@ -17,7 +17,7 @@ This repository holds numerical simulators under [`numerical_sim/`](./numerical_
 | i4h-endoluminal | `i4h_endoluminal` | Vessel anatomy, catheter control and binding, reach measurements |
 | i4h-assessment | `i4h_assessment` | Shared executor, history and reward products |
 | i4h-isaaclab | `i4h_isaaclab` | Isaac Lab hosts, gym tasks and tiled cameras |
-| i4h-standalone | `i4h_standalone` | The `i4h-sim` app: rendering, recording, XR, devices and panels |
+| i4h-host | `i4h_host` | Host-neutral case composition, procedures, cameras, appearance and controls |
 
 Available in-tree today:
 
@@ -27,20 +27,21 @@ Available in-tree today:
 - YAML-authored cases: cholecystectomy (`chole_tet_med`, `chole_grasp`), `liver`, `tissue_contact` and the two-world demo `two_worlds`
 - Endoluminal catheter cases in an aorta (`aorta_static`, `aorta_shell`, `aorta_centreline` and their `_reach` variants), with an endoscope view from the catheter tip
 - Isaac Lab tasks `I4h-TwoWorlds-Direct`, `I4h-Aorta-Direct`, `I4h-ReachTarget-Direct`, `I4h-GraspTarget-Direct` and `I4h-Chole-Direct`
-- Render backends `noop` (headless), `slang`, `gl` and `xr` (Meta Quest 3 through CloudXR; see the [XR guide](./numerical_sim/docs/xr.md))
-- Optional haptic devices (MiniMou, and Follou through its separately installed SDK), and controller vibration in XR
+
+Interactive viewers, device backends, capture and XR moved out of this repository.
+See [package ownership and migration](numerical_sim/docs/standalone-split.md).
 
 Not available yet:
 
 - Bronchoscope and other non-catheter endoluminal devices
 - Airway and colon cases
 
-Production assets (meshes, textures, centrelines and USD) are included under `numerical_sim/data/` and licensed under Apache-2.0. `scripts/fetch_assets.py` can also install them from a copy you supply and checks each file against [`docs/asset-manifest.json`](./numerical_sim/docs/asset-manifest.json); see [numerical_sim/data/README.md](./numerical_sim/data/README.md).
+Production assets (meshes, textures, centrelines and USD) are included under `numerical_sim/data/` and licensed under Apache-2.0, except MIT-licensed dVRK instruments. `scripts/fetch_assets.py` can also install them from a copy you supply and checks each file against [`docs/asset-manifest.json`](./numerical_sim/docs/asset-manifest.json); see [numerical_sim/data/README.md](./numerical_sim/data/README.md).
 
 ```bash
 cd numerical_sim
-uv sync --locked --extra render --extra gl --group dev
-uv run i4h-sim chole_tet_med --data ./data
+uv sync --locked --group dev
+uv run python examples/core_synthetic.py --device cpu
 ```
 
 To embed i4h physics in an Isaac Lab scene, see the [component contracts](./numerical_sim/docs/component-contracts.md) and the [Isaac Lab compatibility notes](./numerical_sim/isaaclab/README.md#isaac-lab-compatibility).
@@ -60,40 +61,44 @@ To embed i4h physics in an Isaac Lab scene, see the [component contracts](./nume
 
 Vessel geometry is authored outside this repository; see the [solver README](./physics_simulation/endoluminal/catheter-vasculature-solver/README.md) for how to feed it a vessel mesh and insertion track.
 
-### Generative Physics Simulation (Cosmos-H-Dreams)
+### Generative Physics Simulation (Cosmos3-H-Dreams)
 
-**Status:** Available as a git submodule at [`neural_sim/cosmos_h_dreams`](./neural_sim/cosmos_h_dreams).
+**Status:** Available as a git submodule at [`neural_sim/cosmos3_h_dreams`](./neural_sim/cosmos3_h_dreams).
 
-Real-time action-conditioned surgical video simulation via WebRTC, built on [FlashDreams](https://github.com/NVIDIA/flashdreams). Given a conditional first frame and a live stream of instrument action vectors, the model rolls forward generated frames and streams them to a browser or Meta Quest headset.
+Cosmos3-H-Dreams uses [FlashDreams](https://github.com/NVIDIA/flashdreams) to generate surgical video from an initial scene image and a sequence of instrument actions.
 
-Key features:
-
-- Offline batch inference from a JSON manifest
-- Interactive WebRTC control (keyboard browser or Meta Quest / WebXR)
-- Multiple runner configs (chunk size, 2- vs 4-step schedule, VAE vs light TAE decoder)
+- Replay recorded actions and save the generated video as an MP4.
+- Control the simulation from a WebXR headset with two tracked controllers and watch the output on the headset or in a PC browser.
+- Configure chunk size, denoising steps, decoder, and cache behavior through inference presets.
 
 ```bash
-git submodule update --init --recursive neural_sim/cosmos_h_dreams
-cd neural_sim/cosmos_h_dreams
+git submodule update --init --recursive neural_sim/cosmos3_h_dreams
+cd neural_sim/cosmos3_h_dreams
 
-# Build and run — see the submodule README for checkpoints and full flags
-docker build -t cosmos-h-dreams:latest docker/
-# Offline example:
-# uv run flashdreams-run cosmosHDreams-chunk3-vae-vae --input-json ...
+uv sync --package flashdreams-cosmos3-h-dreams --locked
+
+# Replay the bundled action trajectory using your Cosmos3-H-Dreams checkpoint.
+uv run --no-sync --package flashdreams-cosmos3-h-dreams \
+  flashdreams-run cosmos3-h-dreams \
+  --output mp4 --output-path replay.mp4 \
+  --config wan-taehv-chunk2-block-compile \
+  --checkpoint checkpoints/model.safetensors \
+  --initial-frame assets/example_data/scenes/example_frame.png \
+  --actions assets/example_data/scenes/trajectory.npy
 ```
 
-Full setup, configs, and system requirements: [Cosmos-H-Dreams README](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/README.md).
+See the [Cosmos3-H-Dreams README](https://github.com/isaac-for-healthcare/cosmos3-h-dreams/blob/v1.0.1/README.md) for checkpoint setup, live headset control, and system requirements.
 
 ## Repository Layout
 
 ```text
-numerical_sim/            # Six Warp / Newton packages and the i4h-sim app
-├── physics/  surgical/  endoluminal/  assessment/  isaaclab/  standalone/
+numerical_sim/            # Six Warp / Newton numerical and host packages
+├── physics/  surgical/  endoluminal/  assessment/  isaaclab/  host/
 ├── docs/                 # Architecture, component contracts, XR, performance, examples
 ├── examples/  scripts/  tests/
 └── data/                 # Apache-2.0 production assets
 neural_sim/
-└── cosmos_h_dreams/      # Git submodule — generative surgical video sim
+└── cosmos3_h_dreams/     # Git submodule — generative surgical video sim
 physics_simulation/
 └── endoluminal/
     └── catheter-vasculature-solver/   # Deprecated catheter + vasculature solver (Newton / Warp)
@@ -118,7 +123,7 @@ physics_simulation/
 
    - **Numerical sim (surgical and endoluminal):** follow [numerical_sim/README.md](./numerical_sim/README.md)
    - **Endoluminal catheter solver (deprecated):** follow [physics_simulation/endoluminal/catheter-vasculature-solver/README.md](./physics_simulation/endoluminal/catheter-vasculature-solver/README.md)
-   - **Generative sim:** follow the [Cosmos-H-Dreams README](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/README.md)
+   - **Generative sim:** follow the [Cosmos3-H-Dreams README](https://github.com/isaac-for-healthcare/cosmos3-h-dreams/blob/v1.0.1/README.md)
 
 ## Requirements
 
@@ -145,4 +150,4 @@ This repository is under active development (experimental). For questions and su
 
 ## License
 
-The root [LICENSE](./LICENSE) (Apache-2.0) applies except where a part carries its own terms; [NOTICE](./NOTICE) lists each part. The `numerical_sim` packages and original production assets in `numerical_sim/data/` are licensed under Apache-2.0. Cosmos-H-Dreams code is primarily Apache-2.0 with model weights under the NVIDIA Open Model License — see [its LICENSE](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/LICENSE). Third-party notices are in [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES), and contributions follow [CONTRIBUTING.md](./CONTRIBUTING.md).
+The root [LICENSE](./LICENSE) (Apache-2.0) applies except where a part carries its own terms. [NOTICE](./NOTICE) lists each part. The `numerical_sim` packages and original production assets in `numerical_sim/data/` are licensed under Apache-2.0. Cosmos3-H-Dreams source code is licensed under Apache-2.0, and separately supplied model assets retain their own license terms. See the [Cosmos3-H-Dreams LICENSE](https://github.com/isaac-for-healthcare/cosmos3-h-dreams/blob/v1.0.1/LICENSE). Third-party notices are in [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES), and contributions follow [CONTRIBUTING.md](./CONTRIBUTING.md).

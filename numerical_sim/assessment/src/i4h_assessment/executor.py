@@ -96,7 +96,7 @@ class TargetMeasurement:
         scene = self.scene
         self.rows = wp.zeros((scene.envs, 12), dtype=float, device=scene.device)
         self.mask = wp.zeros(scene.envs, dtype=wp.bool, device=scene.device)
-        self._bind_tool()
+        self.bind_tool()
         target = self.cfg["target"]
         _check_keys(target, ("position", "body", "index"), "procedure.target")
         self.index, self.fixed = -1, wp.vec3(0.0)
@@ -132,7 +132,7 @@ class TargetMeasurement:
                 raise ValueError("target particle is inactive or padded")
         self.target_q = scene.field("q", self.target_body)
         self.target_flags = scene.field("flags", self.target_body)
-        self._measure()
+        self.measure_step()
         return self
 
     def _selection(self, name):
@@ -147,7 +147,7 @@ class TargetMeasurement:
             return body, p.particle_start, p.particle_start + p.particle_count
         return body, 0, body.count
 
-    def _measure(self, masked=False, evidence=None, slot=0):
+    def measure_step(self, masked=False, evidence=None, slot=0):
         wp.launch(
             measure,
             self.scene.envs,
@@ -432,8 +432,8 @@ class Procedure:
 
     def _sample(self, evidence=None, slot=0):
         for i, step in enumerate(self.steps):
-            step._measure(evidence=evidence, slot=slot)
-            step._qualify()
+            step.measure_step(evidence=evidence, slot=slot)
+            step.qualify()
             wp.copy(
                 self.samples,
                 step.rows,

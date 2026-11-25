@@ -23,6 +23,11 @@ last ``tip_edges`` bend constraints. The track starts at the rod's rest root alo
 ``rod_containment`` must be listed after this system so the vessel projection sees the track
 result (omniendo POST hook order). An env whose root node is inactive (``scene.flags``) is not driven.
 
+``guide_tip`` (opt-in, not omniendo's): the last ``tip_edges`` nodes are snapped onto the track too while they are on
+it, like a steerable tip inside its introducer: the tip bends once it has left the guide. Without it a tip bent while
+the catheter still lies on its track outside a deformable vessel curls before the vessel's entry, misses it and drags
+the wall when inserted (``aorta_centreline``, NVBug 6940614).
+
 Mounted (``mount(0)``, a host body holds the catheter's driver, i4h_isaaclab.coupling): the track's start and the root's
 rest frame come from ``mount_pose (E, 1)`` (component frame, written by the host before each step) instead of the rest
 root: the start is the mount's position, the rest frame its rotation, and the direction the rest tangent carried by
@@ -40,7 +45,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import warp as wp
-from i4h_physics.checks import check_int
+from i4h_physics.checks import check_bool, check_int
 from i4h_physics.scene import ACTIVE
 from i4h_physics.systems.base import System
 from i4h_physics.systems.rods.rod_direct import RodDirect
@@ -52,8 +57,9 @@ class CatheterControl(System):
     state_products = ("targets",)  # per-env products a host observes (System.state_products)
     rod: object  # rod_direct or rod_pbd system id in YAML; the instance after construction
     track_length: float  # live, per env: the guide ends here (from the rod's rest root along its direction)
-    tip_edges: int = 0  # structural: distal bend constraints that carry the tip angle (also excluded from the track)
+    tip_edges: int = 0  # structural: distal bend constraints that carry the tip angle (off the track unless guide_tip)
     tip_axis: tuple = (1.0, 0.0, 0.0)  # structural: material-frame axis the tip bends about
+    guide_tip: bool = False  # structural: the track guides the tip nodes too while they are on it (not omniendo's)
     track_stiffness: float = 1.0  # live, per env: fraction of the snap onto the track per iteration
     rates: tuple = (0.5, 1.5, 1.0)  # live (E, 3): m/s, rad/s, rad/s at action 1 (omniendo XCathVelocityActionCfg)
     lower: tuple = (0.0, -1.0e9, -1.5)  # live (E, 3): target bounds (insertion >= 0, tip in [-1.5, 1.5] as xcath.py)
@@ -67,9 +73,22 @@ class CatheterControl(System):
     distal_free_nodes: int | None = None  # independent of tip steering; None retains tip_edges default
 
     is_control = True
+    command_view_spec = {"actions": (0, 3), "insertion": (0, 1), "rotation": (1, 2), "bend": (2, 3)}
+
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_endoluminal.rod_storage import publish_catheter_control
+        return publish_catheter_control(authoring.scene, declarations, spec.get('id', spec['type']),
+                                        rod=spec['rod'], settings=spec)
+
 
     refs = ("rod",)
-    structural = System.structural + ("tip_edges", "tip_axis", "tip_mapping", "root_mode", "track_path", "distal_free_nodes")
+    structural = System.structural + ("tip_edges", "tip_axis", "tip_mapping", "guide_tip", "root_mode", "track_path",
+                                      "distal_free_nodes")
+
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"tool": [(0, spec["rod"])]}
 
     def __post_init__(self):
         scene = self.scene
@@ -84,6 +103,7 @@ class CatheterControl(System):
         E, dev = scene.envs, scene.device
         self.P, self.F, self.B = b.count, rod.frame_count, rod.bend_count
         self.tip_edges = check_int("catheter_control.tip_edges", self.tip_edges)
+        self.guide_tip = check_bool("catheter_control.guide_tip", self.guide_tip)
         self.tip_axis = tuple(float(x) for x in self.tip_axis)
         if not 0 <= self.tip_edges < self.B:
             raise ValueError(f"catheter_control.tip_edges must be in [0, {self.B}) for this rod, got {self.tip_edges}")
@@ -107,33 +127,24 @@ class CatheterControl(System):
             self.track_path = tuple(tuple(float(x) for x in row) for row in path)
         self._path = wp.array(path, dtype=wp.vec3, device=dev)
         self.freeze("root_mode", "track_path", "distal_free_nodes")
-        self._live("track_length", "track_stiffness", "max_delta", "rates", "lower", "upper")
-        for name in ("rates", "lower", "upper"):
-            if getattr(self, name).shape != (E, 3):
-                raise ValueError(f"catheter_control.{name} must have 3 entries")
-        self.track_start = wp.array(m.start, dtype=wp.vec3, device=dev)  # (V,)
-        self.track_direction = wp.array(m.direction, dtype=wp.vec3, device=dev)  # (V,) unit
-        self.base_orientation = wp.array(np.ascontiguousarray(m.frames[:, 0]), dtype=wp.quat, device=dev)  # (V,)
-        self.actions = wp.zeros((E, 3), dtype=wp.float32, device=dev)  # normalised rates, written from outside step()
-        self.targets = wp.zeros(E, dtype=wp.vec3, device=dev)  # (insertion, rotation, tip angle)
+        from i4h_endoluminal.rod_storage import CATHETER_LIVE, bind_endoluminal
+        bind_endoluminal(self, 'catheter_control')
+        self.register_live(*CATHETER_LIVE)
+        self._prepared_tip_edges = self.tip_edges
+        self.freeze("id", "P", "F", "B", "rod", "root_mode", "track_path", "distal_free_nodes")
         # Mount interface (i4h_isaaclab.coupling): one "instrument", the catheter's driver.
         self.names, self.count = [b.name], 1
-        self.mounted = wp.zeros(1, dtype=wp.int32, device=dev)
         v = rod.variant.numpy()
-        self.mount_pose = wp.array(np.concatenate([m.start[v], m.frames[v, 0]], axis=1).reshape(E, 1, 7).astype(np.float32),
-                                   dtype=wp.transform, device=dev)
         self.root_positions = wp.array(m.start[v], dtype=wp.vec3, device=dev)
         self.root_rotations = wp.array(np.ascontiguousarray(m.frames[v, 0]), dtype=wp.quat, device=dev)
         self._root_start_positions = wp.clone(self.root_positions)
         self._root_start_rotations = wp.clone(self.root_rotations)
         self.register_live("root_positions", "root_rotations")
         self._command_sources = None
-        self.root = wp.array(m.start[v].reshape(E, 1, 3).astype(np.float32), dtype=wp.vec3, device=dev)
         self.impulse = wp.zeros((E, 1), dtype=wp.vec3, device=dev)  # product: sum of m * dx the driver imposed this step
         self.moment = wp.zeros((E, 1), dtype=wp.vec3, device=dev)  # product: its moment about the root
         self._lambda = getattr(rod, "lambda_sum", None)  # rod_direct's multipliers: the root's hold
         self._jacobian = getattr(rod, "jacobian_rot", None)
-        self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
 
     def action_bounds(self, workspace: float) -> tuple[list, list]:
         """Normalised insertion, rotation and tip-bend rates: [-1, 1] each (``rates`` scales them)."""
@@ -161,10 +172,10 @@ class CatheterControl(System):
         for value, target, width, dtype in ((positions, self.root_positions, 3, wp.vec3),
                                             (rotations, self.root_rotations, 4, wp.quat)):
             if type(value).__module__.split(".")[0] == "torch":
-                from i4h_physics.stepper import _warp_after_torch
+                from i4h_physics.stepper import warp_after_torch
                 if tuple(value.shape) != (self.scene.envs, width):
                     raise ValueError(f"root pose must have shape ({self.scene.envs}, {width})")
-                _warp_after_torch(value, self.scene.device)
+                warp_after_torch(value, self.scene.device)
                 source = wp.from_torch(value, dtype=dtype)
             elif isinstance(value, wp.array):
                 source = value
@@ -193,8 +204,20 @@ class CatheterControl(System):
 
 
     def prepare(self, scene):
+        scene.storage.check()
         super().prepare(scene)
-        self.controls.bend_offset.zero_()  # only the last ``tip_edges`` entries are written from here on (or none when disabled)
+        if not self.enabled:  # step_start no longer clears them: the coupling must not read the last reaction again
+            self.zero(None, "impulse", "moment")
+        new = check_int("catheter_control.tip_edges", self.tip_edges)
+        if not 0 <= new < self.B:
+            raise ValueError(f"catheter_control.tip_edges must be in [0, {self.B})")
+        if len(self.tip_axis) != 3 or self.tip_mapping not in ("per_edge", "polyline"):
+            raise ValueError("invalid catheter tip axis or mapping")
+        old = self._prepared_tip_edges
+        if new < old:
+            for world in range(scene.envs):
+                self.controls.bend_offset[world][self.B-old:self.B-new].zero_()
+        self._prepared_tip_edges = new
 
     def step_start(self, scene, dt):
         self.impulse.zero_()
@@ -218,7 +241,7 @@ class CatheterControl(System):
         wp.launch(track_guidance, dim=(scene.envs, self.P),
                   inputs=[scene.field("inv_mass", b), scene.field("flags", b), self.track_start, self.track_direction,
                           self.base_orientation, self.rod.variant, self.track_length, self.track_stiffness,
-                          self.tip_edges if self.distal_free_nodes is None else self.distal_free_nodes, self.P, self.mounted, self.mount_pose, self.root, self._path, self._path.shape[0]],
+                          (0 if self.guide_tip else self.tip_edges if self.distal_free_nodes is None else self.distal_free_nodes), self.P, self.mounted, self.mount_pose, self.root, self._path, self._path.shape[0]],
                   outputs=[scene.field("q", b), self.impulse, self.moment], device=scene.device)
 
     def substep_end(self, scene, dt):
@@ -233,8 +256,19 @@ class CatheterControl(System):
         self.clear(mask, (self.targets, wp.vec3(0.0, 0.0, 0.0)))
         self.zero(mask, "impulse", "moment")
         wp.launch(reset_root_commands, dim=scene.envs,
-                  inputs=[mask, self._root_start_positions, self._root_start_rotations],
+                  inputs=[mask, self._root_start_positions, self._root_start_rotations, int(self.root_mode == "external_pose")],
                   outputs=[self.root_positions, self.root_rotations, self.root], device=scene.device)
+
+    def restore_episode(self, scene, mask):
+        self.reset(scene, mask)
+        # Scene and rod episode rows have just been restored. Place their authored
+        # rest geometry in the current holder frame before the next physics step.
+        wp.launch(reset_mounted_rod, dim=(scene.envs, max(self.P, self.F)),
+                  inputs=[mask, self.mounted, self.mount_pose, self.rod.variant,
+                          self.track_start, self.base_orientation, self.P, self.F],
+                  outputs=[scene.field("q", self.body), scene.field("q_prev", self.body),
+                           scene.field("qd", self.body), self.rod.frame, self.rod.frame_pred, self.root],
+                  device=scene.device)
 
 
 # --- kernels -----------------------------------------------------------------------------------------
@@ -329,8 +363,8 @@ def root_controls(
 
 # Ported from batched_xcath.py:116-146 (_project_track_guidance). Edits: (env, node) prologue; predicted
 # positions are the body's (E, P) view of scene.q; track_enabled dropped (disable the system instead);
-# tip_edge_count is a structural scalar; track per variant, length and stiffness live per env; inactive
-# nodes skipped.
+# tip_edge_count is a structural scalar (0 with guide_tip); track per variant, length and stiffness live per env;
+# inactive nodes skipped.
 @wp.kernel
 def track_guidance(
     inv_mass: wp.array2d(dtype=wp.float32),
@@ -419,10 +453,40 @@ def root_hold(lambda_sum: wp.array(dtype=wp.float32), jacobian_rot: wp.array(dty
 
 @wp.kernel
 def reset_root_commands(mask: wp.array(dtype=wp.bool), positions: wp.array(dtype=wp.vec3),
-                        rotations: wp.array(dtype=wp.quat), root_positions: wp.array(dtype=wp.vec3),
-                        root_rotations: wp.array(dtype=wp.quat), root: wp.array2d(dtype=wp.vec3)):
+                        rotations: wp.array(dtype=wp.quat), external_pose: wp.int32,
+                        root_positions: wp.array(dtype=wp.vec3), root_rotations: wp.array(dtype=wp.quat),
+                        root: wp.array2d(dtype=wp.vec3)):
     env = wp.tid()
     if mask[env]:
         root_positions[env] = positions[env]
         root_rotations[env] = rotations[env]
-        root[env, 0] = positions[env]
+        if external_pose != 0:  # the track's root target is not reset by the catheter
+            root[env, 0] = positions[env]
+
+
+
+
+@wp.kernel
+def reset_mounted_rod(
+    mask: wp.array(dtype=wp.bool), mounted: wp.array(dtype=wp.int32),
+    mount_pose: wp.array2d(dtype=wp.transform), variant: wp.array(dtype=wp.int32),
+    track_start: wp.array(dtype=wp.vec3), base_orientation: wp.array(dtype=wp.quat),
+    P: wp.int32, F: wp.int32,
+    q: wp.array2d(dtype=wp.vec3), q_prev: wp.array2d(dtype=wp.vec3), qd: wp.array2d(dtype=wp.vec3),
+    frame: wp.array(dtype=wp.quat), frame_pred: wp.array(dtype=wp.quat), root: wp.array2d(dtype=wp.vec3),
+):
+    env, i = wp.tid()
+    if not mask[env] or mounted[0] == 0:
+        return
+    v = variant[env]
+    transform = mount_pose[env, 0] * wp.transform_inverse(wp.transform(track_start[v], base_orientation[v]))
+    rotation = wp.transform_get_rotation(transform)
+    if i < P:
+        q[env, i] = wp.transform_point(transform, q[env, i])
+        q_prev[env, i] = wp.transform_point(transform, q_prev[env, i])
+        qd[env, i] = wp.quat_rotate(rotation, qd[env, i])
+    if i < F:
+        frame[env * F + i] = rotation * frame[env * F + i]
+        frame_pred[env * F + i] = rotation * frame_pred[env * F + i]
+    if i == 0:
+        root[env, 0] = wp.transform_get_translation(mount_pose[env, 0])

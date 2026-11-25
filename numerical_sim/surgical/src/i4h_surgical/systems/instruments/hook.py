@@ -49,6 +49,12 @@ class Hook(System):
     refs = ("instruments", "contacts")
     structural = System.structural + ("instrument", "part")  # both are baked into the launches as indices
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_hook
+        return publish_hook(authoring.scene, declarations, spec.get("id", spec["type"]), instruments=spec["instruments"],
+                            instrument=spec["instrument"])
+
     def __post_init__(self):
         scene = self.scene
         if not isinstance(self.instruments, InstrumentControl) or not isinstance(self.contacts, InstrumentContact):
@@ -72,12 +78,9 @@ class Hook(System):
         self._live("engage_overlap", "engage_inward_speed", "retention_slack", "axial_friction", "puncture_distance")
         # Anchors (E, 2): slot 0 the entry (owns the engagement), slot 1 the exit on the far side of the pierced
         # part. Triangle (body-local vertices, owning tet), barycentric, axial and friction coordinates, radial.
-        self.verts = wp.full((E, 2), wp.vec3i(-1, -1, -1), dtype=wp.vec3i, device=dev)
-        self.tet = wp.full((E, 2), -1, dtype=wp.int32, device=dev)
-        self.bary = wp.zeros((E, 2), dtype=wp.vec3, device=dev)
-        self.friction_coord = wp.zeros((E, 2), dtype=wp.float32, device=dev)
-        self.radial = wp.zeros((E, 2), dtype=wp.vec3, device=dev)
-        self.active = wp.zeros((E, 2), dtype=wp.int32, device=dev)
+        # verts, tet, bary, friction_coord, radial and active are Newton State; verts and tet start at -1.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "hook", instrument=self.instrument)
         self.entry_active = self.active[:, 0]  # (E,) views for thermal and observations
         self.entry_tet = self.tet[:, 0]
         self.impulse = wp.zeros((E, ic.count), dtype=wp.vec3, device=dev)  # product: sum of m * dx the anchors imposed this step
@@ -87,6 +90,9 @@ class Hook(System):
         cc.suppress_prim = self.prim  # the contact kernel reads the entry anchor through these views: no sync launch
         cc.suppress_active = self.active[:, 0]
         cc.suppress_verts = self.verts[:, 0]
+        scene.storage.register_package(identities=(
+            (self, "entry_active", self.entry_active), (self, "entry_tet", self.entry_tet),
+            (cc, "suppress_active", cc.suppress_active), (cc, "suppress_verts", cc.suppress_verts)))
         self._substeps = 1
 
 
@@ -102,7 +108,7 @@ class Hook(System):
         wp.launch(
             retain_hook,
             dim=scene.envs,
-            inputs=[scene.field("q_prev", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.active, ic.prim_a,
+            inputs=[scene.field("q_prev", b), scene.field("inv_mass", b), scene.field("flags", b), self.surface.tet_fields.active, ic.prim_a,
                     ic.prim_b, ic.sphere_q_prev, ic.sphere_q, ic.sphere_radius, ic.sphere_active, self.prim, self.retention_slack,
                     self.axial_friction, self.engage_inward_speed, dt * float(self._substeps), dt, self.tool, self.tet,
                     self.verts, self.bary, ic.root],
@@ -115,7 +121,7 @@ class Hook(System):
         wp.launch(
             acquire_hook,
             dim=scene.envs,
-            inputs=[scene.field("q", b), scene.field("q_prev", b), scene.field("flags", b), sf.active, sf.variant, sf.tets, sf.tet_part, sf.face_neighbor, sf.tri_part,
+            inputs=[scene.field("q", b), scene.field("q_prev", b), scene.field("flags", b), sf.tet_fields.active, sf.tet_fields.variant, sf.tet_fields.tets, sf.tet_fields.tet_part, sf.face_neighbor, sf.tri_part,
                     ic.prim_a, ic.prim_b, ic.sphere_q_prev, ic.sphere_q, ic.sphere_active, cc.record_count, cc.rec_tri, cc.rec_tet,
                     cc.rec_verts, cc.rec_bary, cc.rec_pen, cc.rec_t, cc.rec_normal, self.prim, self.part_index,
                     self.engage_overlap, self.engage_inward_speed, self.puncture_distance, dt * float(self._substeps), dt],

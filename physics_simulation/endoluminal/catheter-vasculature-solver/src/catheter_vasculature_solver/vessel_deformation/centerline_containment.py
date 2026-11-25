@@ -295,8 +295,10 @@ def reset_centerline_segments_kernel(
     omega[i] = wp.vec3(0.0, 0.0, 0.0)
 
 
-@wp.kernel
-def project_centerline_containment_batched_kernel(
+@wp.func
+def _contain_env_sample(
+    env: int,
+    sample: int,
     catheter: wp.array(dtype=wp.vec3),
     catheter_inv_mass: wp.array(dtype=wp.float32),
     catheter_points_per_env: int,
@@ -306,6 +308,7 @@ def project_centerline_containment_batched_kernel(
     centerline_inv_mass: wp.array(dtype=wp.float32),
     centerline_nodes_per_env: int,
     centerline_edges_per_env: int,
+    edge_count: int,
     open_root: int,
     open_root_neighbor: int,
     catheter_radius: float,
@@ -321,18 +324,11 @@ def project_centerline_containment_batched_kernel(
     contact_depth: wp.array(dtype=wp.float32),
     contact_count: wp.array(dtype=wp.int32),
 ):
-    """Per-env tapered-tube containment in one launch over ``(num_envs, samples)``.
+    """One env's sample against that env's first ``edge_count`` vessel edges.
 
-    Same projection as :func:`project_centerline_containment_kernel`, with every
-    catheter and centerline index shifted into the calling env's own window, so
-    each env contains its own rod against its own vessel and no correction can
-    cross between envs. ``centerline_edges`` therefore holds *global* node
-    indices (as tiled by :class:`CosseratRod`), while ``open_root`` and
-    ``open_root_neighbor`` are env-local and shifted here.
-
-    ``contact_depth`` and ``contact_count`` hold one slot per env.
+    ``centerline_edges_per_env`` is the window stride and ``edge_count`` how many
+    edges at the start of the window are real; the rest is padding.
     """
-    env, sample = wp.tid()
     cath_base = env * catheter_points_per_env
     node_base = env * centerline_nodes_per_env
 
@@ -363,7 +359,7 @@ def project_centerline_containment_batched_kernel(
     best_gradient = wp.vec3(0.0)
     best_free_radius = float(0.0)
     edge_begin = env * centerline_edges_per_env
-    for edge_index in range(edge_begin, edge_begin + centerline_edges_per_env):
+    for edge_index in range(edge_begin, edge_begin + edge_count):
         edge = centerline_edges[edge_index]
         a = centerline[edge[0]]
         b = centerline[edge[1]]
@@ -458,12 +454,110 @@ def project_centerline_containment_batched_kernel(
         wp.atomic_add(contact_count, env, 1)
 
 
+@wp.kernel
+def project_centerline_containment_batched_kernel(
+    catheter: wp.array(dtype=wp.vec3),
+    catheter_inv_mass: wp.array(dtype=wp.float32),
+    catheter_points_per_env: int,
+    centerline: wp.array(dtype=wp.vec3),
+    centerline_edges: wp.array(dtype=wp.vec2i),
+    centerline_radii: wp.array(dtype=wp.float32),
+    centerline_inv_mass: wp.array(dtype=wp.float32),
+    centerline_nodes_per_env: int,
+    centerline_edges_per_env: int,
+    open_root: int,
+    open_root_neighbor: int,
+    catheter_radius: float,
+    max_distance: float,
+    interior_deadband: float,
+    interior_stiffness: float,
+    two_way: int,
+    vessel_response: float,
+    catheter_corrections: wp.array(dtype=wp.vec3),
+    catheter_counts: wp.array(dtype=wp.float32),
+    centerline_corrections: wp.array(dtype=wp.vec3),
+    centerline_counts: wp.array(dtype=wp.float32),
+    contact_depth: wp.array(dtype=wp.float32),
+    contact_count: wp.array(dtype=wp.int32),
+):
+    """Per-env tapered-tube containment in one launch over ``(num_envs, samples)``.
+
+    Same projection as :func:`project_centerline_containment_kernel`, with every
+    catheter and centerline index shifted into the calling env's own window, so
+    each env contains its own rod against its own vessel and no correction can
+    cross between envs. ``centerline_edges`` therefore holds *global* node
+    indices (as tiled by :class:`CosseratRod`), while ``open_root`` and
+    ``open_root_neighbor`` are env-local and shifted here. Every env shares one
+    vessel topology; see :func:`project_centerline_containment_per_env_kernel`
+    for envs whose vessels differ.
+
+    ``contact_depth`` and ``contact_count`` hold one slot per env.
+    """
+    env, sample = wp.tid()
+    _contain_env_sample(
+        env, sample, catheter, catheter_inv_mass, catheter_points_per_env,
+        centerline, centerline_edges, centerline_radii, centerline_inv_mass,
+        centerline_nodes_per_env, centerline_edges_per_env, centerline_edges_per_env,
+        open_root, open_root_neighbor, catheter_radius, max_distance,
+        interior_deadband, interior_stiffness, two_way, vessel_response,
+        catheter_corrections, catheter_counts, centerline_corrections, centerline_counts,
+        contact_depth, contact_count,
+    )
+
+
+@wp.kernel
+def project_centerline_containment_per_env_kernel(
+    catheter: wp.array(dtype=wp.vec3),
+    catheter_inv_mass: wp.array(dtype=wp.float32),
+    catheter_points_per_env: int,
+    centerline: wp.array(dtype=wp.vec3),
+    centerline_edges: wp.array(dtype=wp.vec2i),
+    centerline_radii: wp.array(dtype=wp.float32),
+    centerline_inv_mass: wp.array(dtype=wp.float32),
+    centerline_nodes_per_env: int,
+    centerline_edges_per_env: int,
+    edge_counts: wp.array(dtype=wp.int32),
+    open_roots: wp.array(dtype=wp.int32),
+    open_root_neighbors: wp.array(dtype=wp.int32),
+    catheter_radius: float,
+    max_distance: float,
+    interior_deadband: float,
+    interior_stiffness: float,
+    two_way: int,
+    vessel_response: float,
+    catheter_corrections: wp.array(dtype=wp.vec3),
+    catheter_counts: wp.array(dtype=wp.float32),
+    centerline_corrections: wp.array(dtype=wp.vec3),
+    centerline_counts: wp.array(dtype=wp.float32),
+    contact_depth: wp.array(dtype=wp.float32),
+    contact_count: wp.array(dtype=wp.int32),
+):
+    """:func:`project_centerline_containment_batched_kernel` for envs with different vessels.
+
+    Each env's vessel occupies a padded window of ``centerline_nodes_per_env``
+    nodes and ``centerline_edges_per_env`` edges, of which ``edge_counts[env]``
+    are real. ``open_roots`` and ``open_root_neighbors`` give each env's own
+    entry, env-local, ``-1`` for a closed root.
+    """
+    env, sample = wp.tid()
+    _contain_env_sample(
+        env, sample, catheter, catheter_inv_mass, catheter_points_per_env,
+        centerline, centerline_edges, centerline_radii, centerline_inv_mass,
+        centerline_nodes_per_env, centerline_edges_per_env, edge_counts[env],
+        open_roots[env], open_root_neighbors[env], catheter_radius, max_distance,
+        interior_deadband, interior_stiffness, two_way, vessel_response,
+        catheter_corrections, catheter_counts, centerline_corrections, centerline_counts,
+        contact_depth, contact_count,
+    )
+
+
 __all__ = [
     "CENTERLINE_EDGE_SAMPLES",
     "apply_centerline_corrections_kernel",
     "clamp_positions_delta_kernel",
     "project_centerline_containment_batched_kernel",
     "project_centerline_containment_kernel",
+    "project_centerline_containment_per_env_kernel",
     "reset_centerline_contact_kernel",
     "reset_centerline_nodes_kernel",
     "reset_centerline_segments_kernel",

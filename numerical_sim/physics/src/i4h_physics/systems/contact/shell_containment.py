@@ -49,6 +49,10 @@ class ShellContainment(System):
 
     structural = System.structural + ("iterations", "two_sided", "two_way")
 
+    @classmethod
+    def output_layout(cls, scene, spec):
+        return {"depth": [(0,)]}
+
     def __post_init__(self):
         scene = self.scene
         E, dev = scene.envs, scene.device
@@ -86,6 +90,11 @@ class ShellContainment(System):
         wp.launch(shell_bounds, dim=(scene.envs, self.F),
                   inputs=[self.q_shell, self.tris, self.variant],
                   outputs=[self.lowers, self.uppers], device=scene.device)
+
+    def rebuild_caches(self, scene):
+        """The tree is built once and only refit while stepping, so its shape depends on when it was built."""
+        self._bounds(scene)
+        self.bvh.rebuild()
 
     def _refit(self, scene):
         self._bounds(scene)

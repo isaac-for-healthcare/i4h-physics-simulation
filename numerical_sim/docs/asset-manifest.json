@@ -1008,5 +1008,65 @@
       "git:f8b5b89:numerical_sim/physics/src/i4h_physics/data/vessels/vascular_templates.yaml",
       "upstream provenance and owner decision pending"
     ]
+  },
+  {
+    "path": "numerical_sim/data/instruments/dvrk/LICENSE",
+    "sha256": "a0a526d3a2b94ab3afad8bfc6bd03f9f3148f64ed8d42a62f82eeac279ace73e",
+    "size": 1078,
+    "source": "dVRK dvrk_model; converted USD copied from i4h-mps-cmr/gtc/assets/dvrk",
+    "owner": "da Vinci Research Kit",
+    "license": "MIT",
+    "redistribution_status": "permitted",
+    "evidence": [
+      "dvrk_model/LICENSE: MIT License, Copyright (c) 2024 da Vinci Research Kit; retained in data/instruments/dvrk/LICENSE."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/instruments/dvrk/dvrk_420049.usdc",
+    "sha256": "2f19ea5d8fac3fa89bc79d68d4a246f74cfe62839a92e5445a049c58be09898e",
+    "size": 899668,
+    "source": "dVRK dvrk_model; converted USD copied from i4h-mps-cmr/gtc/assets/dvrk",
+    "owner": "da Vinci Research Kit",
+    "license": "MIT",
+    "redistribution_status": "permitted",
+    "evidence": [
+      "dvrk_model/LICENSE: MIT License, Copyright (c) 2024 da Vinci Research Kit; retained in data/instruments/dvrk/LICENSE."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/instruments/dvrk/dvrk_420179.usdc",
+    "sha256": "5e5f9112182c8fb798a5025b535cbd29abd46820b08dbf54edded6e2a9bc0021",
+    "size": 756292,
+    "source": "dVRK dvrk_model; converted USD copied from i4h-mps-cmr/gtc/assets/dvrk",
+    "owner": "da Vinci Research Kit",
+    "license": "MIT",
+    "redistribution_status": "permitted",
+    "evidence": [
+      "dvrk_model/LICENSE: MIT License, Copyright (c) 2024 da Vinci Research Kit; retained in data/instruments/dvrk/LICENSE."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/instruments/dvrk/dvrk_420183.usdc",
+    "sha256": "142771d3849461ff2b77c4d8b9f0c7fa0f5c4ef5d6febcac919e557bdcd42477",
+    "size": 333683,
+    "source": "dVRK dvrk_model; converted USD copied from i4h-mps-cmr/gtc/assets/dvrk",
+    "owner": "da Vinci Research Kit",
+    "license": "MIT",
+    "redistribution_status": "permitted",
+    "evidence": [
+      "dvrk_model/LICENSE: MIT License, Copyright (c) 2024 da Vinci Research Kit; retained in data/instruments/dvrk/LICENSE."
+    ]
+  },
+  {
+    "path": "numerical_sim/data/instruments/dvrk/dvrk_420327.usdc",
+    "sha256": "da263e46f81c15c19e9a1f172e5bddd13f39980f12a141a468da948c2c415625",
+    "size": 477329,
+    "source": "dVRK dvrk_model; converted USD copied from i4h-mps-cmr/gtc/assets/dvrk",
+    "owner": "da Vinci Research Kit",
+    "license": "MIT",
+    "redistribution_status": "permitted",
+    "evidence": [
+      "dvrk_model/LICENSE: MIT License, Copyright (c) 2024 da Vinci Research Kit; retained in data/instruments/dvrk/LICENSE."
+    ]
   }
 ]

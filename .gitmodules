@@ -1,3 +1,3 @@
-[submodule "physics_simulation/cosmos_h_dreams"]
-	path = neural_sim/cosmos_h_dreams
-	url = https://github.com/isaac-for-healthcare/Cosmos-H-Dreams.git
+[submodule "physics_simulation/cosmos3_h_dreams"]
+	path = neural_sim/cosmos3_h_dreams
+	url = https://github.com/isaac-for-healthcare/cosmos3-h-dreams.git

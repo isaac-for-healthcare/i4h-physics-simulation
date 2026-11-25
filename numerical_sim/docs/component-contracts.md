@@ -30,7 +30,7 @@ They come from the feasibility spike recorded at the end, and every test of thos
 **Buffers.**
 
 - The coupled manager runs with `_use_single_state = True`: per substep, the rigid solver steps `state_0` in place, then `I4hSolver` steps `state_0` in place.
-- Lab never swaps buffers, so every reference we hold stays valid through odd and even substep counts, graph capture and replay, and partial resets: system arrays, `scene` views, torch views, captured step and reset graphs.
+- Lab never swaps buffers, so every reference we hold stays valid through odd and even substep counts, graph capture and replay, and partial resets: system arrays, `scene` views, torch views and Lab's captured step graph. Hosted bindings do not own capture graphs.
 - The spike showed in-place and double-buffered rigid steps give bitwise-identical bodies for MuJoCo-Warp and Featherstone. It also showed MuJoCo-Warp never writes particles to the output buffer, so a double-buffered schedule would lose our particles at the next swap.
 
 **Rebuild.**
@@ -42,7 +42,21 @@ They come from the feasibility spike recorded at the end, and every test of thos
 **Reset.**
 
 - A masked reset resets our rows (positions, velocities, `q_prev`, flags, system products) and the host rigid solver's selected worlds in one call.
+- A hosted binding may supply `prepare_episode_reset(world_mask)`. After mask selection and before numerical restoration, the Lab host evaluates current holder joints and mount poses only for selected worlds. Write or randomize the holder joints before calling the component reset. Mounted catheters restore their rest geometry and frames at that current mount pose.
 - An empty selection changes nothing.
+- This is the episode reset. The cache reset (`I4hSolver.reset(flags=0)`, which Lab calls after state is written through its asset API) refreshes derived caches and keeps history.
+
+**Continuation.**
+
+- `I4hSolver.save_i4h(dst_state, dst_control, mask=None)` and `restore_i4h(src_state, src_control, mask=None)` copy between the bound containers and another State and Control of the same Model. `PhysicsBinding.save` / `restore` and `I4hComponent.save` / `restore` forward to them and accept `env_ids`.
+- **Copied:** every declared State and Control field and the scene's own rows of `particle_q`, `particle_qd` and `particle_f`. **Never written:** foreign host particles, padding rows, body and joint fields, Model fields and initialization templates.
+- **Mask:** `(E+1,)` bool; the last slot selects rows shared by all worlds. `None` selects everything.
+- **Rejected:** the bound containers themselves, containers of another Model or another finalize, replaced arrays, and a Control that shares its buffers with the Model templates (`model.control(clone_variables=False)`).
+- **Recipe:** bind, prepare, then restore. A restore runs no reset, cache refresh or preparation. Call both at a completed step boundary, outside graph capture.
+- **Side effect:** both calls rebuild the contact search trees from current positions. A runtime that saves differs at rounding level from one that never saved. With a partial mask, unselected worlds keep their State and Control bytes but may differ at rounding level in later steps.
+- **Hosted order:** write the host's own state, call the simulation's `forward()`, and restore the i4h rows last. Otherwise Lab's cache reset follows the restore.
+- **Not saved:** a rigid solver's own history (including MuJoCo-Warp's), host time and episode counters, assessment, procedure and tip evidence, renderer state and recordings. With a rigid solver the host restores body state itself.
+- **Bitwise resume** is tested on the CPU for every case, and on CUDA for the rod and mount fixtures only; chole and the aorta cases are not repeatable on CUDA.
 
 ## 2. Coordinate frames
 
@@ -116,12 +130,36 @@ They come from the feasibility spike recorded at the end, and every test of thos
 
 **Pose.** `pose` composes with Lab's env frame into `T_e`.
 
+**Procedure.** `I4hComponentCfg.procedure` (`from_case(case, procedure=True)`) makes the component own the case's
+assessment.
+
+- Every solver build constructs it with the host's `horizon_s`, set before construction to
+  `max_episode_length * step_dt`.
+- Main uses solver-adapter `post_step`; patched Lab 3.0 uses its solver-step bridge. Both update it once per physics step, including each iteration of a captured decimation batch. Host stream ordering runs after the batch.
+- `component.reset()` stays physical only. The host calls `reset_procedure()` after its reset events, so the
+  procedure samples the state those events left.
+- `i4h_isaaclab.manager` builds the manager-based env on this.
+
 ## 3c. Supported GPU state access
 
 For a hosted component, call `component.sync_views()` and then
 `component.positions("aorta")` (replace `aorta` with the case's body name).
 The result is a zero-copy `torch.float32` tensor of shape `(E, 3*n)` on the
 component's device, normally `cuda:<ordinal>`. Use `.view(E, n, 3)` for xyz.
+After explicit teleports through position views or native State arrays, call
+`component.initialize_particle_history(env_ids, mask=...)` before stepping
+(supply either ids or a mask). It orders Torch writes before Warp and updates
+only selected owned particle history, including private pools. Velocities, flags,
+topology, commands and foreign/unselected rows remain unchanged. Raw view writes
+cannot be detected automatically. Direct `PhysicsBinding` callers have the same
+method and must order position writes onto Warp's stream themselves.
+
+`I4hEnv` and manager-based `I4hHostMixin` complete this operation after startup and reset events. Fresh component construction
+and rebuild callbacks complete writes on the current Torch stream automatically;
+callbacks writing on another stream must call the method on that stream before
+returning. Binding an independent/restored State and cache-only solver reset do
+not initialize history. Restore saved history after construction callbacks.
+
 `component.positions(body, part)` selects a named part. Omit the body only when
 there is exactly one integrated body. No implicit concatenation or world transform
 is performed. `component.state()` maps `<system id>.<product>` to `(E, k)` views;
@@ -187,9 +225,8 @@ These bounds are fixed before any candidate is evaluated. `L` is the catheter le
 
 ## 5. Dependency-check exceptions
 
-`uv pip check` must be clean, apart from exactly these three messages, which come from Isaac Lab 6864dd1's own lockfile:
+`uv pip check` must be clean, apart from exactly these two messages, which come from Isaac Lab v3.0.0's own lockfile (6864dd1 also reported `open3d` requires `ipywidgets>=8.0.4`):
 
-- `open3d` requires `ipywidgets>=8.0.4`;
 - `numba` requires `numpy>=1.22,<2.5`;
 - `cmeel-boost` requires `numpy>=2.3,<2.4`.
 
@@ -229,3 +266,66 @@ not wall contact. Nonzero interior stiffness requires `spline: false`.
 For the internal migration, legacy trajectory comparisons in section 4 are
 **diagnostics**, not release gates. Analytic limits, coupling checks and the
 existing bent-lumen bound remain gates; see `migration/internal-endoluminal.md`.
+
+## Stage B solver observables
+
+`I4hSolverCfg.observables` defaults to `()`. Request custom kinds from
+`i4h_physics.observables.ObservableKind` before host construction. Standalone
+callers allocate `sim.observables = sim.solver.observables(kinds)` before
+`sim.prepare()`. Subsets are allocated with `output.select(kinds)` before
+capture and share the selected arrays; omitted products are not refreshed.
+Allocating another output container after preparation requires preparation again
+so episode-reset capture includes it. Replacing arrays, captured containers or
+source buffers is rejected. A host hard rebuild invalidates the old binding and
+allocates new outputs.
+
+| Kind / array | Row domain | Meaning |
+| --- | --- | --- |
+| `I4H_WRENCH` / `i4h_wrench` | world, control system, tool | `wp.spatial_vector(force, moment)`, reaction on the tool; moment about the instrument/driver root, in component coordinates and case units. Includes unmounted tools. |
+| `I4H_CONTACT_DEPTH` / `i4h_contact_depth` | world, containment system | Struct `depth`, `count`: copies the existing last-substep measurement. Count semantics remain those of the source (nodes or samples pushed); they are not unique frame contacts. |
+| `I4H_SURGICAL_COUNT` / `i4h_surgical_count` | world, instrument-contact system, capsule | Struct `found`, `valid=min(found,capacity)`, `capacity`, `overflow=max(found-capacity,0)`, for the final recording event of the final substep. This overflow is distinct from the source's sum over all substeps. |
+| `I4H_SURGICAL_CONTACT` / `i4h_surgical_contact` | world, instrument-contact system, capsule, stored slot | Struct described below. Opt-in; request `I4H_SURGICAL_COUNT` alongside it to report truncation. |
+
+`output.row_keys[kind]` is an immutable tuple of row identities, derived from
+Model output-layout metadata registered before finalization. Tool keys are
+`(world, control_system_id, tool_index, name_or_rod_system_id)`; the last field
+is the instrument name or the catheter control's referenced rod-system ID. Containment keys are
+`(world, system_id, 0)`. Capsule keys are
+`(world, contact_system_id, capsule_index, tool_index, control_system_id,
+surface_system_id, capacity)`; record keys replace the final capacity with the
+stored slot. Triangle/tet/vertex IDs belong to that surface system's body.
+These are i4h identities, not native Newton shape IDs. Model metadata contains
+no migrated persistent physics state.
+
+Raw wrenches sum each enabled reaction source once in authored order using
+`-sum(impulse)/(substep_dt * step_dt)`, with identical moment scaling. Contact,
+surface grasp, volumetric grasp and hook contribute to instruments; the catheter
+control already accumulates its root hold and guide contributions. Its
+`root_reaction` capability retains its existing meaning: the direct rod solver
+measures the root hold; a PBD driver does not acquire a new root reaction through
+this export. `ToolForce` remains the separate gain-weighted and capped haptic
+product. Reading/exporting a wrench neither consumes nor clears pending coupling
+reactions and does not change their one-step delay. Coupling alone rotates the
+reaction into world coordinates and shifts root moment to body COM.
+
+Surgical records contain `valid`, body-local `triangle`, `tet`, `vertices`,
+`barycentric`, `normal`, `penetration`, `capsule_coordinate`,
+`surface_point_completed`, and `capsule_point_completed`. The last two fields are
+reconstructed from completed-step positions. They are **not points at the
+recording instant**: constraints, motion and cuts can occur after recording.
+Recorded IDs, normal, penetration, barycentrics and stored order are retained,
+including an event whose tissue was cut later in the substep. The capsule point
+is on its axis. The existing tip-capsule coverage is unchanged; wrist/shaft rows
+have zero valid records. No per-contact force is invented. Invalid payload is
+zeroed (IDs are `-1` during publication); only `valid` slots may be consumed.
+
+All requested buffers are allocated before capture. The publication kernels read
+physics products and write only these separate output buffers, after the existing
+five-hook step. Disabled sources publish zero outputs/counts; capacities remain
+layout metadata. Episode reset clears selected worlds' measurements, preserving
+capacity and unselected worlds. Empty masks do nothing. Unrequested kinds have
+`None` arrays; requested empty domains have zero-length arrays.
+
+The coupled wrapper routes custom arrays to i4h and native `CONTACT_F` to
+MuJoCo-Warp, including subset selection. Pure i4h continues to reject native
+`CONTACT_F`. Surgical export must not be interpreted as native rigid contacts.

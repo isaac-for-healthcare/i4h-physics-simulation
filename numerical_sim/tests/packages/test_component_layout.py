@@ -9,7 +9,7 @@ import pytest
 
 newton = pytest.importorskip("newton")
 from i4h_physics.config import build_systems, load_case, load_scene, sim_settings  # noqa: E402
-from i4h_physics.newton_model import add_env_particles  # noqa: E402
+from i4h_physics.newton_model import add_env_particles, complete_scene  # noqa: E402
 from i4h_physics.quat import axis_angle_quat, quat_to_matrix  # noqa: E402
 from i4h_physics.sim import I4hSolver  # noqa: E402
 from i4h_physics.stepper import Stepper  # noqa: E402
@@ -20,11 +20,14 @@ CASE = {"sim": {"device": "cpu", "envs": 2, "dt": .01, "substeps": 2}, "assets":
 HOST_BEFORE, HOST_AFTER = [(5.0, 5.0, 5.0), (6.0, 5.0, 5.0)], [(7.0, 5.0, 5.0)]
 
 
-def host_sim(rotations, gravity=(0.0, 0.0, -9.81)):
+def host_sim(rotations, gravity=(0.0, 0.0, -9.81), case_gravity=None):
     """A host model: one global particle in front, then per world two host particles, ours, one more host particle;
     world ``e`` placed at ``(e, 0, 0)`` with orientation ``rotations[e]`` (xyzw)."""
-    scene = load_scene(CASE)
-    b = newton.ModelBuilder(gravity=gravity[2])
+    case = CASE if case_gravity is None else CASE | {"sim": CASE["sim"] | {"gravity": list(case_gravity)}}
+    scene = load_scene(case)
+    from i4h_physics.rod_storage import declare_rod_direct
+    declare_rod_direct(scene, "rod")
+    b = newton.ModelBuilder(gravity=gravity)
     b.add_particle((9.0, 9.0, 9.0), (0.0, 0.0, 0.0), 1.0)  # a global particle
     for e in range(scene.envs):
         b.begin_world()
@@ -32,11 +35,12 @@ def host_sim(rotations, gravity=(0.0, 0.0, -9.81)):
         add_env_particles(b, scene, e, xform=(np.float32([e, 0.0, 0.0]), np.float32(rotations[e])))
         b.add_particles(HOST_AFTER, [(0.0, 0.0, 0.0)], [1.0])
         b.end_world()
+    complete_scene(b, scene)
     model = b.finalize(device="cpu")
     model.set_gravity(gravity)
     state = model.state()
     scene.allocate(model, state)
-    sim = Stepper(I4hSolver(model, scene, build_systems(scene, CASE), state), **sim_settings(CASE))
+    sim = Stepper(I4hSolver(model, scene, build_systems(scene, case), state), **sim_settings(case))
     return sim, model, state
 
 
@@ -81,6 +85,8 @@ def test_rotated_env_sees_gravity_in_the_component_frame():
 
 def test_misplaced_rows_are_rejected():
     scene = load_scene(CASE)
+    from i4h_physics.rod_storage import declare_rod_direct
+    declare_rod_direct(scene, "rod")
     b = newton.ModelBuilder()
     for e in range(scene.envs):
         b.begin_world()
@@ -88,6 +94,7 @@ def test_misplaced_rows_are_rejected():
             b.add_particles(HOST_BEFORE, [(0.0, 0.0, 0.0)] * 2, [1.0] * 2)  # only world 1 has host particles
         add_env_particles(b, scene, e, xform=(np.zeros(3), np.float32([0, 0, 0, 1])))
         b.end_world()
+    complete_scene(b, scene)
     model = b.finalize(device="cpu")
     with pytest.raises(RuntimeError, match="one column of equally sized worlds"):
         scene.allocate(model, model.state())
@@ -107,3 +114,16 @@ def test_host_gravity_changes_reach_a_rotated_component():
         g = np.float32(g)
         np.testing.assert_allclose(sim.scene.gravity.numpy(), [g, quat_to_matrix(q1).T @ g], atol=1e-6)
         assert sim.scene.gravity.ptr == buffer
+
+
+
+def test_declared_case_gravity_is_the_world_gravity_of_a_rotated_component():
+    """A case's sim.gravity declares the world's gravity (I4hComponent.configure copies it to the host): a rotated
+    component whose case declares the host's gravity builds, and still sees R^T g in its own frame; a different
+    declaration is rejected."""
+    q1 = axis_angle_quat((1.0, 0.0, 0.0), np.pi / 2)
+    sim, model, state = host_sim([(0.0, 0.0, 0.0, 1.0), tuple(q1)], case_gravity=(0.0, 0.0, -9.81))
+    g = np.float32([0.0, 0.0, -9.81])
+    np.testing.assert_allclose(sim.scene.gravity.numpy(), [g, quat_to_matrix(q1).T @ g], atol=1e-5)
+    with pytest.raises(ValueError, match="differs from the case's sim.gravity"):
+        host_sim([(0.0, 0.0, 0.0, 1.0), tuple(q1)], case_gravity=(0.0, -9.81, 0.0))

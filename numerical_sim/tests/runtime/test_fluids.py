@@ -3,11 +3,12 @@
 
 """M6 fluids: pool bodies, the position-based solve, emitters, contact, suction, bleeding."""
 
+
 import numpy as np
 import pytest
 import warp as wp
 from helpers import find, needs_chole, quiet, rest_actions, run
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 from i4h_physics.scene import ACTIVE_INT
 from i4h_physics.systems.contact.fluid_contact import FluidContact
 from i4h_physics.systems.fluids.fluid import Fluid
@@ -333,32 +334,6 @@ def test_fluid_system_order(case):
     sim = load_case(case)
     order = [type(s) for s in sim.systems]
     assert order.index(Fluid) < order.index(Emitter) < order.index(FluidContact) < order.index(Suction) < order.index(Bounds)
-
-
-@needs_chole
-def test_suction_tool_loads_shaft_only():
-    from i4h_standalone.render.instruments import piece_skins, skin_pieces
-    from i4h_surgical.loaders.instrument_usd import CHAIN_SHAFT
-
-    sim = load_case("chole_tet_med", envs=1)
-    scene, control = sim.scene, find(sim, InstrumentControl)
-    rec = scene.instruments["suction"]
-    assert rec.kind == "suction" and [p.name for p in rec.pieces] == ["tool"] and rec.trocar is not None
-    assert all(sp.chain == CHAIN_SHAFT for sp in rec.spheres) and [p[2] for p in rec.prims] == ["shaft"]
-    k = control.names.index("suction")
-    run(sim, 2, rest_actions(control, 1))
-    skins = piece_skins(control, scene.device)
-    tool = [s for s in skins if s.instrument == k][0]
-    out = [wp.zeros(s.count, dtype=wp.vec3, device=scene.device) for s in skins]
-    skin_pieces(control, 0, skins, out, [wp.zeros_like(o) for o in out], scene.device)
-    pts = out[skins.index(tool)].numpy()
-    root, trocar = control.root.numpy()[0, k], rec.trocar
-    along = (pts - root) @ ((trocar - root) / np.linalg.norm(trocar - root))
-    assert along.max() > 1.0 and along.min() > -0.05, "the tube runs from the tip at the root back toward the trocar"
-    assert np.linalg.norm(pts - root, axis=1).min() < 0.05, "the tip sits at the controlled point"
-
-
-# The artery cut by the cutting tool lives in test_scissors.py::test_scissors_cut_the_artery (M9b: the scissors cut).
 
 
 @needs_chole

@@ -63,6 +63,12 @@ class RodDirect(System):
 
     structural = System.structural + ("inertia",)
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_physics.rod_storage import publish_rod
+        return publish_rod(authoring.scene, declarations, spec.get("id", spec["type"]),
+                           body=spec["body"], backend="direct", settings=spec)
+
     def __post_init__(self):
         scene = self.scene
         self.body = b = scene.body(self.body)
@@ -86,26 +92,18 @@ class RodDirect(System):
             "corrections": n * 12 * 2 + ne * 12,
         })
         self.variant = b.variant  # (E,) int32, shared by the body's systems
-        self.frames0 = wp.array(m.frames, dtype=wp.quat, device=dev)  # (V, P)
-        material = b.rod_material
-        self.rest_len = material.rest_len if material is not None and material.backend == 'direct' else wp.array(m.rest_len, dtype=wp.float32, device=dev)
-        self.rest_darboux = material.rest_darboux if material is not None and material.backend == 'direct' else wp.array(m.rest_darboux, dtype=wp.vec3, device=dev)
-        self.inv_mass_q = wp.array(m.inv_mass_q, dtype=wp.float32, device=dev)  # (V, P); 0 at a locked root
-        self.frame = wp.empty(n, dtype=wp.quat, device=dev)  # body-local: index env * P + node
-        self.frame_pred = wp.empty(n, dtype=wp.quat, device=dev)
-        self.omega = wp.zeros(n, dtype=wp.vec3, device=dev)
-        from i4h_physics.regions import RodControls
+        from i4h_physics.rod_storage import DIRECT_LIVE, bind_rod
         material = b.rod_material
         if b.regions is not None and material is None:
-            raise ValueError("rod_direct: regional body requires rod_direct_material before the solver")
+            raise ValueError("rod_direct: regional body requires matching material before the solver")
         if material is not None and material.backend != "direct":
             raise ValueError("rod_direct: mismatched material backend")
-        if b.rod_controls is None:
-            b.rod_controls = RodControls(scene, Ed, Ed)
-        self.bend_offset = b.rod_controls.bend_offset
+        bind_rod(self, "direct")
+        self.frame_pred = wp.clone(self.frame)
+        self.register_live(*DIRECT_LIVE)
         self.regional = material is not None and material.active
-        self.preferred_rest = material.preferred_rest if self.regional else self.rest_darboux
-        self._live("young", "torsion", "bend", "twist", "angular_damping")
+        from i4h_physics.rod_storage import route_alias
+        route_alias(scene, self, "preferred_rest", material.preferred_rest if self.regional else self.rest_darboux)
         # Solver scratch (omniendo's _BatchedRodWorkspace, solver_xpbd_rod.py:287-316, minus the constant arrays).
         # Everything is rewritten before it is read within an iteration; lambda_sum is overwritten on each
         # substep's first iteration; the correction accumulators are cleared by the apply kernel. No masked reset.
@@ -118,16 +116,18 @@ class RodDirect(System):
         self.rot_corr = wp.zeros(n, dtype=wp.vec3, device=dev)
         if self.inertia not in ("unit", "physical"):
             raise ValueError(f"rod_direct.inertia must be 'unit' or 'physical', got {self.inertia!r}")
-        self.inertia_local = wp.array(cylinder_inv_inertia(scene, b, m.rest_len[0]), dtype=wp.vec3, device=dev)  # (P,)
         self.inv_inertia = wp.zeros(n if self.inertia == "physical" else 1, dtype=wp.mat33, device=dev)  # world, per node
-        self.freeze("inertia")
-        self.reset(scene, wp.ones(E, dtype=wp.bool, device=dev))
+        self.freeze("inertia", "id", "P", "Ed", "frame_count", "bend_count")
 
     def prepare(self, scene):
+        scene.storage.check()
         super().prepare(scene)
+        if self.inertia == "physical":  # per-env masses may have changed since construction (in place: graphs keep it)
+            self.inertia_local.assign(cylinder_inv_inertia(scene, self.body, self.rest_len.numpy()[0]).reshape(-1, 3))
         material = self.body.rod_material
         self.regional = material is not None and material.active
-        self.preferred_rest = material.preferred_rest if self.regional else self.rest_darboux
+        from i4h_physics.rod_storage import route_alias
+        route_alias(scene, self, "preferred_rest", material.preferred_rest if self.regional else self.rest_darboux)
 
 
     def substep_start(self, scene, dt, s, substeps):
@@ -191,15 +191,16 @@ class RodDirect(System):
 
 
 def cylinder_inv_inertia(scene, body, rest_len) -> np.ndarray:
-    """``(P, 3)`` float32 local inverse inertia per node for ``inertia: physical``: a cylinder of the node's mass, radius
-    and segment length, ``12 / (m (3 r² + L²))`` about the transverse axes and ``2 / (m r²)`` about the tangent (z),
-    as the workflow's catheter sets it (newton_catheter_physics._apply_physical_rotational_inertia). Zero for a node
-    without mass (the locked root)."""
-    rows = lambda name: scene.field(name, body).numpy()[0]  # noqa: E731  (one mesh variant: env 0's rows)
-    inv_mass, radius = rows("inv_mass").astype(np.float64), rows("radius").astype(np.float64)
+    """``(E, P, 3)`` float32 local inverse inertia per env and node for ``inertia: physical``: a cylinder of the node's
+    mass, radius and segment length, ``12 / (m (3 r² + L²))`` about the transverse axes and ``2 / (m r²)`` about the
+    tangent (z), as the workflow's catheter sets it (newton_catheter_physics._apply_physical_rotational_inertia). Each
+    env's own rows: one geometry variant may carry different masses or radii per env. Zero for a node without mass
+    (the locked root)."""
+    inv_mass = scene.field("inv_mass", body).numpy().astype(np.float64)  # (E, P)
+    radius = scene.field("radius", body).numpy().astype(np.float64)
     seg = np.asarray(rest_len, np.float64)
-    seg = np.concatenate([seg, seg[-1:]])  # node e takes edge e's length, the last node the last edge's
-    out = np.zeros((len(inv_mass), 3), np.float32)
+    seg = np.broadcast_to(np.concatenate([seg, seg[-1:]]), inv_mass.shape)  # node e: edge e's length (last: the last)
+    out = np.zeros(inv_mass.shape + (3,), np.float32)
     free = inv_mass > 0.0
     m = 1.0 / np.where(free, inv_mass, 1.0)
     out[free, 0] = out[free, 1] = (12.0 / (m * (3.0 * radius**2 + seg**2)))[free]

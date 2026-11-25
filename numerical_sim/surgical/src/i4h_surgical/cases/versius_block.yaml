@@ -1,0 +1,76 @@
+# Robot-contact mechanics resolved from the original Versius profile.
+sim:
+  device: cuda:0
+  dt: 0.016666666666666666
+  substeps: 4
+  iterations: 8
+  envs: 2
+  gravity:
+  - 0.0
+  - 0.0
+  - -9.81
+assets:
+  block:
+    type: tet_grid
+    dim:
+    - 4
+    - 4
+    - 4
+    cell: 0.02
+    origin:
+    - -0.03
+    - -0.03
+    - 0.05
+    fix_top: true
+    parts:
+      block:
+        spring: 1.0
+        volume: 1.0
+        heat: true
+        deletable: true
+instruments:
+  probe:
+    kind: sphere
+    radius: 0.006
+    initial:
+      position:
+      - 0.0
+      - 0.0
+      - 100.0
+systems:
+- type: particles
+  max_velocity: 5.0
+- type: tet
+  body: block
+- type: surface
+  tet: tet
+- type: instrument_control
+- type: instrument_contact
+  instruments: instrument_control
+  surface: surface
+- type: tool_force
+  instruments: instrument_control
+  contacts: instrument_contact
+- type: bounds
+  lower:
+  - -0.5
+  - -0.5
+  - 0.0
+  upper:
+  - 0.5
+  - 0.5
+  - 1.0
+render:
+  backend: noop
+  env: 0
+  camera:
+    position:
+    - 0.15
+    - -0.2
+    - 0.17
+    pitch: -18.0
+    yaw: -37.0
+    up:
+    - 0.0
+    - 0.0
+    - 1.0

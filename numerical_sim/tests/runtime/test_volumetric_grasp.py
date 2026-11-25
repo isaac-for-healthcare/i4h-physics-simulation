@@ -4,23 +4,29 @@
 """M9b volumetric grasp: particles inside the closed jaws are captured up to the capacity, held at their captured
 distance from their jaw sphere while the tool moves, released when the jaw opens; env isolation, reset, graph."""
 
+
 import os
 
 import numpy as np
 import pytest
-from helpers import find, needs_chole
-from i4h_isaaclab.composition import data_dir, load_case
+from i4h_host.composition import data_dir
 from i4h_physics import Scene, Stepper
 from i4h_physics.loaders import add_tet_grid
 from i4h_physics.systems.mechanics.tet import Tet
+from i4h_surgical.instrument_storage import declare_instruments
+from i4h_surgical.interaction_storage import declare_volumetric_grasp
 from i4h_surgical.loaders.instrument_usd import add_instrument
-from i4h_surgical.systems.instruments.grasp import Grasp
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
 from i4h_surgical.systems.instruments.volumetric_grasp import VolumetricGrasp
 
 ASSETS = data_dir() / "instruments"
+
+
 pytest.importorskip("pxr", reason="usd-core not installed")
+
+
 pytestmark = pytest.mark.skipif(not os.environ.get("I4H_DATA") and not (ASSETS / "pgrasp.usdc").is_file(), reason=f"instrument assets not found at {ASSETS}")
+
 
 GRASPER = dict(
     kind="grasper", mesh=str(ASSETS / "pgrasp.usdc"), scale=0.0075, trocar=[0.0, 0.0, -2.0],
@@ -36,6 +42,10 @@ def block_and_grasper(envs=2, capacity=64):
     scene = Scene("cuda:0", envs, gravity=(0.0, 0.0, 0.0))
     block = add_tet_grid(scene, "block", [6, 6, 4], 0.02, origin=(-0.06, -0.06, 0.0), fix_top=True, radius=0.005)
     add_instrument(scene, "grasper", **GRASPER)
+    from i4h_physics import declare_tet
+    declare_tet(scene, 'block', system_id='tet')
+    declare_instruments(scene)
+    declare_volumetric_grasp(scene, body="block", capacity=capacity)
     scene.allocate()
     ic = InstrumentControl(scene)
     tet = Tet(scene, body="block")
@@ -144,26 +154,6 @@ def test_capacity_retry_reset_and_graph():
             sim.step()
         counts.append((int(vg.count.numpy()[0, 0]), sim.graph is not None))
     assert counts[0][1] and not counts[1][1] and counts[0][0] == counts[1][0] > 0
-
-
-@needs_chole
-def test_chole_both_grasps_hold_the_gallbladder():
-    from i4h_standalone.app.instruments import InstrumentDriver
-
-    sim = load_case("chole_tet_med", envs=2)
-    control, grasp, vg = find(sim, InstrumentControl), find(sim, Grasp), find(sim, VolumetricGrasp)
-    kinds = [type(s) for s in sim.systems]
-    assert kinds.index(InstrumentControl) < kinds.index(Grasp) < kinds.index(VolumetricGrasp)
-    assert vg.body.name == 'tissue' and vg.capacity == 64
-    k = control.names.index("grasper")
-    driver = InstrumentDriver(sim, control, None, "scripted")
-    best = np.zeros(2, int)
-    for step in range(132):
-        driver.update(step * sim.dt)
-        sim.step()
-        best = np.maximum(best, vg.count.numpy()[:, k])
-    assert best[0] > 0 and grasp.count.numpy()[:, k].max() >= 0 and np.isfinite(sim.scene.q.numpy()).all()
-    assert (vg.count.numpy()[:, [i for i in range(control.count) if i != k]] == 0).all()  # only the grasper holds
 
 
 def test_dead_particles_free_their_slots_and_the_jaw_retries():

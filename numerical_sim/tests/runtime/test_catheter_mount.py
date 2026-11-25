@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 import warp as wp
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 
 P, MASS, SEG = 20, 0.01, 0.01
 REST = ((0.0, 0.0, 1.0), None)  # the rest root: start [0, 0, 1], frame from the rod's rest frames
@@ -159,3 +159,25 @@ def test_root_hold_carries_the_weights_moment():
     expected = np.cross(arm, np.float32([0.0, 0.0, -MASS * 9.81])).sum(axis=1)
     assert np.abs(expected[:, 1]).min() > 0.01, "the weight has a lever arm"
     np.testing.assert_allclose(moment, expected, rtol=0.03, atol=2e-4)
+
+
+def test_manual_mount_defaults_and_reset_persistence():
+    sim = load_case(case())
+    cc = control(sim)
+    np.testing.assert_array_equal(cc.mounted.numpy(), [0])
+    pose = rest_pose(cc)
+    np.testing.assert_array_equal(pose[:, 0, :3], np.tile(REST[0], (2, 1)))
+    cc.mount()
+    pose[:, 0, 1] += np.float32([0.02, -0.03])
+    cc.mount_pose.assign(pose)
+    drive(sim, 1)
+    root = cc.root.numpy().copy()
+    sim.reset([0])
+    np.testing.assert_array_equal(cc.mounted.numpy(), [1])
+    np.testing.assert_array_equal(cc.mount_pose.numpy(), pose)
+    np.testing.assert_array_equal(cc.root.numpy()[0], pose[0, :, :3])
+    np.testing.assert_array_equal(cc.root.numpy()[1], root[1])
+    sim.reset([])
+    sim.reset([0])
+    np.testing.assert_array_equal(cc.root.numpy()[0], pose[0, :, :3])
+    np.testing.assert_array_equal(cc.root.numpy()[1], root[1])

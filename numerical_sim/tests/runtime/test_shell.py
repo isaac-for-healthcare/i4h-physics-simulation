@@ -13,7 +13,7 @@ from conftest import env_slice
 from helpers import VESSELS, find, run_rates, signed_phi
 from i4h_endoluminal.loaders.vessel_mesh import build_shell
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.scene import ACTIVE_INT, Part, ParticleRest
 from i4h_physics.systems.contact.shell_containment import ShellContainment

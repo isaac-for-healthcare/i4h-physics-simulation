@@ -172,10 +172,10 @@ def test_env_rows_copy_one_env_only(monkeypatch):
         return out
 
     class Builder:
-        def add_particles(self, *args):
+        def add_particles(self, *args, **kwargs):
             pass
 
     monkeypatch.setattr(newton_model.np, "concatenate", counting)
     for env in range(scene.envs):
-        newton_model.add_env_particles(Builder(), scene, env)
+        newton_model.add_env_particles(Builder(), scene, env, custom_attributes={})
     assert copied == [W] * 4 * scene.envs, copied

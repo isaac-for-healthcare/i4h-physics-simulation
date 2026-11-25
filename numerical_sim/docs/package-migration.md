@@ -1,5 +1,7 @@
 # Architecture and package boundaries
 
+> Standalone was extracted after this architecture was documented. See [current split ownership and symbol migration](standalone-split.md).
+
 Physics and assessment are neutral packages. Domains depend on physics, and import
 neither hosts nor each other. Standalone owns device adapters, teleoperation, input
 calibration, UI, rendering, XR and capture. Isaac Lab owns environments, tasks and
@@ -10,8 +12,8 @@ device, whose case then follows the environment case.
 `PhysicsBinding` owns physical lifetime and masked reset. Host teardown and replacement
 invalidate bindings. Assessment evaluates every completed physics sample, before rewards
 and termination checks. Empty reset selections leave assessment and host pacing alone.
-`Stepper.step()` advances one physics sample; `NewtonSim.step()` invokes the manager,
-including its configured decimation. Per-sample reward pulses and action totals retain
+`Stepper.step()` advances one standalone physics sample. In Lab, the native
+manager advances physics and owns decimation; the hosted binding has no `step()`. Per-sample reward pulses and action totals retain
 their existing meanings.
 
 Loader and constructor maps are explicit. Ordinary owning sidecars carry presentation;
@@ -31,6 +33,21 @@ Host adapters pass their episode horizon (`max_episode_length * step_dt`) throug
 deadline wins; completion takes precedence at that boundary. Terminal exports identify
 `timeout_source` and the effective `timeout_s`. External hosts must supply their
 horizon explicitly; assessment has no host dependency.
+
+## State ownership and continuation
+
+Particles, tet and surface topology, instruments, rods, catheter commands, mounts and the episode history of every
+system are fields of the Newton Model, State and Control, declared on the builder before finalize. TipEvidence and
+Procedure state are host-owned assessment state and are not part of it.
+
+| Operation | Call | Effect |
+| --- | --- | --- |
+| Episode reset | `Stepper.reset`, `PhysicsBinding.reset`, `I4hSolver.restore_episode` | Selected worlds return to authored state, history and command defaults |
+| Cache reset | `I4hSolver.reset(state, mask, flags=0)` | Derived caches are refreshed; history is kept |
+| Continuation | `save_i4h` / `restore_i4h`, `PhysicsBinding.save` / `restore`, `I4hComponent.save` / `restore` | i4h rows are copied between containers of one Model; no reset runs |
+
+Continuation excludes rigid solver history (including MuJoCo-Warp's), host time and episode counters, assessment,
+procedure and tip evidence, renderer state and recordings. Details are in `docs/component-contracts.md`.
 
 ## Renamed and removed cases
 

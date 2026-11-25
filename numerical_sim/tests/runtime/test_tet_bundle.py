@@ -7,7 +7,7 @@ import os
 
 import numpy as np
 import pytest
-from i4h_isaaclab.composition import data_dir, resolve_data_path
+from i4h_host.composition import data_dir, resolve_data_path
 from i4h_physics import Scene
 from i4h_surgical.loaders.tet_bundle import add_tet_bundle
 
@@ -127,3 +127,9 @@ def test_data_path(monkeypatch):
     monkeypatch.setenv("I4H_DATA", "/tmp/elsewhere")
     assert resolve_data_path("${DATA}/x") == "/tmp/elsewhere/x"
     assert resolve_data_path(["${DATA}/a", "${DATA}/b"]) == ["/tmp/elsewhere/a", "/tmp/elsewhere/b"]
+
+
+@pytest.mark.parametrize("scale", [0.0, -1.0, True, float("inf"), float("nan"), "small"])
+def test_tet_bundle_rejects_invalid_geometry_scale(scale):
+    with pytest.raises(ValueError, match="scale"):
+        add_tet_bundle(Scene("cpu", 1), "tissue", DATA, PARTS, scale=scale)

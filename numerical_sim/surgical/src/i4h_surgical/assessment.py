@@ -83,7 +83,7 @@ def surface(
 
 class GraspTarget(TargetMeasurement):
     extra_keys = ("body",)
-    def _bind_tool(self):
+    def bind_tool(self):
         self.tool_body, self.start, self.end = self._selection(self.cfg["body"])
         self.control = next(
             (
@@ -114,7 +114,7 @@ class GraspTarget(TargetMeasurement):
                 "grasp_target requires a grasp mechanism for its body/tool"
             )
 
-    def _qualify(self):
+    def qualify(self):
         for s in self.grasps:
             if not s.enabled or not self.control.enabled:
                 continue

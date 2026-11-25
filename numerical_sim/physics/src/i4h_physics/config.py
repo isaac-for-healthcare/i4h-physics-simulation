@@ -1,12 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""YAML case -> Scene (on a Newton model and state) + ordered systems -> I4hSolver -> Stepper.
+"""Case authoring, host allocation and runtime binding, then a standalone Stepper.
 
-Construction order: the loaders fill the scene's host records; ``Scene.allocate`` checks memory, builds the Newton
-model (one world per env), creates its state and aliases the main particle block onto them; the systems are built on
-the allocated scene (they cache views of its arrays); ``I4hSolver`` binds the model, scene, systems and state; the
-``Stepper`` owns the timestep, loop counts and graphs."""
+Hosted callers use ``author_case`` directly and retain ownership of allocation,
+stepping and capture. Systems always execute in their case's authored list order.
+"""
 
 from __future__ import annotations
 
@@ -35,8 +34,7 @@ def require_asset(path):
     """Validate an explicitly consumed asset; never discover a checkout or substitute data."""
     path = Path(path).expanduser()
     if not path.is_file():
-        raise FileNotFoundError(f"Expected file {path}. Set I4H_DATA or pass --data.\n"
-                                "Repository checkout example: uv run i4h-sim CASE --data ./data")
+        raise FileNotFoundError(f"Expected file {path}. Set I4H_DATA or pass data=... to the case loader.")
     return path
 
 
@@ -118,8 +116,7 @@ def load_scene(cfg: dict, device=None, envs=None, *, loaders=None) -> Scene:
             loaders[kind](scene, name, **asset)
         except FileNotFoundError as error:
             raise FileNotFoundError(
-                f"{error}\nSet I4H_DATA to the production asset directory, or pass --data.\n"
-                "Repository checkout example: uv run i4h-sim CASE --data ./data"
+                f"{error}\nSet I4H_DATA to the production asset directory, or pass data=... to the case loader."
             ) from error
     return scene
 
@@ -127,9 +124,22 @@ def load_scene(cfg: dict, device=None, envs=None, *, loaders=None) -> Scene:
 def load_case(case, device=None, envs=None, debug=False, *, loaders=None, systems=None, data=None, case_dirs=(), allowed_keys=TOP_LEVEL_KEYS) -> Stepper:
     """Build physics only from a case name, path or mapping. Assessment is constructed by the caller."""
     cfg = read_case(case, data=data, case_dirs=case_dirs, allowed_keys=allowed_keys)
-    scene = load_scene(cfg, device, envs, loaders=loaders)
-    scene.allocate()
-    sim = Stepper.create(scene, build_systems(scene, cfg, constructors=systems), **sim_settings(cfg, debug))
+    import newton
+    from i4h_physics.authoring import author_case
+
+    authoring = author_case(cfg, loaders, systems, device=device, envs=envs)
+    authoring.scene.check_memory(authoring.scene.estimate_bytes(construction=True))
+    builder = newton.ModelBuilder()
+    for world in range(authoring.scene.envs):
+        builder.begin_world(gravity=authoring.scene.gravity_vector)
+        authoring.add_world(builder, world)
+        builder.end_world()
+    authoring.complete(builder)
+    model = builder.finalize(device=authoring.scene.device)
+    model.particle_grid = None
+    state, control = model.state(), model.control()
+    scene, runtime_systems = authoring.bind(model, state, control)
+    sim = Stepper.create(scene, runtime_systems, control=control, **sim_settings(cfg, debug))
     return sim
 
 

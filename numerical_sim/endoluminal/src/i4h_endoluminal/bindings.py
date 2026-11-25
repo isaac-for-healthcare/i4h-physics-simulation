@@ -6,7 +6,7 @@ from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
 
 class CatheterBinding:
     def __init__(self, sim, body="catheter"):
-        self._sim = sim
+        self.sim = sim
         self.owner = sim.physics
         self.evidence = None
         self.owner.check_valid()
@@ -41,7 +41,7 @@ class CatheterBinding:
             raise ValueError("catheter must belong to this physics binding")
         if isinstance(capacity, bool) or not isinstance(capacity, int) or capacity < 1:
             raise ValueError("evidence capacity must be a positive integer")
-        existing = next((system for system in self._sim.systems
+        existing = next((system for system in self.sim.systems
                          if isinstance(system, TipEvidence) and system.owner is self.owner), None)
         if existing is not None:
             self.evidence = existing
@@ -50,5 +50,5 @@ class CatheterBinding:
                 raise ValueError("evidence body/capacity is fixed; reconstruct the runtime")
             return self.evidence
         self.evidence = TipEvidence(self.owner, catheter, capacity)
-        self._sim.systems.append(self.evidence)
+        self.sim.systems.append(self.evidence)
         return self.evidence

@@ -1,30 +1,22 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""The Newton model behind the scene's main particle block.
+"""Author exact per-world particle rows before Newton finalization.
 
-``build_model(scene)`` builds one Newton world per env from the loaders' host records: one template world with the
-main block's ``W`` particles (``ModelBuilder.add_particles``), ``replicate`` over the envs, ``finalize``; then the
-exact per-env rows are assigned (mesh variants differ per env): ``particle_q`` (the rest positions), a consistent
-``particle_mass`` / ``particle_inv_mass`` pair (0 = pinned or padding), ``particle_radius`` and its true maximum,
-``particle_flags`` (i4h uses bit 0 alone, which is Newton's ``ParticleFlags.ACTIVE``), and per-world gravity. The
-particle BVH ``finalize`` built from the template is rebuilt once the state exists (``rebuild_particle_bvh``), so no
-Newton structure describes template values. Newton's particle order is world-grouped, the main block's layout, so
-``Scene.allocate`` aliases these arrays instead of copying them.
+Particle positions remain in each component's mechanics frame. A host's world
+transform is recorded separately; this module does not normalize asset units or
+author native surgical tet, triangle or bending-edge topology.
 
-Measured (chole_tet_med, 64 envs, 359k particles): template 0.15 s, replicate 0.06 s, finalize 0.15 s; the model and
-state particle arrays with the particle BVH hold 71 MB, 129 MB at the construction peak. ``finalize`` also allocates
-a 128^3 particle hash grid (~17 MB) that nothing here queries: ``build_model`` drops it at once, but it is part of the
-peak together with the finalize temporaries. Per particle that is about 196 bytes steady and up to ~340 at the peak
-plus the grid (two_worlds, aorta and chole at 16, 64 and 128 envs): ``estimate_bytes`` budgets 200 steady, and the
-grid plus 150 more per particle during construction; ``Scene.allocate`` checks the construction figure before
-``finalize``.
+Newton owns native rest/live positions, velocities and radii. Custom particle
+attributes retain exact inverse-mass/default-flag bytes on Model and mutable
+history/flags on State, avoiding reciprocal round trips through native masses.
 """
 
 from __future__ import annotations
 
 import numpy as np
-from i4h_physics.scene import _F32, _I32, _VEC3
+from i4h_physics.scene import F32_BYTES, I32_BYTES, VEC3_BYTES
+from i4h_physics.storage import scene_record
 
 HASH_GRID_BYTES = 2 * 128**3 * 4  # Newton's model.particle_grid (a 128^3 wp.HashGrid) whenever there are particles
 
@@ -53,18 +45,31 @@ CONSTRUCTION_BYTES_PER_PARTICLE = 150  # finalize temporaries and the template B
 
 def estimate_bytes(particles: int, construction: bool = False) -> dict[str, int]:
     """Device bytes of the Newton model and state for ``particles`` main-block particles: model q, qd, mass, inv_mass,
-    radius, flags, world; state q, qd, f; hash grid; particle BVH. ``construction`` adds the transient peak of
+    radius, flags, world; native state q, qd, f; declared exact defaults, mutable
+    history/flags and their initialization templates; hash grid; particle BVH. ``construction`` adds the transient peak of
     ``build_model`` and the BVH rebuild (the figure to check before ``finalize``; the steady one is for reporting)."""
-    if particles == 0:
-        return {}
-    n = particles
+    # Empty custom native fields retain one inaccessible backing element.
+    declared = max(1, particles)
     out = {
-        "newton_model": n * (2 * _VEC3 + 3 * _F32 + 2 * _I32),
-        "newton_state": n * 3 * _VEC3,
-        "newton_bvh": n * BVH_BYTES_PER_PARTICLE,
+        "newton_particle_defaults": declared * (F32_BYTES + I32_BYTES),
+        "newton_particle_history": declared * (VEC3_BYTES + I32_BYTES),
+        "newton_particle_templates": declared * (VEC3_BYTES + I32_BYTES),
     }
+    if particles == 0:
+        return out
+    n = particles
+    out.update({
+        "newton_model": n * (2 * VEC3_BYTES + 3 * F32_BYTES + 2 * I32_BYTES),
+        "newton_state": n * 3 * VEC3_BYTES,
+        "newton_bvh": n * BVH_BYTES_PER_PARTICLE,
+    })
     if construction:  # finalize allocates the hash grid too; build_model drops it right away
-        out["newton_grid"] = HASH_GRID_BYTES
+        # build_model releases the grid before model.state() allocates native
+        # q/qd/f and declared history/flags. The steady budget already includes
+        # those later State buffers, so only the grid's excess can increase the
+        # peak. Keep the qualified temporary/BVH allowance for either phase.
+        live_state = out["newton_state"] + out["newton_particle_history"]
+        out["newton_grid"] = max(0, HASH_GRID_BYTES - live_state)
         out["newton_construction"] = n * CONSTRUCTION_BYTES_PER_PARTICLE
     return out
 
@@ -73,11 +78,20 @@ def _masses(inv_mass: np.ndarray) -> np.ndarray:
     return np.where(inv_mass > 0.0, 1.0 / np.maximum(inv_mass, 1.0e-30), 0.0).astype(np.float32)
 
 
-def add_env_particles(builder, scene, env: int, xform=None) -> None:
+def add_env_particles(builder, scene, env: int, xform=None, custom_attributes=None) -> None:
     """Add the main block's ``W`` particles of ``env`` (its own mesh-variant rows) to the builder's current world, in the
     main block's layout order. The per-world form: Isaac Lab's per-world builder hooks call it inside each replicated
     world (a scene with robots), passing the world's ``(position, xyzw quaternion)``; the rows' start and the transform
-    are recorded so ``place_main`` finds our rows among the host's. ``build_builder`` uses one template world instead."""
+    are recorded so ``place_main`` finds our rows among the host's."""
+    if custom_attributes is None:
+        if not hasattr(scene, "declarations"):
+            declare_scene_particles(builder, scene)
+        custom_attributes = scene.declarations.entity_values(scene.particle_domain, env * scene.main.width, scene.main.width)
+    if scene_record(scene).worlds is not None:
+        if env in scene_record(scene).worlds:
+            raise ValueError(f"duplicate Scene world: {env}")
+        scene_record(scene).worlds.add(env)
+        scene_record(scene).starts[env] = builder.particle_count
     if xform is not None:
         if scene.world_starts is None:
             scene.world_starts, scene.env_xforms = [None] * scene.envs, [None] * scene.envs
@@ -87,19 +101,33 @@ def add_env_particles(builder, scene, env: int, xform=None) -> None:
         return
     q0, inv_mass, radius, flags = (env_rows(scene, f, env) for f in ("q0", "inv_mass", "radius", "flags"))
     builder.add_particles(q0.tolist(), [(0.0, 0.0, 0.0)] * len(q0), _masses(inv_mass).tolist(), radius.tolist(),
-                          [int(f) for f in flags])
+                          [int(f) for f in flags], custom_attributes=custom_attributes)
+
+
+def declare_scene_particles(builder, scene):
+    """Scene-only construction uses the same native schema as case authoring."""
+    from i4h_physics.scene_storage import declare_scene, register_scene_finalizers
+    from i4h_physics.storage import Declarations
+    scene.declarations = Declarations()
+    declare_scene(scene.declarations, scene)
+    from i4h_physics.mount_storage import publish_mounts
+    publish_mounts(scene, scene.declarations, builder)
+    scene.declarations.register_schema(builder)
+    register_scene_finalizers(builder, scene)
 
 
 def build_builder(scene, builder=None):
-    """The unfinalized builder of the main block: env 0's particles as a template world, replicated over the envs (the
-    fast path: ``replicate`` tiles with numpy). ``builder`` is the owner's (Isaac Lab's ``create_builder()`` applies its
-    solver attributes and defaults), else a plain one. ``finish_model`` writes every env's own rows after finalize."""
+    """Author every world's exact variant rows into an unfinalized builder."""
     import newton
 
-    template = newton.ModelBuilder()
-    add_env_particles(template, scene, 0)
     builder = builder if builder is not None else newton.ModelBuilder()
-    builder.replicate(template, scene.envs)
+    declare_scene_particles(builder, scene)
+    for world in range(scene.envs):
+        builder.begin_world(gravity=scene.gravity_vector)
+        add_env_particles(builder, scene, world, custom_attributes=scene.declarations.entity_values(
+            scene.particle_domain, world * scene.main.width, scene.main.width))
+        builder.end_world()
+    complete_scene(builder, scene)
     return builder
 
 
@@ -138,55 +166,34 @@ def component_gravity(model, scene) -> np.ndarray:
 
 
 def finish_model(model, scene, state=None, *, host=False) -> None:
-    """After any finalize: every env's exact rows (mesh variants differ per env: positions, a consistent mass/inv_mass
-    pair, radius and its maximum, flags), per-world gravity, and no hash grid. A ``state`` created before this (Isaac
-    Lab's ``state_0``) gets the rest positions and zero velocities too.
+    """Validate world count and host gravity; never overwrite finalized particle arrays.
 
-    Gravity: a model built here (standalone) gets the case's. A ``host`` model keeps the host's: a case that declares
-    ``sim.gravity`` must agree with it (raises otherwise, like ``check_dt``); one that does not adopts it."""
-    E, W = scene.envs, scene.main.width
-    if model.world_count != E:
-        raise RuntimeError(f"newton model has {model.world_count} worlds, the scene {E} envs")
-    base, S, col = scene.main.place(E)
-    alone = model.particle_count == E * W  # no host particles share the arrays
-    if alone:
-        model.particle_grid = None  # finalize's 128^3 hash grid (~17 MB): no i4h system or renderer queries it
+    The standalone owner can release the unused particle hash grid. A host retains
+    all of its allocation and chooses its gravity before binding.
+    """
+    if model.world_count != scene.envs:
+        raise RuntimeError(f"newton model has {model.world_count} worlds, the scene {scene.envs} envs")
     if host:
         check_host_gravity(model, scene)
     else:
-        model.set_gravity(tuple(float(g) for g in scene.gravity_vector))
-    if W:
-        q0, inv_mass, radius, flags = (main_rows(scene, f) for f in ("q0", "inv_mass", "radius", "flags"))
-        rows = (base + np.arange(E)[:, None] * S + col + np.arange(W)[None, :]).reshape(-1)  # our flat indices
-
-        def put(arr, values):  # only our rows: host particles keep theirs
-            full = arr.numpy()
-            full[rows] = values.reshape((rows.size,) + full.shape[1:]).astype(full.dtype)
-            arr.assign(full)
-
-        put(model.particle_q, q0)
-        put(model.particle_mass, _masses(inv_mass))
-        put(model.particle_inv_mass, inv_mass)
-        put(model.particle_radius, radius)
-        put(model.particle_flags, flags)
-        ours = float(radius.max())
-        model.particle_max_radius = ours if alone else max(ours, float(model.particle_max_radius))
-        if state is not None:
-            put(state.particle_q, q0)
-            put(state.particle_qd, np.zeros_like(q0))
+        model.particle_grid = None
 
 
 def check_host_gravity(model, scene) -> None:
-    """The host owns gravity. A declared case gravity must match every env's world within 1e-6 (relative to 1 m/s^2
-    or the magnitude); without one the scene adopts world 0's, so ``scene.down`` follows the host."""
-    host = component_gravity(model, scene).astype(np.float64)
+    """The host owns gravity. A declared case gravity is the world's (``I4hComponent.configure`` copies it to the host)
+    and must match every world's within 1e-6 (relative to 1 m/s^2 or the magnitude), before any env rotation; a
+    rotated component then sees ``R_e^T g`` (``component_gravity``). Without one the scene adopts world 0's in the
+    component frame, so ``scene.down`` follows the host."""
     if not scene.gravity_declared:
-        scene._gravity = tuple(float(g) for g in host[0])
+        scene.adopt_gravity(component_gravity(model, scene).astype(np.float64)[0])
         return
+    world = model.gravity.numpy()[: scene.envs].astype(np.float64)
     case = np.asarray(scene.gravity_vector, np.float64)
-    if np.abs(host - case).max() > 1.0e-6 * max(1.0, float(np.linalg.norm(case))):
-        raise ValueError(f"the host's gravity {host[0].tolist()} differs from the case's sim.gravity {case.tolist()}; "
-                         "set the host's gravity to the case's, or drop sim.gravity from the case to use the host's")
+    bad = np.abs(world - case).max(axis=1) > 1.0e-6 * max(1.0, float(np.linalg.norm(case)))
+    if bad.any():
+        raise ValueError(f"the host's gravity {world[int(np.argmax(bad))].tolist()} differs from the case's sim.gravity "
+                         f"{case.tolist()} (both world frame); set the host's gravity to the case's, or drop sim.gravity "
+                         "from the case to use the host's")
 
 
 def build_model(scene):
@@ -197,6 +204,12 @@ def build_model(scene):
 
 
 def rebuild_particle_bvh(model, state) -> None:
-    """Rebuild Newton's particle BVH from the assigned rows (``finalize`` built it from the template)."""
+    """Build Newton's particle BVH for the selected standalone state."""
     if model.particle_count:
         model.bvh_build_particles(state)
+
+
+def complete_scene(builder, scene):
+    """Complete direct Scene declarations after world authoring, before finalize."""
+    from i4h_physics.scene_storage import complete_scene as complete
+    complete(builder, scene)

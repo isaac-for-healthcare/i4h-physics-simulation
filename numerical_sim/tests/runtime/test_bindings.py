@@ -9,7 +9,7 @@ from helpers import needs_external_data
 from i4h_assessment.executor import Procedure
 from i4h_endoluminal.assessment import ReachTarget, single_target_assessor
 from i4h_endoluminal.bindings import CatheterBinding
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 
 
 @pytest.mark.parametrize("captured", [False, True])
@@ -58,7 +58,6 @@ def test_public_assessor_and_complete_selected_reset(captured):
 
 @pytest.mark.parametrize("captured", [False, True])
 def test_shared_owner_resets_every_body_and_preserves_assessment(captured):
-    from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
     from i4h_physics.systems.rods.rod_direct import RodDirect
 
     cfg = read_case("two_worlds")
@@ -67,12 +66,13 @@ def test_shared_owner_resets_every_body_and_preserves_assessment(captured):
             entry["type"] = "rod_direct"
     cfg["assets"]["rod2"] = {**cfg["assets"]["rod"], "start": [-0.2, 0.0, 0.2]}
     cfg["systems"].append(dict(type="rod_direct", id="second_rod", body="rod2"))
+    cfg['systems'].extend(dict(type='catheter_control', id=entry.get('id', entry['type'])+'_control',
+                               rod=entry.get('id', entry['type']), track_length=0.0)
+                          for entry in list(cfg['systems']) if entry['type']=='rod_direct')
     sim = load_case(cfg, envs=2)
     sim.cuda_graph = captured
     rods = [s for s in sim.systems if isinstance(s, RodDirect)]
     rod = rods[0]
-    for item in rods:
-        sim.systems.append(CatheterControl(sim.scene, rod=item, track_length=0.0))
     first, second = CatheterBinding(sim, "rod"), CatheterBinding(sim, "rod2")
     assert first.owner is second.owner is sim.physics
     assert not hasattr(first, "reset")

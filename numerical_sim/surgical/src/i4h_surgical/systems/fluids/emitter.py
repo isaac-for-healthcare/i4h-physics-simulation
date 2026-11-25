@@ -45,6 +45,11 @@ class Emitter(System):
     refs = ("fluid", "instruments")
     structural = System.structural + ("body", "instrument", "max_spawn")
 
+    @classmethod
+    def declare_storage(cls, authoring, declarations, spec, records):
+        from i4h_surgical.interaction_storage import publish_emitter
+        return publish_emitter(authoring.scene, declarations, spec.get("id", spec["type"]))
+
     def __post_init__(self):
         scene = self.scene
         E, dev = scene.envs, scene.device
@@ -68,8 +73,9 @@ class Emitter(System):
         self.register_live("position")
         self._live("direction")
         self._live("rate", "speed", "spawn_radius", "threshold", "enabled_env")
-        self.acc = wp.zeros(E, dtype=wp.float32, device=dev)
-        self.serial = wp.zeros(E, dtype=wp.int32, device=dev)
+        # Newton State: acc (E,), the fractional particle carried to the next step; serial (E,), the random stream.
+        from i4h_surgical.interaction_storage import bind_interaction
+        bind_interaction(self, "emitter")
         self.spawned = wp.zeros(E, dtype=wp.int32, device=dev)  # particles born this step
 
 

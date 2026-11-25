@@ -85,6 +85,12 @@ class System:
     refs: ClassVar[tuple[str, ...]] = ()
     state_products: ClassVar[tuple[str, ...]] = ()  # per-env products a host observes and records
     is_control: ClassVar[bool] = False  # reads ``actions`` written from outside the step
+    command_view_spec: ClassVar[dict[str, tuple[int, int]] | None] = None
+
+    @classmethod
+    def author(cls, scene):
+        """Prepare optional host-only geometry or capacities before model finalization."""
+        pass
 
     def action_bounds(self, workspace: float) -> tuple[list, list]:
         """A control's physical ``(low, high)`` per flattened column of ``actions``; ``workspace`` is the host's
@@ -185,4 +191,22 @@ class System:
 
     def reset(self, scene: Scene, mask: wp.array) -> None:
         """Restore this system's state for envs where ``mask[env]`` is true."""
+        pass
+
+    def restore_episode(self, scene: Scene, mask: wp.array) -> None:
+        """Restore existing episode defaults; live parameters retain their established policy."""
+        self.reset(scene, mask)
+
+    def rebuild_caches(self, scene: Scene) -> None:
+        """Rebuild search structures whose shape depends on when they were built, from current State. Called by
+        ``save_i4h`` and ``restore_i4h`` only, so that a restored runtime and the saving one hold the same
+        structure; never part of a step, reset or preparation. Writes no State or Control."""
+        pass
+
+    def refresh(self, scene: Scene, mask: wp.array) -> None:
+        """Refresh derived caches without changing history, commands, topology or measurements.
+
+        Most systems build their scratch from current state at the next substep.
+        They require no work at this boundary.
+        """
         pass

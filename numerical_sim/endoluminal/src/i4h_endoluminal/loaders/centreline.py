@@ -31,7 +31,7 @@ import numpy as np
 import warp as wp
 from i4h_endoluminal.scene import GraphMetadata, SkinMesh
 from i4h_physics.scene import ACTIVE_INT, Body, Part, ParticleRest, RodGraph, Scene
-from i4h_physics.systems.rods.rod_pbd import _qmul_np, rest_darboux_quats
+from i4h_physics.systems.rods.rod_pbd import qmul_np, rest_darboux_quats
 
 # --- Mosaic JSON (xcath/config.py:1624-1692, 1764-1847) ------------------------------------------------------
 
@@ -324,7 +324,7 @@ def tree_frames(positions, edges, root: int) -> np.ndarray:
                 for f in node_edges[node]:
                     if f in visited:
                         continue
-                    qf = _qmul_np(_quat_between(tang[e], tang[f]), frames[e])
+                    qf = qmul_np(_quat_between(tang[e], tang[f]), frames[e])
                     frames[f] = qf / np.linalg.norm(qf)
                     visited.add(f)
                     dq.append(f)

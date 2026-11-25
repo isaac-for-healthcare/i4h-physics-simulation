@@ -5,15 +5,16 @@
 fluid pools. ``scene.field`` resolves a body's live arrays in its own block; ``scene.view`` applies a body's
 layout to the array it is given (live or a snapshot copy) and rejects arrays of the wrong block."""
 
+
 import numpy as np
 import pytest
-import warp as wp
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics import Scene, Stepper
+from i4h_physics.fluid_storage import declare_fluid
 from i4h_physics.loaders import add_fluid
 from i4h_physics.systems.fluids.fluid import Fluid
 from i4h_physics.systems.mechanics.bounds import Bounds
-from i4h_standalone.render.snapshots import Snapshots
+from i4h_surgical.interaction_storage import declare_emitter
 from i4h_surgical.systems.fluids.emitter import Emitter
 
 
@@ -48,29 +49,11 @@ def test_duplicate_names_across_blocks_are_rejected():
         add_fluid(scene, "water", 8)
 
 
-def test_a_held_snapshot_keeps_its_own_data():
-    """Views of a published snapshot read the snapshot, never the live state, after the simulation moves on."""
-    sim = load_case("two_worlds")
-    scene, water, block = sim.scene, sim.scene.body("water"), sim.scene.body("block")
-    for _ in range(20):  # the emitter brings water to life
-        sim.step()
-    ring = Snapshots(sim)
-    ring.publish()
-    wp.synchronize()
-    snap = ring.acquire()
-    held_pool = scene.view(snap.pool_q, water).numpy().copy()
-    held_block = scene.view(snap.q, block).numpy().copy()
-    for _ in range(20):
-        sim.step()
-    wp.synchronize()
-    assert np.array_equal(scene.view(snap.pool_q, water).numpy(), held_pool)
-    assert np.array_equal(scene.view(snap.q, block).numpy(), held_block)
-    assert not np.array_equal(scene.field("q", water).numpy(), held_pool), "live water moved on"
-
-
 def fluid_only(cuda_graph):
     scene = Scene("cuda:0", 2, (0.0, 0.0, -9.81))
     add_fluid(scene, "water", 64, mass=0.001, radius=0.003, interaction_radius=0.012, rest_distance=0.006)
+    declare_fluid(scene)
+    declare_emitter(scene)
     scene.allocate()
     fluid = Fluid(scene)
     systems = [fluid, Emitter(scene, fluid=fluid, body="water", position=(0.0, 0.0, 0.1), rate=600.0, speed=0.0),
@@ -98,7 +81,7 @@ def test_fluid_only_scene_steps_and_resets(cuda_graph):
 def test_main_block_is_world_major():
     """Env e's row of the main block holds every body side by side (Newton's world-grouped order)."""
     from helpers import deterministic
-    from i4h_isaaclab.composition import read_case
+    from i4h_host.composition import read_case
 
     sim = load_case(deterministic(read_case("two_worlds"), spacer_before="rod"), envs=3)
     scene = sim.scene
@@ -117,7 +100,7 @@ def test_observation_views_stay_zero_copy_when_strided():
     """isaaclab.views._flat: a strided (E, count) body view is still a zero-copy (E, 3 * count) torch view."""
     torch = pytest.importorskip("torch")
     from helpers import deterministic
-    from i4h_isaaclab.composition import read_case
+    from i4h_host.composition import read_case
     from i4h_isaaclab.views import observation_views
 
     sim = load_case(deterministic(read_case("two_worlds"), spacer_before="rod"), envs=3)

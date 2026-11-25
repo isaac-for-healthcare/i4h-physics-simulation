@@ -20,6 +20,9 @@ def compatible(constructor):
                 kwargs[new] = kwargs.pop(old)
         return constructor(scene, **kwargs)
     factory.refs = constructor.refs
+    factory.author = constructor.author
+    if hasattr(constructor, "declare_storage"):
+        factory.declare_storage = constructor.declare_storage  # storage settings keep their neutral names
     return factory
 
 SYSTEMS = {

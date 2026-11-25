@@ -9,7 +9,7 @@ import copy
 
 import numpy as np
 import pytest
-from i4h_isaaclab.composition import load_case, read_case
+from i4h_host.composition import load_case, read_case
 
 
 def settled_bottom(model, dt, substeps, iterations, spring=500.0, volume=1.0e9, seconds=3.0):
@@ -46,3 +46,27 @@ def test_model_is_validated_and_structural():
     tet.model = "xpbd"
     with pytest.raises(ValueError, match="fixed at construction"):
         sim.prepare()
+
+
+@pytest.mark.parametrize("epsilon", [0.0, -1.0, True, float("inf"), float("nan"), "small"])
+def test_volume_cutoff_is_positive_finite_and_structural(epsilon):
+    cfg=copy.deepcopy(read_case("two_worlds"))
+    cfg["sim"]["cuda_graph"]=False
+    cfg["assets"]={"block":cfg["assets"]["block"]}
+    cfg["systems"]=[{"type":"particles"},{"type":"tet","body":"block","volume_epsilon":epsilon}]
+    with pytest.raises(ValueError,match="volume_epsilon"):
+        load_case(cfg)
+
+
+def test_volume_cutoff_change_requires_prepare():
+    cfg=copy.deepcopy(read_case("two_worlds"))
+    cfg["assets"]={"block":cfg["assets"]["block"]}
+    cfg["systems"]=[{"type":"particles"},{"type":"tet","body":"block"}]
+    sim=load_case(cfg)
+    sim.step()
+    tet=sim.systems[1]
+    tet.volume_epsilon=1e-8/7**4
+    with pytest.raises(RuntimeError,match="prepare"):
+        sim.step()
+    sim.prepare()
+    sim.step()

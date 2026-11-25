@@ -47,8 +47,9 @@ def read_rows(path: Path, width: int, dtype) -> np.ndarray:
     return rows
 
 
-def read_part(directory: Path, translation, mass: float) -> PartMesh:
-    q0 = read_rows(directory / "model.vertices", 3, np.float32) + np.asarray(translation, np.float32)
+def read_part(directory: Path, translation, mass: float, scale: float = 1.0) -> PartMesh:
+    """Vertices are scaled before translation; masses and connectivity are preserved."""
+    q0 = read_rows(directory / "model.vertices", 3, np.float32) * np.float32(scale) + np.asarray(translation, np.float32)
     tets = read_rows(directory / "model.tetras", 4, np.int32)
     edges = read_rows(directory / "model.edges", 2, np.int32)
     tris = read_rows(directory / "model.tris", 3, np.int32)

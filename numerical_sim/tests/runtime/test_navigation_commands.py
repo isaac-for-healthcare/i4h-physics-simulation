@@ -5,8 +5,9 @@ import numpy as np
 import pytest
 import warp as wp
 from i4h_endoluminal.loaders.centreline import add_centreline_tree
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics import Scene, Stepper
+from i4h_physics.containment_storage import declare_graph_containment
 from i4h_physics.loaders.rod import add_rod, material_frames
 from i4h_physics.systems.contact.graph_containment import GraphContainment
 from test_catheter_port import case, system
@@ -138,6 +139,7 @@ def test_interior_pull_is_wire_only(envs, candidates, capacity, offset, contact)
     cath = add_rod(scene, 'wire', [0.02,offset,0], [1,0,0], 5, 0.01, 0.001, mass=1)
     tree = add_centreline_tree(scene, 'vessel', np.float32([[0,0,0],[0.04,0,0],[0.08,0,0]]),
                               np.int32([[0,1],[1,2]]), 0.01, root=0, pinned_nodes=[0], open_root=True)
+    declare_graph_containment(scene, body='wire', centreline='vessel', capacity=capacity)
     scene.allocate()
     control = GraphContainment(scene, body='wire', centreline='vessel', spline=False, candidates=candidates,
                                capacity=capacity, interior_deadband=0.5, interior_stiffness=0.25,

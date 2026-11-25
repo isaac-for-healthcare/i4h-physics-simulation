@@ -39,3 +39,25 @@ def test_only_frozen_product_noise_is_permitted():
         baseline.compare(ref, {'x': ref['x']}, 1e-5, 0, 3)
     with pytest.raises(ValueError):
         baseline.compare(ref, {'x': ref['x']}, 0, 0, 4)
+
+
+def test_slot_permutation_preserves_records_and_ignores_dead_payload():
+    fields = {'particle': np.array([[[7, 3, 99]]], np.int32),
+              'rest': np.array([[[[.7, 0, 0], [.3, 0, 0], [123, 0, 0]]]], np.float32),
+              'active': np.array([[[1, 1, 0]]], np.int32)}
+    expected = baseline.canonical_slots(fields)
+    permuted = {k: v[:, :, [2, 0, 1]].copy() for k, v in fields.items()}
+    permuted['rest'][0, 0, 0] = -999
+    assert not compare(expected, baseline.canonical_slots(permuted))
+    permuted['rest'][0, 0, 1, 0] += .1
+    assert compare(expected, baseline.canonical_slots(permuted))
+    permuted = {k: v.copy() for k, v in fields.items()}
+    permuted['active'][0, 0, 1] = 0
+    assert compare(expected, baseline.canonical_slots(permuted))
+
+
+def test_empty_slots_and_consumed_clip_nodes():
+    empty = {'active': np.empty((2, 1, 0), np.int32), 'particle': np.empty((2, 1, 0), np.int32)}
+    assert baseline.canonical_slots(empty)['particle'].shape == (2, 1, 0)
+    clips = {'node': np.array([[4, 2]], np.int32), 'active': np.array([[0, 1]], np.int32)}
+    assert 4 in baseline.canonical_slots(clips, discard_inactive=False)['node']

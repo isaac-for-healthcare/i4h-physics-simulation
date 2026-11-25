@@ -3,36 +3,43 @@
 
 """Regional metadata, mechanics, graph edits and transactional persistence."""
 
+
 import copy
 
 import numpy as np
 import pytest
 import warp as wp
-from helpers import needs_external_data, regional_case
 from i4h_endoluminal.loaders.centreline import add_centreline_tree, build_tree
 from i4h_endoluminal.loaders.rod import add_rod
 from i4h_endoluminal.regions import instrument_regions, vessel_regions
+from i4h_endoluminal.rod_storage import declare_catheter_control, declare_control_layout
 from i4h_endoluminal.systems.rods.catheter_control import CatheterControl
-from i4h_isaaclab.composition import read_case
 from i4h_physics import Scene, Stepper
 from i4h_physics.regions import RegionMembership
+from i4h_physics.rod_storage import (
+    declare_rod_direct,
+    declare_rod_direct_material,
+    declare_rod_pbd,
+    declare_rod_pbd_material,
+)
 from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.material import RodDirectMaterial, RodPbdMaterial
 from i4h_physics.systems.rods.rod_direct import RodDirect
 from i4h_physics.systems.rods.rod_pbd import RodPbd
-from i4h_standalone.app.panel_adapters import panel
-from i4h_standalone.app.ui import load_overrides
-from i4h_standalone.app.workspace import resolve_workspace
-from i4h_standalone.config import load_case
 
 INSTRUMENT = {'schema_version': 1, 'default': 'unassigned', 'regions': [
     {'name': 'shaft', 'interval': [0, .8]}, {'name': 'transition', 'interval': [.8, .9]}, {'name': 'tip', 'interval': [.9, 1]}]}
 
 
-def rod_sim(regional=True, graph=True):
+def rod_sim(regional=True, graph=True, catheter=False):
     scene = Scene('cuda:0', 2, (0, 0, 0))
     body = add_rod(scene, 'wire', [0, 0, 0], [1, 0, 0], 21, .02, .002,
                    regions=INSTRUMENT if regional else None)
+    if regional:
+        declare_rod_direct_material(scene, 'wire', system_id='material')
+    declare_rod_direct(scene, 'wire', system_id='rod', angular_damping=.05)
+    if catheter:
+        declare_catheter_control(scene, 'rod', track_length=.1)
     scene.allocate()
     materials = [RodDirectMaterial(scene, body='wire', id='material')] if regional else []
     rod = RodDirect(scene, body='wire', id='rod', angular_damping=.05)
@@ -121,7 +128,7 @@ def test_curvature_relaxation_steering_and_reset_geometry():
 
 
 def test_insertion_does_not_change_material_membership():
-    sim, rod, body = rod_sim()
+    sim, rod, body = rod_sim(catheter=True)
     control = CatheterControl(sim.scene, rod=rod, track_length=.1)
     sim.systems.append(control)
     sim.prepare()
@@ -132,12 +139,17 @@ def test_insertion_does_not_change_material_membership():
     np.testing.assert_array_equal(body.regions.edge, membership)
 
 
-def pbd_sim(radius_scale=1, anatomical_scale=1):
+def pbd_sim(radius_scale=1, anatomical_scale=1, layouts=None):
     scene = Scene('cuda:0', 2, (0, 0, 0))
     positions = np.array([[0, 0, 0], [1, 0, 0], [2, 0, 0]], np.float32)
     body = add_centreline_tree(scene, 'vessel', positions, [[0, 1], [1, 2]], np.array([1, 2, 3])*radius_scale, 0)
     body.tree.material_radius = np.array([[1, 2, 3]], np.float32)*anatomical_scale
     body.regions = RegionMembership(('a', 'b'), np.array([0, 1], np.int32))
+    declare_rod_pbd_material(scene, 'vessel', system_id='material')
+    declare_rod_pbd(scene, 'vessel', system_id='pbd')
+    if layouts is not None:
+        body.anatomy.layouts = layouts
+        declare_control_layout(scene, 'vessel')
     scene.allocate()
     material = RodPbdMaterial(scene, body='vessel', id='material')
     rod = RodPbd(scene, body='vessel', id='pbd')
@@ -175,21 +187,6 @@ def test_pbd_harmonic_layout_radius_weighting():
     assert props.tables['bend'].numpy()[1, 0] == 2
 
 
-def test_atomic_overrides_and_restore_defaults():
-    sim, rod, body = rod_sim()
-    data = {'regions': {'wire': {'rod': {'tip': {'curvature_x': [0, 5], 'bend_multiplier': [1, 3]}}}}}
-    load_overrides(sim, data)
-    assert body.region_properties.tables['curvature_x'].numpy()[1, -1] == 5
-    for changes in ({'curvature_x': 200}, {'bend_multiplier': 11}, {'curvature_x': [1]}, {'unknown': 2}):
-        invalid = {'systems': {'rod': {'young': 1234}}, 'regions': {'wire': {'rod': {'tip': changes}}}}
-        with pytest.raises(ValueError):
-            load_overrides(sim, invalid)
-        assert (rod.young.numpy() == 1e6).all()
-        assert body.region_properties.tables['curvature_x'].numpy()[1, -1] == 5
-    body.region_properties.restore([1])
-    assert not body.region_properties.tables['curvature_x'].numpy().any()
-
-
 @pytest.mark.parametrize('backend', ['direct', 'pbd'])
 def test_eager_and_capture_regional_edits(backend):
     sims = []
@@ -207,24 +204,12 @@ def test_eager_and_capture_regional_edits(backend):
     np.testing.assert_allclose(sims[0].scene.q.numpy(), sims[1].scene.q.numpy(), atol=1e-7)
 
 
-@needs_external_data
-def test_workspace_validation_and_wrapper():
-    sim, rod, body = rod_sim()
-    for declaration in ({'groups': [{'knobs': [['rod', 'missing']]}]}, {'region_bodies': ['missing']}, {'actions': ['unknown']}):
-        with pytest.raises((ValueError, KeyError)):
-            resolve_workspace(sim, declaration)
-    cfg = read_case({'case': 'aorta_centreline', 'ui': {'title': 'Wrapper', 'groups': []}})
-    assert cfg['ui']['title'] == 'Wrapper'
-    s = load_case(cfg, envs=2)
-    assert s.workspace['title'] == 'Wrapper'
-
-
 def test_layout_disable_and_masked_reset_preserve_regions():
     from i4h_endoluminal.systems.rods.control_layout import ControlLayout
-    sim, rod, body = pbd_sim()
-    body.anatomy.layouts = [[{'pid': 1, 'position': [1, 0, 0], 'rotation': [0, 0, 0, 1],
+    layouts = [[{'pid': 1, 'position': [1, 0, 0], 'rotation': [0, 0, 0, 1],
                           'stiffness': 0, 'falloff': 0, 'rest_bend': [0, 0], 'active': True,
                           'bend_stiffness_multiplier': 2, 'stretch_stiffness_multiplier': .5}]]
+    sim, rod, body = pbd_sim(layouts=layouts)
     control = ControlLayout(sim.scene, centreline='vessel')
     sim.systems.append(control)
     body.region_properties.edit({'bend': 3, 'stretch': 4}, 'a', [1])
@@ -235,43 +220,21 @@ def test_layout_disable_and_masked_reset_preserve_regions():
     control.enabled = False
     sim.prepare()
     sim.step()
-    np.testing.assert_allclose(rod.effective_bend.numpy()[:, 0], [1, 1.5])
+    # Disabling and cache-only preparation preserve the last layout commands.
+    np.testing.assert_allclose(rod.effective_bend.numpy()[:, 0], [2, 3])
     sim.reset([1])
     assert body.region_properties.tables['bend'].numpy()[1, 0] == 3
-    np.testing.assert_array_equal(rod.bend_scale.numpy(), 1)
+    np.testing.assert_array_equal(rod.bend_scale.numpy(), [[2], [1]])
     # Legacy references still receive construction-time validation.
     with pytest.raises(TypeError):
         ControlLayout(sim.scene, centreline='vessel', rod=object())
 
 
-@needs_external_data
-def test_pbd_unit_regions_match_existing_path(tmp_path):
-    # Compare both backends in a real regional case, with and without sidecars. The catheter starts against the
-    # aorta wall, and contact accumulation is not bitwise reproducible, so both runs leave containment out.
-    from i4h_isaaclab.composition import read_case
-    case = str(regional_case(tmp_path))
-
-    def contact_free(regions):
-        cfg = read_case(case)
-        cfg.pop('ui')
-        removed = ('lumen_containment',) if regions else ('lumen_containment', 'rod_pbd_material', 'rod_direct_material')
-        cfg['systems'] = [s for s in cfg['systems'] if s['type'] not in removed]
-        if not regions:
-            cfg['assets']['catheter'].pop('regions')
-            cfg['assets']['aorta']['centreline'].pop('regions')
-        return cfg
-
-    unconfigured = load_case(contact_free(False), envs=2)
-    configured = load_case(contact_free(True), envs=2)
-    for sim in (unconfigured, configured):
-        for _ in range(4):
-            sim.step()
-    np.testing.assert_allclose(unconfigured.scene.q.numpy(), configured.scene.q.numpy(), atol=1e-7)
-
-
 def test_radius_weighting_without_region_configuration():
     scene = Scene('cuda:0', 2, (0, 0, 0))
     body = add_centreline_tree(scene, 'vessel', [[0, 0, 0], [1, 0, 0], [2, 0, 0]], [[0, 1], [1, 2]], [1, 2, 3], 0)
+    declare_rod_pbd_material(scene, 'vessel', system_id='material')
+    declare_rod_pbd(scene, 'vessel')
     scene.allocate()
     material = RodPbdMaterial(scene, body='vessel', id='material')
     rod = RodPbd(scene, body='vessel')
@@ -330,6 +293,8 @@ def test_material_disable_enable_persistence(backend, graph):
 def test_explicit_material_validation_before_capture():
     scene = Scene('cuda:0', 2, (0, 0, 0))
     body = add_rod(scene, 'wire', [0, 0, 0], [1, 0, 0], 5, .02, .002, regions=INSTRUMENT)
+    declare_rod_direct_material(scene, 'wire', system_id='material')
+    declare_rod_direct(scene, 'wire', system_id='rod')
     scene.allocate()
     with pytest.raises(ValueError, match='requires'):
         RodDirect(scene, body='wire')
@@ -346,37 +311,5 @@ def test_explicit_material_validation_before_capture():
         assert sim.graph is None
     sim = Stepper.create(scene, [provider, rod])
     body.rod_material.bend_multiplier = wp.ones((2, 1), dtype=float, device=scene.device)
-    with pytest.raises(ValueError, match='dimensions'):
+    with pytest.raises(RuntimeError, match='replaced'):
         sim.prepare()
-
-
-def test_legacy_resolution_and_conflicts_are_transactional():
-    sim, rod, body = rod_sim()
-    resolved = resolve_workspace(sim, {'groups': [{'knobs': [['rod', 'region_curvature_x'], ['rod', 'young']]}]})
-    assert resolved['groups'][0]['knobs'] == [['material', 'region_curvature_x'], ['rod', 'young']]
-    load_overrides(sim, {'regions': {'wire': {'rod': {'tip': {'curvature_x': 2}},
-                                           'material': {'tip': {'bend_multiplier': 3}}}}})
-    assert body.region_properties.tables['curvature_x'].numpy()[0, -1] == 2
-    assert body.region_properties.tables['bend_multiplier'].numpy()[0, -1] == 3
-    before = {n: a.numpy().copy() for n, a in body.region_properties.tables.items()}
-    with pytest.raises(ValueError, match='conflicting'):
-        load_overrides(sim, {'systems': {'rod': {'young': 1234}}, 'regions': {'wire': {
-            'rod': {'tip': {'curvature_x': 4}}, 'material': {'tip': {'curvature_x': 5}}}}})
-    np.testing.assert_array_equal(rod.young.numpy(), 1e6)
-    for n, a in body.region_properties.tables.items():
-        np.testing.assert_array_equal(a.numpy(), before[n])
-    sim, rod, body = pbd_sim()
-    load_overrides(sim, {'systems': {'pbd': {'radius_weighting': True, 'bend': 2}}})
-    provider = next(s for s in sim.systems if isinstance(s, RodPbdMaterial))
-    assert provider.radius_weighting
-    np.testing.assert_array_equal(rod.bend.numpy(), 2)
-    resolved = resolve_workspace(sim, {'groups': [{'knobs': [['pbd', 'radius_weighting']]}]})
-    assert resolved['groups'][0]['knobs'] == [['material', 'radius_weighting']]
-    with pytest.raises(ValueError, match='conflicting'):
-        load_overrides(sim, {'systems': {'pbd': {'radius_weighting': False, 'bend': 3},
-                                        'material': {'radius_weighting': True}}})
-    assert provider.radius_weighting
-    np.testing.assert_array_equal(rod.bend.numpy(), 2)
-    assert not any(k.scope for k in panel(rod))
-    assert 'radius_weighting' not in {k.label for k in panel(rod)}
-    assert {k.label for k in panel(provider)} == {'region_stretch', 'region_bend', 'region_twist', 'radius_weighting'}

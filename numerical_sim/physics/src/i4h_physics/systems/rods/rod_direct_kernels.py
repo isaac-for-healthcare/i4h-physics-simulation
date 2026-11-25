@@ -921,5 +921,5 @@ def world_inv_inertia(
         inv_inertia[i] = wp.mat33(0.0)
         return
     r = wp.quat_to_matrix(frame_pred[i])
-    d = local[e]
+    d = local[i]  # this env's node
     inv_inertia[i] = r * wp.diag(d) * wp.transpose(r)

@@ -93,6 +93,7 @@ def build(captured=True, device="cuda:0"):
         return owned["control"]
     mount_factory.refs = ()
     control_factory.refs = ()
+    control_factory.declare_storage = InstrumentControl.declare_storage
     cfg = {"sim": {"device": device, "envs": 2, "gravity": [0, 0, 0], "dt": .01,
                    "substeps": 2, "iterations": 4, "cuda_graph": captured},
            "assets": {"block": {"type": "tet_grid", "dim": [6, 6, 4], "cell": .02,

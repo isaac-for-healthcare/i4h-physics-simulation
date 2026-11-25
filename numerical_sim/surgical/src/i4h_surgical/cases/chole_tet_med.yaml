@@ -74,42 +74,107 @@ assets:
 instruments:                    # laparoscopic tools through trocars; actions[env, k] = [position, quaternion, grip]
   grasper:
     kind: grasper
-    mesh: "${DATA}/instruments/pgrasp.usdc"
-    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
-    scale: 0.0075
-    trocar: [-1.0, 5.0, 3.0]
-    initial: {position: [0.3, 1.2, -3.0]}
+    mesh: ${DATA}/instruments/dvrk/dvrk_420049.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    trocar:
+    - -1.0
+    - 5.0
+    - 3.0
+    initial:
+      position:
+      - 0.3
+      - 1.2
+      - -3.0
     input: primary
-    jaw_spheres: {distance: 0.015, offset: [0.0, -0.015, 0.0]}   # 13 spheres of radius 0.015 (the defaults)
+    # Original jaw proxies retained for alignment review with the da Vinci mesh.
+    jaw_spheres:
+      count: 13
+      radius: 0.015
+      distance: 0.015
+      offset: [0.0, -0.015, 0.0]
   hook:
     kind: hook
-    mesh: "${DATA}/instruments/hook.usdc"
-    prims: {shaft: /root/shaft_color_001/shaft_color_001, body: /root/logobody_color_002/logobody_color_002, hook: /root/hook/Mesh_001}
-    scale: 0.0075
-    trocar: [5.5, 5.0, 5.0]
-    initial: {position: [0.7, 1.2, -3.0]}
+    mesh: ${DATA}/instruments/dvrk/dvrk_420183.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      hook: /Instrument/hook
+    scale: 7.5
+    trocar:
+    - 5.5
+    - 5.0
+    - 5.0
+    initial:
+      position:
+      - 0.7
+      - 1.2
+      - -3.0
     input: secondary
     jaw_spheres:
-      count: 5
-      distance: 0.01
-      chains: {jaw_left: {offset: [0.0, 0.0, 0.1], euler: [-20.0, 0.0, 0.0]}, jaw_right: {offset: [0.0, 0.02, 0.15], euler: [80.0, 0.0, 0.0]}}
-    wrist_end: [0.0, 0.0, 0.06]
-  clip_applier:                 # the grasper mesh in its own colours: never grasps, F (fire) clips the duct or artery node in reach
-    kind: clip_applier          # (ours: omnisurg had no clip kind; the commented secondary grasper's trocar)
-    mesh: "${DATA}/instruments/pgrasp.usdc"
-    prims: {shaft: /root/shaft_color/shaft_color_001, body: /root/logobody_color/logobody_color_002, jaw_left: /root/jawLeft_color/jawLeft_color_001, jaw_right: /root/jawRight_color/jawRight_color_001}
-    scale: 0.0075
-    trocar: [3.0, 5.0, 3.0]
-    initial: {position: [1.1, 1.2, -3.0]}
-    jaw_spheres: {distance: 0.015, offset: [0.0, -0.015, 0.0]}
-  scissors:                     # omnisurg rts.usdc as authored (commented out in the source case): 5 collision spheres per jaw and
-    kind: scissors              # 8 finer cutting spheres per jaw (the `cutting` defaults); closing the jaw cuts fat
-    mesh: "${DATA}/instruments/rts.usdc"
-    prims: {shaft: /root/shaft_color_001/shaft_color_003, body: /root/logobody_color_001/logobody_color_004, jaw_left: /root/jawLeft_color_001/jawLeft_color_003, jaw_right: /root/jawRight_color_001/jawRight_color_003}
-    scale: 0.0075
-    trocar: [0.0, 1.7, -2.0]
-    initial: {position: [0.3, 1.2, -3.0]}   # as authored: the grasper's rest pose too (tools do not collide with each other)
-    jaw_spheres: {count: 5, distance: 0.015, offset: [0.0, -0.015, 0.0]}
+      count: 13
+      radius: 0.0075
+      distance: 0.010047750547528267
+    wrist_end:
+    - 0.0
+    - 0.0
+    - 0.0
+  clip_applier:
+    kind: clip_applier
+    mesh: ${DATA}/instruments/dvrk/dvrk_420327.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    trocar:
+    - 3.0
+    - 5.0
+    - 3.0
+    initial:
+      position:
+      - 1.1
+      - 1.2
+      - -3.0
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.013874999713152647
+  scissors:
+    kind: scissors
+    mesh: ${DATA}/instruments/dvrk/dvrk_420179.usdc
+    prims:
+      shaft: /Instrument/shaft
+      body: /Instrument/body
+      jaw_left: /Instrument/jaw_left
+      jaw_right: /Instrument/jaw_right
+    scale: 7.5
+    trocar:
+    - 0.0
+    - 1.7
+    - -2.0
+    initial:
+      position:
+      - 0.3
+      - 1.2
+      - -3.0
+    jaw_spheres:
+      count: 13
+      radius: 0.0075
+      distance: 0.008156178519129753
+    cutting:
+      count: 8
+      radius: 0.00375
+      distance: 0.013982020318508148
+      offset:
+      - 0.0
+      - 0.0
+      - 0.0
   suction:                      # irrigation and suction tube (omnisurg irrigation_suction): grip irrigates, energy sucks
     kind: suction
     mesh: "${DATA}/instruments/suction_irrigation.usdc"
@@ -147,6 +212,7 @@ systems:
   - type: instrument_contact
     instruments: instrument_control
     surface: surface
+    records: 256
     front_side_only: [liver]
   - type: contact_paint         # debug paint: M/V/B held in the window tint what the tools touch (damage, coagulation, blood)
     contacts: instrument_contact

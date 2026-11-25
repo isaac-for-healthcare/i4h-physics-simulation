@@ -16,7 +16,7 @@ class AssessmentHost:
         if not self.simulation.reset_physics(env_ids, mask=mask):
             return
         if self.procedure is not None:
-            self.procedure.reset(mask=self.simulation._mask)
+            self.procedure.reset(mask=self.simulation.env_mask)
 
     def prepare(self):
         self.simulation.prepare()
@@ -59,7 +59,7 @@ class AssessmentHost:
 
     @property
     def _mask(self):
-        return self.simulation._mask
+        return self.simulation.env_mask
 
     @property
     def cuda_graph(self):

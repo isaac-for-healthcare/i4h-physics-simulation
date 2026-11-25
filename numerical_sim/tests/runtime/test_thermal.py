@@ -3,10 +3,11 @@
 
 """M4 thermal: heat from an energised probe, diffusion, burn, deletion and coagulation paint, per env."""
 
+
 import numpy as np
 import pytest
-from helpers import find, live_surface_is_consistent, needs_chole, push_actions, run
-from i4h_isaaclab.composition import load_case
+from helpers import find, live_surface_is_consistent, push_actions, run
+from i4h_host.composition import load_case
 from i4h_physics.systems.mechanics.tet import Tet
 from i4h_surgical.systems.contact.instrument_contact import InstrumentContact
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
@@ -86,31 +87,3 @@ def test_thermal_structural_and_refs():
     with pytest.raises(TypeError, match="thermal.hook"):
         Thermal(sim.scene, surface=find(sim, Surface), contacts=find(sim, InstrumentContact), instruments=find(sim, InstrumentControl),
                 instrument="probe", hook=find(sim, Tet))
-
-
-@needs_chole
-def test_scripted_hook_burns_fat():
-    """The scripted hook energises near the fat: heat, coagulation and removed fat tets in the touching env."""
-    from i4h_standalone.app.instruments import InstrumentDriver
-
-    sim = load_case("chole_tet_med", envs=2)
-    scene, body = sim.scene, sim.scene.body('tissue')
-    control, surface, _thermal, tet = find(sim, InstrumentControl), find(sim, Surface), find(sim, Thermal), find(sim, Tet)
-    driver = InstrumentDriver(sim, control, None, "scripted")
-    sim.prepare()
-    for step in range(300):
-        driver.update(step * sim.dt)
-        sim.step()
-    assert control.energized.numpy()[:, 1].max() >= 0 and np.isfinite(scene.q.numpy()).all()
-    deleted = surface.deleted.numpy()
-    assert deleted.max() > 0, deleted
-    fat = body.parts["fat"]
-    removed = np.flatnonzero(tet.active.numpy()[int(np.argmax(deleted))] == 0)
-    assert (body.tet.part[removed] == fat.index).all()  # only the fat burns
-    # coagulation paint is fat-only. Checked over every env that burned: the burn is chaotic, and when it removes every
-    # painted particle of the env with the most deletions its paint goes with them (the test failed that way rarely)
-    visual = surface.appearance.visual.numpy().reshape(scene.envs, -1, 4)
-    painted = np.flatnonzero((visual[deleted > 0][:, :, 1] > 0.0).any(axis=0))
-    assert painted.size and (painted >= fat.particle_start).all() and (painted < fat.particle_start + fat.particle_count).all()
-    assert surface.overflow.numpy().max() == 0
-    live_surface_is_consistent(sim, int(np.argmax(deleted)))

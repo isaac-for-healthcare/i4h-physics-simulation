@@ -26,3 +26,12 @@ baselines/
 # catheter parity (scripts/parity): the reference venv and run outputs
 /.parity/
 /parity/
+
+.venvs/
+
+# Pinned-liver numerical qualification traces, snapshots and videos
+/artifacts/liver-grasp*/
+
+# Experiment-local policy environment and retained training artifacts
+/examples/liver_grasp/.venv-train/
+/artifacts/liver-policy-*/

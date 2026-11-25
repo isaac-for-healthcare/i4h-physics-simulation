@@ -7,7 +7,7 @@ from helpers import needs_external_data
 
 pytest.importorskip("torch")
 
-from i4h_isaaclab.composition import (  # noqa: E402 - optional dependency guard must run first
+from i4h_host.composition import (  # noqa: E402 - optional dependency guard must run first
     build_procedure,
     load_case,
     read_case,

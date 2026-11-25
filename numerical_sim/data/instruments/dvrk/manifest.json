@@ -1,0 +1,1936 @@
+{
+  "source_catalog_sha256": "16f8a72d6729432f2f1cc44a2d0d25ae832ad96168f9e1c642b15b569f1948ce",
+  "source_xacro_sha256": {
+    "urdf/common/RCM_visual.urdf.xacro": "a682c42f30e736d54b3ac6212cac7443193d2cf3126c09a5f94786da398a9c4f",
+    "urdf/common/endoscope.urdf.xacro": "c3c74a56365c15f6daf34bc4c94339c6f5c7c6fc33c32ac280665969a244cabe",
+    "urdf/common/endoscopes/Classic_SD_straight.urdf.xacro": "e47e40522e3bba9acaabfc8dac906bfcb32b5dd49b7551753255413ec7fee783",
+    "urdf/common/endoscopes/Si_straight.urdf.xacro": "663664acfe9f921eaac29ce8866acab8b788c0d4543fcb1791fc4f92246c53b5",
+    "urdf/common/instrument.urdf.xacro": "d43e93157b6015a4e6f7d4b3471d978e11207afcf13f61d0c99f397bd261faeb",
+    "urdf/common/instruments/housing/housing_Classic.urdf.xacro": "813c23bda7ebed2e0ad3610a1dcb3ad388175ec3c2f7f512e4761ac80a3b80ea",
+    "urdf/common/instruments/housing/housing_Si.urdf.xacro": "f132b32dae3d3566b82eab665dcefeae808e961bb31b817354e64aad98145a65",
+    "urdf/common/instruments/roll/roll_4162.urdf.xacro": "e607cd0e281bc524bc1b3c3bd0b5fdd3732b9a58e64e4c34a83ae2a9cc6c38f7",
+    "urdf/common/instruments/roll/roll_4670.urdf.xacro": "c79829f4741ccd59f732a2e5826ba5c8e4bd70f004f470b7a967ad4190dd909a",
+    "urdf/common/instruments/tip/tip_006.urdf.xacro": "e0fa12137828e92b57a63d324cc1ed170a8486276d14dd7b2237eacbccec4825",
+    "urdf/common/instruments/tip/tip_049.urdf.xacro": "fb83e45c1be83d03accd762e09771d093864cefbbc7d9b1ae30758f75720376b",
+    "urdf/common/instruments/tip/tip_093.urdf.xacro": "f274dbbd788fb2521e3ec32af300683817e41616901e62eadae1855f2252c968",
+    "urdf/common/instruments/tip/tip_172.urdf.xacro": "da3489f6a0a599f7fe566b400c3bd6754a67cdf91e13c0969fe87402beca5468",
+    "urdf/common/instruments/tip/tip_179.urdf.xacro": "f6304059cdb9e00e6c97c2430aae85354e372f9479faa4e7db7b162a6776ad90",
+    "urdf/common/instruments/tip/tip_183.urdf.xacro": "f0f6f555a2ecfe14a9435961cd9febfbd61ee37d7d29611e4b6513bbf00ef081",
+    "urdf/common/instruments/tip/tip_184.urdf.xacro": "c710086f48caa93ba95f4b5b5f2857c7617bc77dd43c6d6cab934c2938d61a5a",
+    "urdf/common/instruments/tip/tip_194.urdf.xacro": "d7441dca65ac5e0953f82ef93e97508a83e973daea2bd183754cb4a919080375",
+    "urdf/common/instruments/tip/tip_309.urdf.xacro": "eefe9a18a74dc592fc91320df7f3802916b41d16440b54ff1dcdfbd18ef8467c",
+    "urdf/common/instruments/tip/tip_327.urdf.xacro": "db21de419d84151926e6522428f116c82c618e5f908a5486d63390158ababd95",
+    "urdf/common/instruments/tip/tip_placeholder.urdf.xacro": "b41679ec1b0d68f583beb34b706e3923aceecced52def6231bad830becb8378d",
+    "urdf/common/instruments/wrist_pitch/wrist_pitch_0091.urdf.xacro": "1251eb7274ce583e8a08ae2c24945f222dbdfe66a6950a4206c3666425f5fbd8",
+    "urdf/common/instruments/wrist_pitch/wrist_pitch_0093.urdf.xacro": "82e17caa5f62fbd6f804bb633e092d57c6b9b0d73db047e21192e0dfa848374e",
+    "urdf/common/instruments/wrist_pitch/wrist_pitch_0100.urdf.xacro": "3f06b4c7a172d2aedfd6123df9076421355e5a300b9d922be56246115c8aca34",
+    "urdf/common/instruments/wrist_pitch/wrist_pitch_0107.urdf.xacro": "bd75bf601e8f8206207d4a9165f97b10e3e74a24797c8f3ac7a0581b783405e9",
+    "urdf/common/instruments/wrist_pitch/wrist_pitch_0112.urdf.xacro": "f8f4bdabef557bcad56adda66eabacf6f5b4e0ee5c998b648e13c1018c9c892e",
+    "urdf/common/instruments/wrist_yaw/wrist_yaw_0091.urdf.xacro": "ec297ba7807366eb4e1766591d0b72b05f0757878d204aaf15ef7780de095cb9",
+    "urdf/common/instruments/wrist_yaw/wrist_yaw_0093.urdf.xacro": "366ccf7a14470ac751274929067627f415e32e45219924f626acdf7401752140",
+    "urdf/common/instruments/wrist_yaw/wrist_yaw_0100.urdf.xacro": "06056292f4dfeb96afe4719482bed2b79a0f04e598337a52af2a7b0dd6b812b9",
+    "urdf/common/instruments/wrist_yaw/wrist_yaw_0107.urdf.xacro": "325283ec4a41fbf30f79dbc2ff1a4ceec6eac37e384cddbaeb15839fde066bcb",
+    "urdf/common/instruments/wrist_yaw/wrist_yaw_0112.urdf.xacro": "0d25190b806702542a243df1ed81223f52d7fd525d47b2d7295d7e025eeef2f4"
+  },
+  "units": "metres",
+  "frames": "jaw hinge local X, distal local +Z; i4h loader applies Ry(pi)",
+  "limitations": [
+    "visual/kinematic assets; no USD rigid-body articulation",
+    "proximal housing omitted",
+    "wrist pitch and yaw meshes combined into i4h body role",
+    "093 jaw-axis prismatic mimic frozen at closed offset 0.0077 m; native i4h has fixed jaw pivots",
+    "sphere/cutting templates are approximations requiring contact qualification"
+  ],
+  "instruments": {
+    "400006": {
+      "name": "Large Needle Driver",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0091",
+        "wrist_yaw": "0091",
+        "tip": "006",
+        "name": "Large Needle Driver"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0091/wrist_pitch_0091.obj": "a0fbe4dffaa3561b42f1b50019b9fcecab9308298a5592df917bea38b5ac8390",
+        "meshes/instruments/wrist_yaw/0091/wrist_yaw_0091.obj": "9a6b64b0ce58833b0bbfa8be57e577dcece4425781bb0962ce242f8f3105bf8f",
+        "meshes/instruments/tip/006/tip_006_1.obj": "96e08f64608fadb0da4864bd38cd06a56345095ca8316f9e27d514c3031fb44a",
+        "meshes/instruments/tip/006/tip_006_2.obj": "d59c9fdd11131597e42b8fec22f0b297b9f7d4ac2872e374c28984deb3097a2b"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 20985,
+          "triangles": 28312,
+          "bounds_m": [
+            [
+              -0.0032053999602794647,
+              -0.0031793001107871532,
+              -0.0030424001161009073
+            ],
+            [
+              0.003180299885571003,
+              0.003116199979558587,
+              0.011485000140964985
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 57335,
+          "triangles": 20376,
+          "bounds_m": [
+            [
+              -0.0010310000507161021,
+              -0.00241199997253716,
+              -0.0024129999801516533
+            ],
+            [
+              0.001969000091776252,
+              0.0024129999801516533,
+              0.009651999920606613
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 57331,
+          "triangles": 20376,
+          "bounds_m": [
+            [
+              -0.0019940000493079424,
+              -0.0024129999801516533,
+              -0.0024129999801516533
+            ],
+            [
+              0.0010049999691545963,
+              0.00241199997253716,
+              0.009651999920606613
+            ]
+          ]
+        }
+      },
+      "sha256": "b413e471405cc4fc0f40ea327bdd3c4582c9409b85bc608d1af00e2002a9e1fe",
+      "file": "dvrk_400006.usdc"
+    },
+    "400049": {
+      "name": "Cadiere Forceps",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0091",
+        "wrist_yaw": "0091",
+        "tip": "049",
+        "name": "Cadiere Forceps"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0091/wrist_pitch_0091.obj": "a0fbe4dffaa3561b42f1b50019b9fcecab9308298a5592df917bea38b5ac8390",
+        "meshes/instruments/wrist_yaw/0091/wrist_yaw_0091.obj": "9a6b64b0ce58833b0bbfa8be57e577dcece4425781bb0962ce242f8f3105bf8f",
+        "meshes/instruments/tip/049/tip_049_1.obj": "4277e227ff20dded7fb7e98182c08e07e9f2cbb154b347affc7149766e8e4d91",
+        "meshes/instruments/tip/049/tip_049_2.obj": "7dc5b43df6ff26c7206c2c72fbe1a27f9d7158967e183dfcfcca711326b4f40b"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 20985,
+          "triangles": 28312,
+          "bounds_m": [
+            [
+              -0.0032053999602794647,
+              -0.0031793001107871532,
+              -0.0030424001161009073
+            ],
+            [
+              0.003180299885571003,
+              0.003116199979558587,
+              0.011485000140964985
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 12306,
+          "triangles": 18914,
+          "bounds_m": [
+            [
+              -0.0027705999091267586,
+              -0.002572899917140603,
+              -0.0021524999756366014
+            ],
+            [
+              0.0027964001055806875,
+              0.0024667999241501093,
+              0.021036799997091293
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 11196,
+          "triangles": 16898,
+          "bounds_m": [
+            [
+              -0.002774300053715706,
+              -0.002525199903175235,
+              -0.002150299958884716
+            ],
+            [
+              0.0027985000051558018,
+              0.002488299971446395,
+              0.021032700315117836
+            ]
+          ]
+        }
+      },
+      "sha256": "30350b95331cf5ae37de4287d7459d31e75abcbe4d3c0db0f08adc5c41fbcebf",
+      "file": "dvrk_400049.usdc"
+    },
+    "400093": {
+      "name": "Prograsp Forceps",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0107",
+        "wrist_yaw": "0107",
+        "tip": "093",
+        "name": "Prograsp Forceps"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0107/wrist_pitch_0107.obj": "40e7827bb340ec8cc84b71f329193921b13e49ec52ee14791da5e827071228b0",
+        "meshes/instruments/wrist_yaw/0107/wrist_yaw_0107.obj": "9410cef9732d83e1f6d6705f4ded589294ce424cda49c69f415cd19a05033297",
+        "meshes/instruments/tip/093/tip_093_1.obj": "9e57fff38ee5f902810f105cd8fed248e7abb8f7b5509fbb5da3cbd195dff803",
+        "meshes/instruments/tip/093/tip_093_2.obj": "da01186c0ed57732546566126d55dcac767116dfb5c27f825524062b54b7e9bb"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_right": [
+          "jaw_1_link"
+        ],
+        "jaw_left": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [
+        "jaw_axis"
+      ],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 12564,
+          "triangles": 18768,
+          "bounds_m": [
+            [
+              -0.004223700147122145,
+              -0.004247100092470646,
+              -0.002516800072044134
+            ],
+            [
+              0.004223499912768602,
+              0.004247100092470646,
+              0.015390800312161446
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 16668,
+          "triangles": 5556,
+          "bounds_m": [
+            [
+              -0.002649350091814995,
+              -0.002136151073500514,
+              -0.007645401172339916
+            ],
+            [
+              0.002648815978318453,
+              0.003577995114028454,
+              0.02099989540874958
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 18324,
+          "triangles": 6108,
+          "bounds_m": [
+            [
+              -0.00277771707624197,
+              -0.0035779939498752356,
+              -0.007645401172339916
+            ],
+            [
+              0.002649345900863409,
+              0.002136151073500514,
+              0.02099989540874958
+            ]
+          ]
+        }
+      },
+      "sha256": "e976b69fb62a073ea0b1c7dbfad782324f47cd915a9141c6ae702ffb4e458ec2",
+      "file": "dvrk_400093.usdc"
+    },
+    "400172": {
+      "name": "Maryland Bipolar Forceps",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0107",
+        "wrist_yaw": "0107",
+        "tip": "172",
+        "name": "Maryland Bipolar Forceps"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0107/wrist_pitch_0107.obj": "40e7827bb340ec8cc84b71f329193921b13e49ec52ee14791da5e827071228b0",
+        "meshes/instruments/wrist_yaw/0107/wrist_yaw_0107.obj": "9410cef9732d83e1f6d6705f4ded589294ce424cda49c69f415cd19a05033297",
+        "meshes/instruments/tip/172/tip_172_1.obj": "f92437033fe36855c4017f76619b40990bb292107ae8382542d60cca7ae2a626",
+        "meshes/instruments/tip/172/tip_172_2.obj": "fb62634a15772d030dd4702346f3fb8d6f2842203c538920dea2df596f761c9c"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 12564,
+          "triangles": 18768,
+          "bounds_m": [
+            [
+              -0.004223700147122145,
+              -0.004247100092470646,
+              -0.002516800072044134
+            ],
+            [
+              0.004223499912768602,
+              0.004247100092470646,
+              0.015390800312161446
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 4234,
+          "triangles": 5992,
+          "bounds_m": [
+            [
+              -0.003918299917131662,
+              -0.0034298000391572714,
+              -0.00349949998781085
+            ],
+            [
+              0.002356400014832616,
+              0.0034298000391572714,
+              0.02104179933667183
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 4229,
+          "triangles": 5898,
+          "bounds_m": [
+            [
+              -0.002059000078588724,
+              -0.0034298000391572714,
+              -0.00349949998781085
+            ],
+            [
+              0.003918299917131662,
+              0.0034298000391572714,
+              0.02105329930782318
+            ]
+          ]
+        }
+      },
+      "sha256": "f172390d7d0ca9b5b94eb820be233b58cbbbf14685502a8288a51e5b981f508a",
+      "file": "dvrk_400172.usdc"
+    },
+    "400179": {
+      "name": "Monopolar Curved Scissors",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0091",
+        "wrist_yaw": "0091",
+        "tip": "179",
+        "name": "Monopolar Curved Scissors"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0091/wrist_pitch_0091.obj": "a0fbe4dffaa3561b42f1b50019b9fcecab9308298a5592df917bea38b5ac8390",
+        "meshes/instruments/wrist_yaw/0091/wrist_yaw_0091.obj": "9a6b64b0ce58833b0bbfa8be57e577dcece4425781bb0962ce242f8f3105bf8f",
+        "meshes/instruments/tip/179/tip_179_1.obj": "26806f6cd70515e7a9619ef8367c2aef987c4b59a5d04ce374c0dac8c7fc76fc",
+        "meshes/instruments/tip/179/tip_179_2.obj": "3590e1dba0651bd835ef15e6c620872ef9749fdf78edb4a02c7cf963417c72d2"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 20985,
+          "triangles": 28312,
+          "bounds_m": [
+            [
+              -0.0032053999602794647,
+              -0.0031793001107871532,
+              -0.0030424001161009073
+            ],
+            [
+              0.003180299885571003,
+              0.003116199979558587,
+              0.011485000140964985
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 11190,
+          "triangles": 3730,
+          "bounds_m": [
+            [
+              -0.0017131209606304765,
+              -0.00243966793641448,
+              -0.002407671883702278
+            ],
+            [
+              0.0017470760503783822,
+              0.002439713105559349,
+              0.013049885630607605
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 11244,
+          "triangles": 3748,
+          "bounds_m": [
+            [
+              -0.0002810790028888732,
+              -0.0024396709632128477,
+              -0.002407673979178071
+            ],
+            [
+              0.002114953938871622,
+              0.0024397100787609816,
+              0.013029787689447403
+            ]
+          ]
+        }
+      },
+      "sha256": "c2617e67f1a622aa938b13fd8c575e7f23371a35af1ccbd887fe2a21b6b1a938",
+      "file": "dvrk_400179.usdc"
+    },
+    "400183": {
+      "name": "Permanent Cautery Hook",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0093",
+        "wrist_yaw": "0093",
+        "tip": "183",
+        "name": "Permanent Cautery Hook"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0093/wrist_pitch_0093.obj": "e9f638694e089818c5f7dac231ec8cc9bb2b94d2c8132952d8e62664ed23faff",
+        "meshes/instruments/wrist_yaw/0093/wrist_yaw_0093.obj": "c72c806585796c8b6eb6e26fa3bf38db9f855560f59b9ad89f8622f1098c2f34",
+        "meshes/instruments/tip/183/tip_183.obj": "9a2079ef951ded6b599ba843d63d16b4691fa06c1e35623cb854b7139df081c6"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "hook": [
+          "jaw_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 8310,
+          "triangles": 13663,
+          "bounds_m": [
+            [
+              -0.0042500002309679985,
+              -0.0030791000463068485,
+              -0.0024649000260978937
+            ],
+            [
+              0.0042500002309679985,
+              0.0031371000222861767,
+              0.012937500141561031
+            ]
+          ]
+        },
+        "hook": {
+          "vertices": 3164,
+          "triangles": 5496,
+          "bounds_m": [
+            [
+              -0.0025241998955607414,
+              -0.0033728000707924366,
+              -0.003626100020483136
+            ],
+            [
+              0.0027071998920291662,
+              0.0033728000707924366,
+              0.016076400876045227
+            ]
+          ]
+        }
+      },
+      "sha256": "644f7c083590bd95bd3d78a288d086481f523dbd8c022546a654585da1a3f3f0",
+      "file": "dvrk_400183.usdc"
+    },
+    "400184": {
+      "name": "Permanent Cautery Spatula",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0093",
+        "wrist_yaw": "0093",
+        "tip": "184",
+        "name": "Permanent Cautery Spatula"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0093/wrist_pitch_0093.obj": "e9f638694e089818c5f7dac231ec8cc9bb2b94d2c8132952d8e62664ed23faff",
+        "meshes/instruments/wrist_yaw/0093/wrist_yaw_0093.obj": "c72c806585796c8b6eb6e26fa3bf38db9f855560f59b9ad89f8622f1098c2f34",
+        "meshes/instruments/tip/184/tip_184.obj": "69c25ffdd98014725390f696b4ea2723c7aef2745a7b7a92867a2341a84cebb4"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "hook": [
+          "jaw_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 8310,
+          "triangles": 13663,
+          "bounds_m": [
+            [
+              -0.0042500002309679985,
+              -0.0030791000463068485,
+              -0.0024649000260978937
+            ],
+            [
+              0.0042500002309679985,
+              0.0031371000222861767,
+              0.012937500141561031
+            ]
+          ]
+        },
+        "hook": {
+          "vertices": 6791,
+          "triangles": 10364,
+          "bounds_m": [
+            [
+              -0.002961799968034029,
+              -0.0033644000068306923,
+              -0.0047889999113976955
+            ],
+            [
+              0.0027366001158952713,
+              0.003401600057259202,
+              0.016072800382971764
+            ]
+          ]
+        }
+      },
+      "sha256": "06ccb181615f183bfa15d206e98007432dc678b5a08eb610684f49ee1ff98825",
+      "file": "dvrk_400184.usdc"
+    },
+    "400194": {
+      "name": "Mega Needle Driver",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0112",
+        "wrist_yaw": "0112",
+        "tip": "194",
+        "name": "Mega Needle Driver"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0112/wrist_pitch_0112.obj": "5b08539b3a5702c43cb27b05eff974e5aab8440bf714511f5df33cf1dded86a3",
+        "meshes/instruments/wrist_yaw/0112/wrist_yaw_0112.obj": "be8ed3a7fd64895a9bd43c8b9349bc32b6de5d81de7bc04a0fa867afe69bcca5",
+        "meshes/instruments/tip/194/tip_194_1.obj": "135544cf857e1769cd880e79a2c99d34911ad58279c7eb03fa03c965d968967c",
+        "meshes/instruments/tip/194/tip_194_2.obj": "f3674e8206ddfe1a1fc224e16541750fc9b7aa2365e458bc92a042779cc9b5cb"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_right": [
+          "jaw_1_link"
+        ],
+        "jaw_left": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 9469,
+          "triangles": 14440,
+          "bounds_m": [
+            [
+              -0.004177100025117397,
+              -0.003890699939802289,
+              -0.002299400046467781
+            ],
+            [
+              0.00417769979685545,
+              0.0038954000920057297,
+              0.01507049985229969
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 4731,
+          "triangles": 6144,
+          "bounds_m": [
+            [
+              -0.0026444001123309135,
+              -0.003802299965173006,
+              -0.0036786000709980726
+            ],
+            [
+              0.001804900006391108,
+              0.0037980000488460064,
+              0.012787899933755398
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 4717,
+          "triangles": 6128,
+          "bounds_m": [
+            [
+              -0.001804900006391108,
+              -0.0037980000488460064,
+              -0.0036786000709980726
+            ],
+            [
+              0.0026444001123309135,
+              0.003802299965173006,
+              0.012787899933755398
+            ]
+          ]
+        }
+      },
+      "sha256": "5804104159178d93d0360398941fb90ba87dc48cf7d63a29bf78180bebb0cf14",
+      "file": "dvrk_400194.usdc"
+    },
+    "400309": {
+      "name": "Mega Suturecut Needle Driver",
+      "parts": {
+        "housing": "Classic",
+        "roll": "4162",
+        "wrist_pitch": "0100",
+        "wrist_yaw": "0100",
+        "tip": "309",
+        "name": "Mega Suturecut Needle Driver"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0100/wrist_pitch_0100.obj": "7ffeb8a925341e90545a48b9359fbbda394ccb63e32981add8a3272e313a3860",
+        "meshes/instruments/wrist_yaw/0100/wrist_yaw_0100.obj": "e3bcbf774f72a45d3c0013668dd334e6ae06b2d7a5196bc26030e4bdab6780d3",
+        "meshes/instruments/tip/309/tip_309_1.obj": "62b73760dfadfecc3568e165659523f511d0d597c2fce78bd98dc666eef97e28",
+        "meshes/instruments/tip/309/tip_309_2.obj": "5aa4323485589ef5aced579a328a6f5e5f4e212c67a1cfa9069aa71930dcfd17"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_right": [
+          "jaw_1_link"
+        ],
+        "jaw_left": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 8847,
+          "triangles": 12776,
+          "bounds_m": [
+            [
+              -0.0034030000679194927,
+              -0.0032065000850707293,
+              -0.0025973001029342413
+            ],
+            [
+              0.0034028999507427216,
+              0.0032065000850707293,
+              0.01332169957458973
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 4198,
+          "triangles": 3309,
+          "bounds_m": [
+            [
+              -0.0020274000708013773,
+              -0.003061800030991435,
+              -0.0031032999977469444
+            ],
+            [
+              0.0015499000437557697,
+              0.003061800030991435,
+              0.010796699672937393
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 4196,
+          "triangles": 3309,
+          "bounds_m": [
+            [
+              -0.0015499000437557697,
+              -0.0031808000057935715,
+              -0.0030702000949531794
+            ],
+            [
+              0.0020274000708013773,
+              0.0029426999390125275,
+              0.010829799808561802
+            ]
+          ]
+        }
+      },
+      "sha256": "74c06431746b0ff0b89bc6932a2cfaf43815995d2c206f847d81f19fc9f55a5a",
+      "file": "dvrk_400309.usdc"
+    },
+    "420006": {
+      "name": "Large Needle Driver",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0091",
+        "wrist_yaw": "0091",
+        "tip": "006",
+        "name": "Large Needle Driver"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0091/wrist_pitch_0091.obj": "a0fbe4dffaa3561b42f1b50019b9fcecab9308298a5592df917bea38b5ac8390",
+        "meshes/instruments/wrist_yaw/0091/wrist_yaw_0091.obj": "9a6b64b0ce58833b0bbfa8be57e577dcece4425781bb0962ce242f8f3105bf8f",
+        "meshes/instruments/tip/006/tip_006_1.obj": "96e08f64608fadb0da4864bd38cd06a56345095ca8316f9e27d514c3031fb44a",
+        "meshes/instruments/tip/006/tip_006_2.obj": "d59c9fdd11131597e42b8fec22f0b297b9f7d4ac2872e374c28984deb3097a2b"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 20985,
+          "triangles": 28312,
+          "bounds_m": [
+            [
+              -0.0032053999602794647,
+              -0.0031793001107871532,
+              -0.0030424001161009073
+            ],
+            [
+              0.003180299885571003,
+              0.003116199979558587,
+              0.011485000140964985
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 57335,
+          "triangles": 20376,
+          "bounds_m": [
+            [
+              -0.0010310000507161021,
+              -0.00241199997253716,
+              -0.0024129999801516533
+            ],
+            [
+              0.001969000091776252,
+              0.0024129999801516533,
+              0.009651999920606613
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 57331,
+          "triangles": 20376,
+          "bounds_m": [
+            [
+              -0.0019940000493079424,
+              -0.0024129999801516533,
+              -0.0024129999801516533
+            ],
+            [
+              0.0010049999691545963,
+              0.00241199997253716,
+              0.009651999920606613
+            ]
+          ]
+        }
+      },
+      "sha256": "57df739a5d5ad4070c5f2dc6ec7fa27686b90092e3e0e79389a999e604473ef6",
+      "file": "dvrk_420006.usdc"
+    },
+    "420049": {
+      "name": "Cadiere Forceps",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0091",
+        "wrist_yaw": "0091",
+        "tip": "049",
+        "name": "Cadiere Forceps"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0091/wrist_pitch_0091.obj": "a0fbe4dffaa3561b42f1b50019b9fcecab9308298a5592df917bea38b5ac8390",
+        "meshes/instruments/wrist_yaw/0091/wrist_yaw_0091.obj": "9a6b64b0ce58833b0bbfa8be57e577dcece4425781bb0962ce242f8f3105bf8f",
+        "meshes/instruments/tip/049/tip_049_1.obj": "4277e227ff20dded7fb7e98182c08e07e9f2cbb154b347affc7149766e8e4d91",
+        "meshes/instruments/tip/049/tip_049_2.obj": "7dc5b43df6ff26c7206c2c72fbe1a27f9d7158967e183dfcfcca711326b4f40b"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 20985,
+          "triangles": 28312,
+          "bounds_m": [
+            [
+              -0.0032053999602794647,
+              -0.0031793001107871532,
+              -0.0030424001161009073
+            ],
+            [
+              0.003180299885571003,
+              0.003116199979558587,
+              0.011485000140964985
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 12306,
+          "triangles": 18914,
+          "bounds_m": [
+            [
+              -0.0027705999091267586,
+              -0.002572899917140603,
+              -0.0021524999756366014
+            ],
+            [
+              0.0027964001055806875,
+              0.0024667999241501093,
+              0.021036799997091293
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 11196,
+          "triangles": 16898,
+          "bounds_m": [
+            [
+              -0.002774300053715706,
+              -0.002525199903175235,
+              -0.002150299958884716
+            ],
+            [
+              0.0027985000051558018,
+              0.002488299971446395,
+              0.021032700315117836
+            ]
+          ]
+        }
+      },
+      "sha256": "2f19ea5d8fac3fa89bc79d68d4a246f74cfe62839a92e5445a049c58be09898e",
+      "file": "dvrk_420049.usdc"
+    },
+    "420093": {
+      "name": "Prograsp Forceps",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0107",
+        "wrist_yaw": "0107",
+        "tip": "093",
+        "name": "Prograsp Forceps"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0107/wrist_pitch_0107.obj": "40e7827bb340ec8cc84b71f329193921b13e49ec52ee14791da5e827071228b0",
+        "meshes/instruments/wrist_yaw/0107/wrist_yaw_0107.obj": "9410cef9732d83e1f6d6705f4ded589294ce424cda49c69f415cd19a05033297",
+        "meshes/instruments/tip/093/tip_093_1.obj": "9e57fff38ee5f902810f105cd8fed248e7abb8f7b5509fbb5da3cbd195dff803",
+        "meshes/instruments/tip/093/tip_093_2.obj": "da01186c0ed57732546566126d55dcac767116dfb5c27f825524062b54b7e9bb"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_right": [
+          "jaw_1_link"
+        ],
+        "jaw_left": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [
+        "jaw_axis"
+      ],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 12564,
+          "triangles": 18768,
+          "bounds_m": [
+            [
+              -0.004223700147122145,
+              -0.004247100092470646,
+              -0.002516800072044134
+            ],
+            [
+              0.004223499912768602,
+              0.004247100092470646,
+              0.015390800312161446
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 16668,
+          "triangles": 5556,
+          "bounds_m": [
+            [
+              -0.002649350091814995,
+              -0.002136151073500514,
+              -0.007645401172339916
+            ],
+            [
+              0.002648815978318453,
+              0.003577995114028454,
+              0.02099989540874958
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 18324,
+          "triangles": 6108,
+          "bounds_m": [
+            [
+              -0.00277771707624197,
+              -0.0035779939498752356,
+              -0.007645401172339916
+            ],
+            [
+              0.002649345900863409,
+              0.002136151073500514,
+              0.02099989540874958
+            ]
+          ]
+        }
+      },
+      "sha256": "e5b2f07b73887584d798d1a78af348a99e92d2e71876174627f074fa10035032",
+      "file": "dvrk_420093.usdc"
+    },
+    "420172": {
+      "name": "Maryland Bipolar Forceps",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0107",
+        "wrist_yaw": "0107",
+        "tip": "172",
+        "name": "Maryland Bipolar Forceps"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0107/wrist_pitch_0107.obj": "40e7827bb340ec8cc84b71f329193921b13e49ec52ee14791da5e827071228b0",
+        "meshes/instruments/wrist_yaw/0107/wrist_yaw_0107.obj": "9410cef9732d83e1f6d6705f4ded589294ce424cda49c69f415cd19a05033297",
+        "meshes/instruments/tip/172/tip_172_1.obj": "f92437033fe36855c4017f76619b40990bb292107ae8382542d60cca7ae2a626",
+        "meshes/instruments/tip/172/tip_172_2.obj": "fb62634a15772d030dd4702346f3fb8d6f2842203c538920dea2df596f761c9c"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 12564,
+          "triangles": 18768,
+          "bounds_m": [
+            [
+              -0.004223700147122145,
+              -0.004247100092470646,
+              -0.002516800072044134
+            ],
+            [
+              0.004223499912768602,
+              0.004247100092470646,
+              0.015390800312161446
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 4234,
+          "triangles": 5992,
+          "bounds_m": [
+            [
+              -0.003918299917131662,
+              -0.0034298000391572714,
+              -0.00349949998781085
+            ],
+            [
+              0.002356400014832616,
+              0.0034298000391572714,
+              0.02104179933667183
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 4229,
+          "triangles": 5898,
+          "bounds_m": [
+            [
+              -0.002059000078588724,
+              -0.0034298000391572714,
+              -0.00349949998781085
+            ],
+            [
+              0.003918299917131662,
+              0.0034298000391572714,
+              0.02105329930782318
+            ]
+          ]
+        }
+      },
+      "sha256": "b36158cd70580df0621ff7599dbcf83df581d6ad5c83289d7d402b2c3e2eec8e",
+      "file": "dvrk_420172.usdc"
+    },
+    "420179": {
+      "name": "Monopolar Curved Scissors",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0091",
+        "wrist_yaw": "0091",
+        "tip": "179",
+        "name": "Monopolar Curved Scissors"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0091/wrist_pitch_0091.obj": "a0fbe4dffaa3561b42f1b50019b9fcecab9308298a5592df917bea38b5ac8390",
+        "meshes/instruments/wrist_yaw/0091/wrist_yaw_0091.obj": "9a6b64b0ce58833b0bbfa8be57e577dcece4425781bb0962ce242f8f3105bf8f",
+        "meshes/instruments/tip/179/tip_179_1.obj": "26806f6cd70515e7a9619ef8367c2aef987c4b59a5d04ce374c0dac8c7fc76fc",
+        "meshes/instruments/tip/179/tip_179_2.obj": "3590e1dba0651bd835ef15e6c620872ef9749fdf78edb4a02c7cf963417c72d2"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 20985,
+          "triangles": 28312,
+          "bounds_m": [
+            [
+              -0.0032053999602794647,
+              -0.0031793001107871532,
+              -0.0030424001161009073
+            ],
+            [
+              0.003180299885571003,
+              0.003116199979558587,
+              0.011485000140964985
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 11190,
+          "triangles": 3730,
+          "bounds_m": [
+            [
+              -0.0017131209606304765,
+              -0.00243966793641448,
+              -0.002407671883702278
+            ],
+            [
+              0.0017470760503783822,
+              0.002439713105559349,
+              0.013049885630607605
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 11244,
+          "triangles": 3748,
+          "bounds_m": [
+            [
+              -0.0002810790028888732,
+              -0.0024396709632128477,
+              -0.002407673979178071
+            ],
+            [
+              0.002114953938871622,
+              0.0024397100787609816,
+              0.013029787689447403
+            ]
+          ]
+        }
+      },
+      "sha256": "5e5f9112182c8fb798a5025b535cbd29abd46820b08dbf54edded6e2a9bc0021",
+      "file": "dvrk_420179.usdc"
+    },
+    "420183": {
+      "name": "Permanent Cautery Hook",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0093",
+        "wrist_yaw": "0093",
+        "tip": "183",
+        "name": "Permanent Cautery Hook"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0093/wrist_pitch_0093.obj": "e9f638694e089818c5f7dac231ec8cc9bb2b94d2c8132952d8e62664ed23faff",
+        "meshes/instruments/wrist_yaw/0093/wrist_yaw_0093.obj": "c72c806585796c8b6eb6e26fa3bf38db9f855560f59b9ad89f8622f1098c2f34",
+        "meshes/instruments/tip/183/tip_183.obj": "9a2079ef951ded6b599ba843d63d16b4691fa06c1e35623cb854b7139df081c6"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "hook": [
+          "jaw_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 8310,
+          "triangles": 13663,
+          "bounds_m": [
+            [
+              -0.0042500002309679985,
+              -0.0030791000463068485,
+              -0.0024649000260978937
+            ],
+            [
+              0.0042500002309679985,
+              0.0031371000222861767,
+              0.012937500141561031
+            ]
+          ]
+        },
+        "hook": {
+          "vertices": 3164,
+          "triangles": 5496,
+          "bounds_m": [
+            [
+              -0.0025241998955607414,
+              -0.0033728000707924366,
+              -0.003626100020483136
+            ],
+            [
+              0.0027071998920291662,
+              0.0033728000707924366,
+              0.016076400876045227
+            ]
+          ]
+        }
+      },
+      "sha256": "142771d3849461ff2b77c4d8b9f0c7fa0f5c4ef5d6febcac919e557bdcd42477",
+      "file": "dvrk_420183.usdc"
+    },
+    "420184": {
+      "name": "Permanent Cautery Spatula",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0093",
+        "wrist_yaw": "0093",
+        "tip": "184",
+        "name": "Permanent Cautery Spatula"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0093/wrist_pitch_0093.obj": "e9f638694e089818c5f7dac231ec8cc9bb2b94d2c8132952d8e62664ed23faff",
+        "meshes/instruments/wrist_yaw/0093/wrist_yaw_0093.obj": "c72c806585796c8b6eb6e26fa3bf38db9f855560f59b9ad89f8622f1098c2f34",
+        "meshes/instruments/tip/184/tip_184.obj": "69c25ffdd98014725390f696b4ea2723c7aef2745a7b7a92867a2341a84cebb4"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "hook": [
+          "jaw_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 8310,
+          "triangles": 13663,
+          "bounds_m": [
+            [
+              -0.0042500002309679985,
+              -0.0030791000463068485,
+              -0.0024649000260978937
+            ],
+            [
+              0.0042500002309679985,
+              0.0031371000222861767,
+              0.012937500141561031
+            ]
+          ]
+        },
+        "hook": {
+          "vertices": 6791,
+          "triangles": 10364,
+          "bounds_m": [
+            [
+              -0.002961799968034029,
+              -0.0033644000068306923,
+              -0.0047889999113976955
+            ],
+            [
+              0.0027366001158952713,
+              0.003401600057259202,
+              0.016072800382971764
+            ]
+          ]
+        }
+      },
+      "sha256": "6edf48b836ceb88419f9ac33effabc4d34490653e6ad3e0afd9576c7ddf5ffdf",
+      "file": "dvrk_420184.usdc"
+    },
+    "420194": {
+      "name": "Mega Needle Driver",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0112",
+        "wrist_yaw": "0112",
+        "tip": "194",
+        "name": "Mega Needle Driver"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0112/wrist_pitch_0112.obj": "5b08539b3a5702c43cb27b05eff974e5aab8440bf714511f5df33cf1dded86a3",
+        "meshes/instruments/wrist_yaw/0112/wrist_yaw_0112.obj": "be8ed3a7fd64895a9bd43c8b9349bc32b6de5d81de7bc04a0fa867afe69bcca5",
+        "meshes/instruments/tip/194/tip_194_1.obj": "135544cf857e1769cd880e79a2c99d34911ad58279c7eb03fa03c965d968967c",
+        "meshes/instruments/tip/194/tip_194_2.obj": "f3674e8206ddfe1a1fc224e16541750fc9b7aa2365e458bc92a042779cc9b5cb"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_right": [
+          "jaw_1_link"
+        ],
+        "jaw_left": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 9469,
+          "triangles": 14440,
+          "bounds_m": [
+            [
+              -0.004177100025117397,
+              -0.003890699939802289,
+              -0.002299400046467781
+            ],
+            [
+              0.00417769979685545,
+              0.0038954000920057297,
+              0.01507049985229969
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 4731,
+          "triangles": 6144,
+          "bounds_m": [
+            [
+              -0.0026444001123309135,
+              -0.003802299965173006,
+              -0.0036786000709980726
+            ],
+            [
+              0.001804900006391108,
+              0.0037980000488460064,
+              0.012787899933755398
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 4717,
+          "triangles": 6128,
+          "bounds_m": [
+            [
+              -0.001804900006391108,
+              -0.0037980000488460064,
+              -0.0036786000709980726
+            ],
+            [
+              0.0026444001123309135,
+              0.003802299965173006,
+              0.012787899933755398
+            ]
+          ]
+        }
+      },
+      "sha256": "5006cfb9735f8d536b1626ae47024c3729a959bf15f3ec01bd20f5496721b431",
+      "file": "dvrk_420194.usdc"
+    },
+    "420309": {
+      "name": "Mega Suturecut Needle Driver",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0100",
+        "wrist_yaw": "0100",
+        "tip": "309",
+        "name": "Mega Suturecut Needle Driver"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0100/wrist_pitch_0100.obj": "7ffeb8a925341e90545a48b9359fbbda394ccb63e32981add8a3272e313a3860",
+        "meshes/instruments/wrist_yaw/0100/wrist_yaw_0100.obj": "e3bcbf774f72a45d3c0013668dd334e6ae06b2d7a5196bc26030e4bdab6780d3",
+        "meshes/instruments/tip/309/tip_309_1.obj": "62b73760dfadfecc3568e165659523f511d0d597c2fce78bd98dc666eef97e28",
+        "meshes/instruments/tip/309/tip_309_2.obj": "5aa4323485589ef5aced579a328a6f5e5f4e212c67a1cfa9069aa71930dcfd17"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_right": [
+          "jaw_1_link"
+        ],
+        "jaw_left": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 8847,
+          "triangles": 12776,
+          "bounds_m": [
+            [
+              -0.0034030000679194927,
+              -0.0032065000850707293,
+              -0.0025973001029342413
+            ],
+            [
+              0.0034028999507427216,
+              0.0032065000850707293,
+              0.01332169957458973
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 4198,
+          "triangles": 3309,
+          "bounds_m": [
+            [
+              -0.0020274000708013773,
+              -0.003061800030991435,
+              -0.0031032999977469444
+            ],
+            [
+              0.0015499000437557697,
+              0.003061800030991435,
+              0.010796699672937393
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 4196,
+          "triangles": 3309,
+          "bounds_m": [
+            [
+              -0.0015499000437557697,
+              -0.0031808000057935715,
+              -0.0030702000949531794
+            ],
+            [
+              0.0020274000708013773,
+              0.0029426999390125275,
+              0.010829799808561802
+            ]
+          ]
+        }
+      },
+      "sha256": "55056f3042ab0ff1d32348d5a46eed6f76ab6aa95dc9524a45052f1f6143415d",
+      "file": "dvrk_420309.usdc"
+    },
+    "420327": {
+      "name": "Medium-large Clip Applier",
+      "parts": {
+        "housing": "Si",
+        "roll": "4670",
+        "wrist_pitch": "0107",
+        "wrist_yaw": "0107",
+        "tip": "327",
+        "name": "Medium-large Clip Applier"
+      },
+      "sources": {
+        "meshes/instruments/roll/4670/roll_4670.obj": "e7f3ea661d2e4f2de73cdea59d56c14e62b60dcc5e75664c0d89723013e6e8eb",
+        "meshes/instruments/wrist_pitch/0107/wrist_pitch_0107.obj": "40e7827bb340ec8cc84b71f329193921b13e49ec52ee14791da5e827071228b0",
+        "meshes/instruments/wrist_yaw/0107/wrist_yaw_0107.obj": "9410cef9732d83e1f6d6705f4ded589294ce424cda49c69f415cd19a05033297",
+        "meshes/instruments/tip/327/tip_327_1.obj": "10ccbd06ca06dc9a7c3e357657aec5fbc40f2c76257de734e98402893bd7c385",
+        "meshes/instruments/tip/327/tip_327_2.obj": "ab012baa80aa7decdb65c435254a62c804c26720a633af8d2488da509c277b71"
+      },
+      "role_links": {
+        "shaft": [
+          "roll_link"
+        ],
+        "body": [
+          "wrist_pitch_link",
+          "wrist_yaw_link"
+        ],
+        "jaw_left": [
+          "jaw_1_link"
+        ],
+        "jaw_right": [
+          "jaw_2_link"
+        ]
+      },
+      "frozen_prismatic_mimics": [],
+      "geometry": {
+        "shaft": {
+          "vertices": 6831,
+          "triangles": 11156,
+          "bounds_m": [
+            [
+              -0.004372499883174896,
+              -0.004372600000351667,
+              -0.5565921068191528
+            ],
+            [
+              0.004372400231659412,
+              0.004372400231659412,
+              0.0030326000414788723
+            ]
+          ]
+        },
+        "body": {
+          "vertices": 12564,
+          "triangles": 18768,
+          "bounds_m": [
+            [
+              -0.004223700147122145,
+              -0.004247100092470646,
+              -0.002516800072044134
+            ],
+            [
+              0.004223499912768602,
+              0.004247100092470646,
+              0.015390800312161446
+            ]
+          ]
+        },
+        "jaw_left": {
+          "vertices": 5179,
+          "triangles": 8006,
+          "bounds_m": [
+            [
+              -0.0011241999454796314,
+              -0.00377209996804595,
+              1.5999999959603883e-05
+            ],
+            [
+              0.002724400022998452,
+              0.002138500101864338,
+              0.022199999541044235
+            ]
+          ]
+        },
+        "jaw_right": {
+          "vertices": 3541,
+          "triangles": 4806,
+          "bounds_m": [
+            [
+              -0.002725000027567148,
+              -0.002138799987733364,
+              1.5999999959603883e-05
+            ],
+            [
+              0.0011700999457389116,
+              0.0037718000821769238,
+              0.022199999541044235
+            ]
+          ]
+        }
+      },
+      "sha256": "da263e46f81c15c19e9a1f172e5bddd13f39980f12a141a468da948c2c415625",
+      "file": "dvrk_420327.usdc"
+    }
+  },
+  "omitted_placeholders": {
+    "400001": "Potts Scissors",
+    "400003": "Small Clip Applier",
+    "400007": "Round Tip Scissors",
+    "400033": "Black Diamond Micro Forceps",
+    "400035": "Round Tooth Forceps",
+    "400036": "DeBakey Forceps",
+    "400048": "Long Tip Forceps",
+    "400127": "Bowel Grasper",
+    "400178": "Curved Scissors",
+    "400181": "Resano Forceps",
+    "400189": "Double Fenestrated Grasper",
+    "400205": "Fenestrated Bipolar Forceps",
+    "400207": "Tenaculum Forceps",
+    "400208": "Thoracic Grasper",
+    "400230": "Large Clip Applier",
+    "400296": "Large Suturecut Needle Driver",
+    "420001": "Potts Scissors",
+    "420007": "Round Tip Scissors",
+    "420033": "Black Diamond Micro Forceps",
+    "420036": "DeBakey Forceps",
+    "420048": "Long Tip Forceps",
+    "420178": "Curved Scissors",
+    "420181": "Resano Forceps",
+    "420205": "Fenestrated Bipolar Forceps",
+    "420230": "Large Clip Applier",
+    "420296": "Large Suturecut Needle Driver"
+  }
+}

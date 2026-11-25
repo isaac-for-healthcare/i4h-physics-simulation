@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import warp as wp
 from helpers import find, push_actions
-from i4h_isaaclab.composition import data_dir, load_case, read_case
+from i4h_host.composition import data_dir, load_case, read_case
 from i4h_physics import Scene
 from i4h_surgical.systems.fluids.emitter import Emitter
 from i4h_surgical.systems.instruments.instrument_control import InstrumentControl

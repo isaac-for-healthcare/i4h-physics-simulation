@@ -62,13 +62,20 @@ def test_explicit_data_precedence_and_no_checkout_discovery(monkeypatch, tmp_pat
     assert resolve_data_path("${DATA}/mesh.vtu", tmp_path / "explicit") == str(tmp_path / "explicit/mesh.vtu")
 
 
-def test_missing_production_assets_explain_checkout_command(tmp_path):
+@pytest.mark.parametrize("consumer", ["case", "asset"])
+def test_missing_production_assets_explain_data_api(consumer, tmp_path):
+    from i4h_physics.config import require_asset
     from i4h_surgical import load_case
+
     with pytest.raises(FileNotFoundError) as error:
-        load_case("chole_tet_med", data=tmp_path, device="cpu")
-    assert str(tmp_path / "choly-mid") in str(error.value)
-    assert "I4H_DATA" in str(error.value)
-    assert "uv run i4h-sim CASE --data ./data" in str(error.value)
+        if consumer == "case":
+            load_case("chole_tet_med", data=tmp_path, device="cpu")
+        else:
+            require_asset(tmp_path / "missing.vtu")
+    expected = tmp_path / ("choly-mid" if consumer == "case" else "missing.vtu")
+    assert str(expected) in str(error.value)
+    assert "I4H_DATA" in str(error.value) and "data=" in str(error.value)
+    assert "i4h-sim" not in str(error.value)
 
 
 MODULE_PATH = re.compile(r"^i4h_\w+(\.\w+)*(:\w+)?$")  # "i4h_x.y" or a class path "i4h_x.y:Name"
@@ -111,7 +118,7 @@ def violations(source: str, forbidden: tuple, guarded: tuple = ()) -> list[str]:
 @pytest.mark.parametrize("member,forbidden,guarded", [
     ("surgical", ("i4h_endoluminal", "i4h_isaaclab", "i4h_standalone"), ()),
     ("endoluminal", ("i4h_surgical", "i4h_isaaclab", "i4h_standalone"), ()),
-    ("isaaclab", ("i4h_standalone",), DOMAINS),
+    ("isaaclab", ("i4h_standalone", "i4h_isaaclab_standalone"), DOMAINS),
 ])
 def test_domain_and_camera_lazy_import_boundaries(member, forbidden, guarded):
     for path in (WORKSPACE / member / "src").rglob("*.py"):
@@ -120,8 +127,8 @@ def test_domain_and_camera_lazy_import_boundaries(member, forbidden, guarded):
 
 
 @pytest.mark.parametrize("source,count", [
-    ("import i4h_standalone.devices", 1),
-    ("class_type = 'i4h_standalone.devices:I4hTeleopDevice'", 1),
+    ("import i4h_isaaclab_standalone.devices", 1),
+    ("class_type = 'i4h_isaaclab_standalone.devices:I4hTeleopDevice'", 1),
     ("m = __import__('i4h_standalone.app')", 2),  # the call and its module-path string
     ("import importlib\nm = importlib.import_module('i4h_standalone')", 2),
     ("from i4h_surgical.systems import X", 1),  # module level, unguarded
@@ -132,7 +139,7 @@ def test_domain_and_camera_lazy_import_boundaries(member, forbidden, guarded):
     ("if error.name != 'i4h_surgical':\n    raise", 0),
 ])
 def test_boundary_rules_catch_planted_violations(source, count):
-    found = violations(source, ("i4h_standalone",), DOMAINS)
+    found = violations(source, ("i4h_standalone", "i4h_isaaclab_standalone"), DOMAINS)
     assert len(found) == count, found
 
 
@@ -142,10 +149,10 @@ def test_isaaclab_root_and_lab_pin_import_without_isaac_lab_or_standalone():
 import importlib, sys
 class Block:
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.split(".")[0] in ("isaaclab", "isaaclab_newton", "isaaclab_tasks", "isaaclab_rl", "i4h_standalone"):
+        if fullname.split(".")[0] in ("isaaclab", "isaaclab_newton", "isaaclab_tasks", "isaaclab_rl", "i4h_standalone", "i4h_isaaclab_standalone"):
             raise ModuleNotFoundError(fullname, name=fullname)
 sys.meta_path.insert(0, Block())
-for name in ("i4h_isaaclab", "i4h_isaaclab.lab"):
+for name in ("i4h_isaaclab", "i4h_isaaclab.lab", "i4h_isaaclab.views", "i4h_isaaclab.camera.tiled", "i4h_isaaclab.run", "i4h_isaaclab.versius.status"):
     importlib.import_module(name)
 try:
     importlib.import_module("i4h_isaaclab.env")
@@ -215,3 +222,14 @@ else:
     raise AssertionError("a procedure case read without i4h-assessment")
 """
     subprocess.run([sys.executable, "-c", script], cwd="/tmp", check=True)
+
+
+def test_private_names_of_other_objects_are_listed():
+    """Every use of another object's underscore-prefixed name is listed with its reason, and the list has no stale entry."""
+    import runpy
+
+    checker = runpy.run_path(str(WORKSPACE / "scripts/check_private_reaches.py"))
+    errors, count = checker["verify"](WORKSPACE)
+    assert not errors, "\n".join(errors)
+    assert count
+    assert checker["reaches"](ast.parse("a._b; self._c; getattr(d, '_e'); getattr(self, '_f')\nfrom g import _h")) == {"_b", "_e", "_h"}

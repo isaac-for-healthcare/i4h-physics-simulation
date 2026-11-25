@@ -20,6 +20,7 @@ from .centerline_containment import (
     clamp_positions_delta_kernel,
     project_centerline_containment_batched_kernel,
     project_centerline_containment_kernel,
+    project_centerline_containment_per_env_kernel,
     reset_centerline_contact_kernel,
     reset_centerline_nodes_kernel,
     reset_centerline_segments_kernel,
@@ -46,6 +47,44 @@ class CenterlineDynamicsParams:
     gravity: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
 
+def _root_neighbor(edges, root: int) -> int:
+    """The node across the first edge touching ``root``, or ``-1``."""
+    for a, b in np.asarray(edges, dtype=np.int32).reshape((-1, 2)):
+        if int(a) == root:
+            return int(b)
+        if int(b) == root:
+            return int(a)
+    return -1
+
+
+def _tree_boundary(tree: CenterlineTree, params: CenterlineDynamicsParams) -> tuple[list[int], list[int]]:
+    """Fixed nodes (sorted, so the first roots the rod) and fixed segments of one tree."""
+    n_nodes = int(np.asarray(tree.positions).shape[0])
+    fixed_nodes: set[int] = set()
+    if params.root_locked:
+        fixed_nodes.add(int(tree.root))
+    if params.endpoints_locked:
+        degree = np.bincount(np.asarray(tree.edges, dtype=np.int32).reshape(-1), minlength=n_nodes)
+        fixed_nodes.update(np.flatnonzero(degree == 1).tolist())
+    fixed_segments = (
+        [int(tree.root_segment)] if params.root_locked and tree.root_segment is not None else []
+    )
+    return sorted(fixed_nodes), fixed_segments
+
+
+def _rod_material(params: CenterlineDynamicsParams) -> dict:
+    """The CosseratRod settings a centerline vessel is built with."""
+    return dict(
+        node_mass=params.node_mass,
+        seg_inertia=params.segment_inertia,
+        bend_stiffness=(params.bend_stiffness, params.bend_stiffness),
+        twist_stiffness=params.twist_stiffness,
+        fix_root_pos=False,
+        fix_root_orient=False,
+        orientation_mode="pbd",
+    )
+
+
 class CenterlineVesselRuntime:
     """Deforming centerline vessel + live tapered-tube containment.
 
@@ -60,6 +99,11 @@ class CenterlineVesselRuntime:
     contaminate one another. Vessel memory therefore scales with ``num_envs``.
     Containment still runs as a single batched launch per collision iteration,
     so cost tracks total samples rather than env count.
+
+    Envs may also hold different vessels (:meth:`from_trees`). Each env's
+    vessel then sits in a window padded to the largest one, and containment
+    searches only that env's ``edge_counts[env]`` real edges from its own entry
+    (``open_roots[env]``, ``open_root_neighbors[env]``).
     """
 
     def __init__(
@@ -81,9 +125,14 @@ class CenterlineVesselRuntime:
         collision_iterations: int = 2,
         open_root: int | None = None,
         open_root_neighbor: int | None = None,
+        edge_counts: np.ndarray | None = None,
+        open_roots: np.ndarray | None = None,
+        open_root_neighbors: np.ndarray | None = None,
     ):
         self.rod = rod
         self.tree = tree
+        self.trees = [tree]
+        self.env_tree = np.zeros(int(getattr(rod, "num_envs", 1)), dtype=np.int32)
         self.edges = edges
         self.radii = radii
         self.params = params or CenterlineDynamicsParams()
@@ -103,15 +152,7 @@ class CenterlineVesselRuntime:
 
         root = int(tree.root) if open_root is None else int(open_root)
         if open_root_neighbor is None:
-            neighbor = -1
-            for a, b in np.asarray(tree.edges, dtype=np.int32):
-                if int(a) == root:
-                    neighbor = int(b)
-                    break
-                if int(b) == root:
-                    neighbor = int(a)
-                    break
-            open_root_neighbor = neighbor
+            open_root_neighbor = _root_neighbor(tree.edges, root)
         self.open_root = int(root)
         self.open_root_neighbor = int(open_root_neighbor)
 
@@ -137,7 +178,26 @@ class CenterlineVesselRuntime:
                 f"nodes_per_env {self.nodes_per_env} x num_envs {self.num_envs}"
             )
 
+        # Per-env vessel extents. A uniform batch has every edge of every window
+        # real and one shared entry; a padded batch says otherwise per env.
+        self.per_env_vessels = (
+            edge_counts is not None
+            or open_roots is not None
+            or open_root_neighbors is not None
+            or not bool(getattr(rod, "uniform_topology", True))
+        )
+        self.edge_counts = self._per_env_ints(edge_counts, self.edges_per_env, "edge_counts")
+        if np.any(self.edge_counts < 0) or np.any(self.edge_counts > self.edges_per_env):
+            raise ValueError(f"edge_counts must lie in [0, {self.edges_per_env}]")
+        self.open_roots = self._per_env_ints(open_roots, self.open_root, "open_roots")
+        self.open_root_neighbors = self._per_env_ints(
+            open_root_neighbors, self.open_root_neighbor, "open_root_neighbors"
+        )
+
         device = rod.device
+        self._edge_counts_wp = wp.array(self.edge_counts, dtype=wp.int32, device=device)
+        self._open_roots_wp = wp.array(self.open_roots, dtype=wp.int32, device=device)
+        self._open_root_neighbors_wp = wp.array(self.open_root_neighbors, dtype=wp.int32, device=device)
         self._step_start = wp.zeros(rod.n_nodes, dtype=wp.vec3, device=device)
         self._vessel_corrections = wp.zeros(rod.n_nodes, dtype=wp.vec3, device=device)
         self._vessel_counts = wp.zeros(rod.n_nodes, dtype=wp.float32, device=device)
@@ -166,6 +226,7 @@ class CenterlineVesselRuntime:
         collision_radius_scale: float = 1.0,
         num_envs: int = 1,
         env_positions: np.ndarray | None = None,
+        env_radii: np.ndarray | None = None,
         **kwargs,
     ) -> "CenterlineVesselRuntime":
         """Build a Cosserat centerline vessel from a :class:`CenterlineTree`.
@@ -179,7 +240,11 @@ class CenterlineVesselRuntime:
                 so two-way contact in one env cannot move another env's wall.
             env_positions: Optional ``(num_envs, n_nodes, 3)`` per-env node
                 positions, for anatomy that varies across envs. Defaults to
-                replicating ``tree.positions``. Topology is always shared.
+                replicating ``tree.positions``. Topology is always shared; use
+                :meth:`from_trees` for envs whose vessel trees differ.
+            env_radii: Optional ``(num_envs, n_nodes)`` per-env lumen radii,
+                before ``collision_radius_scale``. Defaults to replicating
+                ``tree.radii``.
         """
         params = params or CenterlineDynamicsParams()
         num_envs = int(num_envs)
@@ -197,47 +262,33 @@ class CenterlineVesselRuntime:
         edges = [tuple(map(int, e)) for e in np.asarray(tree.edges, dtype=np.int32)]
 
         n_nodes = int(np.asarray(tree.positions).shape[0])
-        fixed_nodes: set[int] = set()
-        if params.root_locked:
-            fixed_nodes.add(int(tree.root))
-        if params.endpoints_locked:
-            degree = np.bincount(
-                np.asarray(tree.edges, dtype=np.int32).reshape(-1),
-                minlength=n_nodes,
-            )
-            fixed_nodes.update(np.flatnonzero(degree == 1).tolist())
-        fixed_segments = (
-            [int(tree.root_segment)]
-            if params.root_locked and tree.root_segment is not None
-            else []
-        )
+        fixed_nodes, fixed_segments = _tree_boundary(tree, params)
 
         rod = CosseratRod(
             positions,
             device,
             edges=edges,
-            node_mass=params.node_mass,
-            seg_inertia=params.segment_inertia,
-            bend_stiffness=(params.bend_stiffness, params.bend_stiffness),
-            twist_stiffness=params.twist_stiffness,
-            fixed_nodes=sorted(fixed_nodes),
+            fixed_nodes=fixed_nodes,
             fixed_segments=fixed_segments,
-            fix_root_pos=False,
-            fix_root_orient=False,
-            orientation_mode="pbd",
             num_envs=num_envs,
+            **_rod_material(params),
         )
-        radii_np = np.maximum(
-            np.asarray(tree.radii, dtype=np.float32) * float(collision_radius_scale),
-            1.0e-6,
-        )
+        if env_radii is None:
+            radii_np = np.tile(np.asarray(tree.radii, dtype=np.float32), num_envs)
+        else:
+            radii_np = np.asarray(env_radii, dtype=np.float32)
+            if radii_np.shape != (num_envs, n_nodes):
+                raise ValueError(
+                    f"env_radii must have shape ({num_envs}, {n_nodes}), got {radii_np.shape}"
+                )
+            radii_np = radii_np.reshape(-1)
+        radii_np = np.maximum(radii_np * float(collision_radius_scale), 1.0e-6)
         # Edges carry global node indices and radii are per global node, so the
         # batched containment kernel can address each env's vessel directly.
         edges_np = np.asarray(tree.edges, dtype=np.int32)
         if num_envs > 1:
             node_off = (np.arange(num_envs, dtype=np.int32) * n_nodes)[:, None, None]
             edges_np = (edges_np[None, :, :] + node_off).reshape((-1, 2))
-            radii_np = np.tile(radii_np, num_envs)
         edges_wp = wp.array(edges_np, dtype=wp.vec2i, device=device)
         radii_wp = wp.array(radii_np, dtype=wp.float32, device=device)
         return cls(
@@ -248,6 +299,101 @@ class CenterlineVesselRuntime:
             params=params,
             **kwargs,
         )
+
+    @classmethod
+    def from_trees(
+        cls,
+        trees,
+        device: str = "cuda:0",
+        *,
+        env_trees=None,
+        params: CenterlineDynamicsParams | None = None,
+        collision_radius_scale: float = 1.0,
+        **kwargs,
+    ) -> "CenterlineVesselRuntime":
+        """Build a batch in which envs hold different vessel trees.
+
+        Each env's vessel is padded to the largest tree's node and edge counts,
+        so the batch keeps one fixed-stride layout and a single containment
+        launch per collision iteration. Padding is inert: padded nodes carry
+        zero inverse mass and padded edges are never searched.
+
+        Args:
+            trees: The distinct :class:`CenterlineTree` anatomies.
+            device: Warp device string.
+            env_trees: Index into ``trees`` for each env, which also sets the
+                env count. Defaults to one env per tree.
+            params: Material / boundary-condition knobs shared by every env.
+            collision_radius_scale: Multiplier on every tree's lumen radii.
+            **kwargs: Forwarded to the constructor (contact settings). Per-env
+                entries are derived from each tree, so ``open_root`` and
+                ``open_root_neighbor`` are not accepted.
+        """
+        trees = list(trees)
+        if not trees:
+            raise ValueError("from_trees needs at least one tree")
+        for key in ("num_envs", "env_positions", "env_radii", "open_root", "open_root_neighbor",
+                    "edge_counts", "open_roots", "open_root_neighbors"):
+            if key in kwargs:
+                raise TypeError(f"from_trees derives {key!r} from the trees; do not pass it")
+        env_trees = (
+            np.arange(len(trees), dtype=np.int32)
+            if env_trees is None
+            else np.asarray(env_trees, dtype=np.int32).reshape(-1)
+        )
+        if env_trees.size == 0 or env_trees.min() < 0 or env_trees.max() >= len(trees):
+            raise ValueError(f"env_trees must index into the {len(trees)} trees")
+        params = params or CenterlineDynamicsParams()
+
+        env_list = [trees[int(i)] for i in env_trees]
+        boundaries = [_tree_boundary(tree, params) for tree in trees]
+        rod = CosseratRod.from_envs(
+            [np.asarray(tree.positions, dtype=np.float32) for tree in env_list],
+            device,
+            env_edges=[[tuple(map(int, e)) for e in np.asarray(tree.edges, dtype=np.int32)] for tree in env_list],
+            env_fixed_nodes=[boundaries[int(i)][0] for i in env_trees],
+            env_fixed_segments=[boundaries[int(i)][1] for i in env_trees],
+            **_rod_material(params),
+        )
+
+        # Vessel edges are the rod's segments in the same order, so the rod's
+        # padded window (degenerate edges on the env's root) is reused as is.
+        nodes, segments = rod.n_nodes_per_env, rod.n_seg_per_env
+        edges_np = np.stack([rod.seg_n0.numpy(), rod.seg_n1.numpy()], axis=1).astype(np.int32)
+        radii_np = np.empty((len(env_list), nodes), dtype=np.float32)
+        for env, tree in enumerate(env_list):
+            radii = np.asarray(tree.radii, dtype=np.float32).reshape(-1)
+            radii_np[env, : len(radii)] = radii
+            radii_np[env, len(radii):] = radii[int(rod.env_roots[env])]
+        radii_np = np.maximum(radii_np.reshape(-1) * float(collision_radius_scale), 1.0e-6)
+        if edges_np.shape[0] != segments * len(env_list):
+            raise ValueError("vessel trees without edges cannot be batched")
+
+        runtime = cls(
+            rod,
+            env_list[0],
+            edges=wp.array(edges_np, dtype=wp.vec2i, device=device),
+            radii=wp.array(radii_np, dtype=wp.float32, device=device),
+            params=params,
+            edge_counts=rod.env_segment_counts,
+            open_roots=np.asarray([int(tree.root) for tree in env_list], dtype=np.int32),
+            open_root_neighbors=np.asarray(
+                [_root_neighbor(tree.edges, int(tree.root)) for tree in env_list], dtype=np.int32
+            ),
+            **kwargs,
+        )
+        runtime.trees = trees
+        runtime.env_tree = env_trees
+        return runtime
+
+    def _per_env_ints(self, values, default: int, name: str) -> np.ndarray:
+        """``values`` as one int32 per env, or ``default`` replicated."""
+        if values is None:
+            return np.full(self.num_envs, int(default), dtype=np.int32)
+        values = np.asarray(values, dtype=np.int32).reshape(-1)
+        if values.shape != (self.num_envs,):
+            raise ValueError(f"{name} must have one entry per env ({self.num_envs}), got {values.shape}")
+        return values.copy()
 
     # --------------------------------------------------------------- buffers
     def _ensure_catheter_buffers(self, num_points: int, device: str) -> None:
@@ -314,7 +460,8 @@ class CenterlineVesselRuntime:
         edges_np = self.edges.numpy()
         if self.num_envs > 1:
             begin = self._skin_env * self.edges_per_env
-            edges_np = edges_np[begin : begin + self.edges_per_env] - self._skin_env * self.nodes_per_env
+            count = int(self.edge_counts[self._skin_env])
+            edges_np = edges_np[begin : begin + count] - self._skin_env * self.nodes_per_env
             device = self.rod.device
             self._skin_x = wp.zeros(self.nodes_per_env, dtype=wp.vec3, device=device)
             self._skin_q = wp.zeros(max(self.segments_per_env, 1), dtype=wp.quat, device=device)
@@ -435,8 +582,11 @@ class CenterlineVesselRuntime:
             self._vessel_corrections.zero_()
             self._vessel_counts.zero_()
             if num_envs > 1:
+                per_env = self.per_env_vessels
                 wp.launch(
-                    project_centerline_containment_batched_kernel,
+                    project_centerline_containment_per_env_kernel
+                    if per_env
+                    else project_centerline_containment_batched_kernel,
                     dim=sample_dim,
                     inputs=[
                         catheter_predicted,
@@ -448,8 +598,13 @@ class CenterlineVesselRuntime:
                         self.rod.inv_mass,
                         int(self.nodes_per_env),
                         int(self.edges_per_env),
-                        int(self.open_root),
-                        int(self.open_root_neighbor),
+                    ]
+                    + (
+                        [self._edge_counts_wp, self._open_roots_wp, self._open_root_neighbors_wp]
+                        if per_env
+                        else [int(self.open_root), int(self.open_root_neighbor)]
+                    )
+                    + [
                         float(self.catheter_radius),
                         float(self.max_distance),
                         float(self.interior_deadband),

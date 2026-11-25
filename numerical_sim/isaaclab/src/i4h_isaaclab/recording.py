@@ -66,6 +66,33 @@ def action_layout(sim) -> list:
     return [[s.id, int(v.shape[1]), targets(s)] for s, v in zip(controls(sim), action_views(sim))]
 
 
+def append_sample(episode, key, value, clone=True):
+    """Accumulate samples through EpisodeData.data, shared by qualified Lab main and 3.0.
+
+    Lab main's EpisodeData is now a tensor container; the host recorder owns collection.
+    Keep the original nested keys, clone semantics and leading sample dimension.
+    """
+    if isinstance(value, dict):
+        for name, sample in value.items():
+            append_sample(episode, f"{key}/{name}", sample, clone=clone)
+        return
+    data = episode.data
+    keys = key.split("/")
+    for name in keys[:-1]:
+        data = data.setdefault(name, {})
+    stored = value.clone() if clone and isinstance(value, torch.Tensor) else value
+    data.setdefault(keys[-1], []).append(stored)
+
+
+def stack_samples(data):
+    """Finalize the same tensor tree formerly produced by EpisodeData.pre_export()."""
+    for key, value in data.items():
+        if isinstance(value, dict):
+            stack_samples(value)
+        elif isinstance(value, list):
+            data[key] = torch.stack(value)
+
+
 class Recorder:
     def __init__(self, path, teleop, record_camera: bool = False):
         from i4h_isaaclab.views import state_names
@@ -89,7 +116,7 @@ class Recorder:
         cfg = u.cfg
         self.handler.add_env_args({
             "format_version": FORMAT_VERSION, "case": str(cfg.case), "data_root": root,
-            "case_yaml": yaml.safe_dump(unresolve_data_path(u._case, root), sort_keys=False),
+            "case_yaml": yaml.safe_dump(unresolve_data_path(u.resolved_case, root), sort_keys=False),
             "backend": cfg.backend, "num_envs": int(u.num_envs), "decimation": int(cfg.decimation),
             "physics_dt": float(u.physics_dt), "workspace": float(cfg.workspace), "observe": str(cfg.observe),
             "camera": int(cfg.camera), "camera_mode": str(cfg.camera_mode), "episode_length_s": float(cfg.episode_length_s),
@@ -115,7 +142,7 @@ class Recorder:
             self.teleop.reset()
         self.episode = EpisodeData()
         self.episode.seed = int(self.u.cfg.seed)
-        self.episode.add("initial_episode_length", self.u.episode_length_buf[0:1].clone())
+        append_sample(self.episode, "initial_episode_length", self.u.episode_length_buf[0:1].clone())
 
     def record(self, obs: dict) -> None:
         """One step, after ``teleop.step()``: the action it applied and ``obs``, the observation that step returned."""
@@ -124,24 +151,24 @@ class Recorder:
             return
         u = self.u
         action = self.teleop.physical[0]
-        ep.add("actions", action)
-        ep.add("actions_normalized", torch.clamp((action - u._mid) / u._half, -1.0, 1.0), clone=False)
-        ep.add("obs/policy", obs["policy"][0])
+        append_sample(ep, "actions", action)
+        append_sample(ep, "actions_normalized", torch.clamp((action - u.action_mid) / u.action_half, -1.0, 1.0), clone=False)
+        append_sample(ep, "obs/policy", obs["policy"][0])
         if self.record_camera:
             for key in ("rgb", "depth"):
                 if key in obs:
-                    ep.add(f"obs/{key}", obs[key][0])
+                    append_sample(ep, f"obs/{key}", obs[key][0])
         for name, view in zip(self.state_names, u.state_views):
-            ep.add(f"states/{name}", view[0])
+            append_sample(ep, f"states/{name}", view[0])
         for dev, st in self.teleop.devices.states.items():
-            ep.add(f"devices/{dev}", {"position": torch.tensor(np.asarray(st.position, np.float32)),
+            append_sample(ep, f"devices/{dev}", {"position": torch.tensor(np.asarray(st.position, np.float32)),
                                       "rotation": torch.tensor(np.asarray(st.rotation, np.float32)),
                                       "grip": torch.tensor([float(st.grip)]),
                                       "buttons": torch.tensor([float(st.buttons.get(b, False)) for b in ("grab", "secondary", "fire")])},
                    clone=False)
         if self.tool_force is not None:
-            ep.add("haptics/force", wp.to_torch(self.tool_force.force)[0])
-            ep.add("haptics/jaw_load", wp.to_torch(self.tool_force.jaw_load)[0])
+            append_sample(ep, "haptics/force", wp.to_torch(self.tool_force.force)[0])
+            append_sample(ep, "haptics/jaw_load", wp.to_torch(self.tool_force.jaw_load)[0])
 
     def end(self, success: bool) -> str | None:
         """Write the episode (``demo_N``, returned) with its ``success`` flag; an empty episode writes nothing."""
@@ -149,7 +176,7 @@ class Recorder:
         if ep is None or ep.is_empty():
             return None
         ep.success = bool(success)
-        ep.pre_export()
+        stack_samples(ep.data)
         name = f"demo_{self.handler.get_num_episodes()}"
         self.handler.write_episode(ep)
         self.handler.flush()
@@ -192,30 +219,35 @@ def env_cfg_from_recording(env_args: dict, overrides: dict | None = None, *, dat
     """An ``I4hEnvCfg`` that rebuilds the recorded env: the recorded case YAML (``${DATA}`` resolved against ``data`` or
     the current ``I4H_DATA``; written to ``workdir`` or a temporary directory, so ``cfg.case`` stays a path) and every
     recorded setting, physical actions. ``overrides`` (None values ignored) replace recorded settings; one that changes
-    the dynamics (``DYNAMICS``) warns. A recording without ``format_version`` keeps only its case name and decimation
-    (with a warning)."""
+    the dynamics (``DYNAMICS``) warns. Explicit legacy ``i4h`` backend metadata maps to
+    the Newton host path; incomplete action metadata is rejected."""
     import tempfile
 
     from i4h_isaaclab.env import I4hEnvCfg
     from i4h_physics.config import resolve_data_path
 
     overrides = {k: v for k, v in (overrides or {}).items() if v is not None}
-    if "format_version" not in env_args:
-        warnings.warn("a recording without format_version: only its case name and decimation are restored, the replay "
-                      "may differ", DeprecationWarning, stacklevel=2)
-        values = {"case": env_args["case"], "decimation": int(env_args["decimation"])} | overrides
-    else:
-        case = resolve_data_path(yaml.safe_load(env_args["case_yaml"]), data)
-        folder = Path(workdir) if workdir is not None else Path(tempfile.mkdtemp(prefix="i4h-replay-"))
-        path = folder / "recorded_case.yaml"
-        path.write_text(yaml.safe_dump(case, sort_keys=False))
-        values = {k: env_args[k] for k in RECORDED} | {"case": str(path)}
-        for key, value in overrides.items():
-            recorded = env_args["case"] if key == "case" else values.get(key)
-            if key in DYNAMICS and value != recorded:
-                warnings.warn(f"replay override {key}={value!r} differs from the recording ({recorded!r}): the "
-                              "trajectory will differ", RuntimeWarning, stacklevel=2)
-            values[key] = value
+    required = {*RECORDED, "format_version", "case", "case_yaml", "action_layout", "action_mode"}
+    missing = required - env_args.keys()
+    if missing:
+        raise ValueError(f"recording has insufficient metadata to preserve action identity: missing {sorted(missing)}")
+    if env_args["format_version"] != FORMAT_VERSION or env_args["action_mode"] != "physical":
+        raise ValueError("unsupported recording format_version or action_mode")
+    if env_args["backend"] not in ("newton", "i4h"):
+        raise ValueError(f"unsupported recorded backend {env_args['backend']!r}")
+    if overrides.get("backend", "newton") != "newton":
+        raise ValueError("only the newton host path is supported")
+    case = resolve_data_path(yaml.safe_load(env_args["case_yaml"]), data)
+    folder = Path(workdir) if workdir is not None else Path(tempfile.mkdtemp(prefix="i4h-replay-"))
+    path = folder / "recorded_case.yaml"
+    path.write_text(yaml.safe_dump(case, sort_keys=False))
+    values = {k: env_args[k] for k in RECORDED} | {"case": str(path), "backend": "newton"}
+    for key, value in overrides.items():
+        recorded = env_args["case"] if key == "case" else values.get(key)
+        if key in DYNAMICS and value != recorded:
+            warnings.warn(f"replay override {key}={value!r} differs from the recording ({recorded!r}): the "
+                          "trajectory will differ", RuntimeWarning, stacklevel=2)
+        values[key] = value
     cfg = I4hEnvCfg(case=str(values.pop("case")), action_mode="physical", gravity_from_case=True)
     if "physics_dt" in values:
         cfg.sim.dt = float(values.pop("physics_dt"))
@@ -232,7 +264,9 @@ def env_cfg_from_recording(env_args: dict, overrides: dict | None = None, *, dat
 
 def check_replay_compatible(u, env_args: dict) -> None:
     """Raise when the env's action row is not laid out as recorded; warn when its dynamics settings differ."""
-    if "action_layout" in env_args and action_layout(u.simulator) != env_args["action_layout"]:
+    if "action_layout" not in env_args:
+        raise ValueError("recording has insufficient action layout metadata")
+    if action_layout(u.simulator) != env_args["action_layout"]:
         raise ValueError(f"the env's action layout {action_layout(u.simulator)} differs from the recording's "
                          f"{env_args['action_layout']}: the recorded rows would drive the wrong columns")
     live = {"decimation": int(u.cfg.decimation), "physics_dt": float(u.physics_dt), "workspace": float(u.cfg.workspace),

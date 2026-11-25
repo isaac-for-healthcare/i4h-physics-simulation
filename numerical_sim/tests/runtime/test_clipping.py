@@ -3,13 +3,14 @@
 
 """M4 centrelines and clipping on the chole data: loader, tracker, attach on the fire edge, pinch that holds, masked reset."""
 
+
 import os
 
 import numpy as np
 import pytest
 import warp as wp
 from helpers import CHOLE, find
-from i4h_isaaclab.composition import load_case
+from i4h_host.composition import load_case
 from i4h_physics import Scene
 from i4h_surgical.loaders.tet_bundle import add_tet_bundle
 from i4h_surgical.systems.instruments.clipping import Clipping
@@ -18,17 +19,21 @@ from i4h_surgical.systems.mechanics.centreline import Centreline
 
 pytestmark = pytest.mark.skipif(not os.environ.get("I4H_DATA") and (not CHOLE.is_dir()), reason=f"chole data not found at {CHOLE}")
 
+
 PARTS = {"liver": {"spring": 1.0, "volume": 1.0}, "fat": {"spring": 0.1, "volume": 0.1}, "gallbladder": {"spring": 0.8, "volume": 0.1}}
+
+
 LINES = [{"name": "cystic_artery", "path": "centrelines/cystic_artery.cntr", "part": "gallbladder"},
          {"name": "cystic_duct", "path": "centrelines/cystic_duct.cntr", "part": "gallbladder"}]
 
 
 def ring_radius(scene, body, centreline, env, node):
-    """Mean distance of a node's live clamp particles from their centroid."""
+    """Mean distance of a node's live clamp particles from their centroid (in float64: a float32 mean leaves about one
+    ulp of the coordinates, ~5e-7 here, on a ring collapsed onto its centroid)."""
     c = body.centrelines
     v = body.variant_of_env[env]
     ids = c.clamp[v, c.clamp_start[v, node] : c.clamp_start[v, node] + c.clamp_count[v, node]]
-    q = scene.view(scene.q, body).numpy()[env][ids]
+    q = scene.view(scene.q, body).numpy()[env][ids].astype(np.float64)
     return float(np.linalg.norm(q - q.mean(axis=0), axis=1).mean())
 
 
@@ -48,8 +53,32 @@ def test_centreline_loader():
         add_tet_bundle(Scene("cuda:0", 1), "t", str(CHOLE), PARTS, centrelines=[{**LINES[0], "part": "spleen"}])
 
 
-def test_tracker_and_clip():
+@pytest.fixture
+def retain_clipping_failure(request, tmp_path):
+    def retain(sim):
+        request.node._clipping_sim = sim
+    yield retain
+    report = getattr(request.node, "rep_call", None)
+    sim = getattr(request.node, "_clipping_sim", None)
+    if report is not None and report.failed and sim is not None:
+        arrays = {"scene/q": sim.scene.q.numpy()}
+        for system in sim.systems:
+            if isinstance(system, (InstrumentControl, Centreline, Clipping)):
+                for key, value in vars(system).items():
+                    if isinstance(value, wp.array):
+                        arrays[f"{system.id}/{key}"] = value.numpy()
+        body = sim.scene.body("tissue")
+        for key, value in vars(body.centrelines).items():
+            if isinstance(value, np.ndarray):
+                arrays[f"centreline_host/{key}"] = value
+        path = tmp_path / "clipping-failure.npz"
+        np.savez_compressed(path, **arrays)
+        print(f"retained clipping endpoint arrays: {path}")
+
+
+def test_tracker_and_clip(retain_clipping_failure):
     sim = load_case("chole_tet_med", envs=2)
+    retain_clipping_failure(sim)
     scene, body = sim.scene, sim.scene.body('tissue')
     control, centreline, clipping = find(sim, InstrumentControl), find(sim, Centreline), find(sim, Clipping)
     ka = clipping.k  # the applier's instrument index
@@ -78,7 +107,9 @@ def test_tracker_and_clip():
         actions[0, ka, :3] = centreline.positions.numpy()[0, node]
         control.actions.assign(actions)
         sim.step()
-    before = ring_radius(scene, body, centreline, 0, node)
+    # the open rings, before the fire step: hold_clips pinches from the step that attaches the clip on (lumen 0,
+    # stiffness 1 in every iteration), so a ring measured after it is already closed, fully on some GPUs (NVBug 6940611)
+    open_rings = {int(k): ring_radius(scene, body, centreline, 0, k) for k in duct}
     root = control.root.numpy()[0, ka]
     gap = float(np.linalg.norm(root - centreline.positions.numpy()[0, node]))
     assert gap < 0.25, f"the root stayed {gap:.3f} from the node"
@@ -89,7 +120,7 @@ def test_tracker_and_clip():
     assert clipping.count.numpy().tolist() == [1, 0]  # env 1's applier is not within reach of any duct node
     node = int(clipping.node.numpy()[0, 0])  # the nearest duct node at that moment
     assert c.line[node] == 1 and clipping.clipped.numpy()[0, node] == 1 and clipping.clipped.numpy()[1].max() == 0
-    before = ring_radius(scene, body, centreline, 0, node)
+    before = open_rings[node]
     for _ in range(30):  # fire held: no second clip (edge), the ring pinches
         control.actions.assign(actions)
         sim.step()
@@ -97,17 +128,35 @@ def test_tracker_and_clip():
     after = ring_radius(scene, body, centreline, 0, node)
     assert after < 0.35 * before, (before, after)
     others = [k for k in duct if abs(k - node) > 2]
-    assert ring_radius(scene, body, centreline, 0, others[0]) > 0.6 * before  # neighbours keep their lumen
+    assert ring_radius(scene, body, centreline, 0, others[0]) > 0.6 * open_rings[int(others[0])]  # neighbours keep their lumen
     actions[:, ka, 9] = 0.0
     for _ in range(60):  # the clip holds while the tissue keeps sagging
         control.actions.assign(actions)
         sim.step()
     assert ring_radius(scene, body, centreline, 0, node) < 0.35 * before and np.isfinite(scene.q.numpy()).all()
-    # a second press takes the next nearest node
+    # NVBug 7011011: after sagging, the next live duct node can be outside the
+    # unchanged reach. Reposition through actions as before the first press.
+    candidates = duct[(clipping.eligible.numpy()[duct] != 0)
+                      & (clipping.clipped.numpy()[0, duct] == 0)
+                      & (centreline.active_count.numpy()[0, duct] > 0)]
+    assert candidates.size, "no unclipped live duct node remains for the second press"
+    distances = np.linalg.norm(centreline.positions.numpy()[0, candidates] - control.root.numpy()[0, ka], axis=1)
+    next_node = int(candidates[np.argmin(distances)])
+    for _ in range(90):
+        actions[0, ka, :3] = centreline.positions.numpy()[0, next_node]
+        control.actions.assign(actions)
+        sim.step()
+    gap = float(np.linalg.norm(control.root.numpy()[0, ka] - centreline.positions.numpy()[0, next_node]))
+    reach = float(clipping.reach.numpy()[0])
+    assert gap < reach, f"second press: node {next_node} is {gap:.6f} from the root, reach {reach:.6f}"
+    assert clipping.eligible.numpy()[next_node] and centreline.active_count.numpy()[0, next_node] > 0
+    assert clipping.clipped.numpy()[0, next_node] == 0
+    assert clipping.count.numpy().tolist() == [1, 0] and sim.graph is graph
+    # A new fire edge takes a different node; repositioning alone must not clip.
     actions[0, ka, 9] = 1.0
     control.actions.assign(actions)
     sim.step()
-    assert clipping.count.numpy()[0] == 2 and clipping.node.numpy()[0, 1] != node and clipping.clipped.numpy()[0].sum() == 2
+    assert clipping.count.numpy().tolist() == [2, 0] and clipping.node.numpy()[0, 1] != node and clipping.clipped.numpy()[0].sum() == 2
     # masked reset of env 1 leaves env 0's clips; of env 0 clears them
     sim.reset([1])
     assert clipping.count.numpy().tolist() == [2, 0]
@@ -125,6 +174,71 @@ def test_clipping_structural():
         sim.step()
     with pytest.raises(ValueError, match="fixed at construction"):
         sim.prepare()
+
+
+def test_cache_refresh_tracks_host_edits_without_restoring_history():
+    """Clipping reads the tracker before step_end; host edits must be visible at reset(flags=0)."""
+    sim = load_case("chole_tet_med", envs=2, device="cpu")
+    scene, body = sim.scene, sim.scene.body("tissue")
+    tracker = find(sim, Centreline)
+    control, clipping = find(sim, InstrumentControl), find(sim, Clipping)
+    before = tracker.positions.numpy().copy()
+    counts = tracker.active_count.numpy().copy()
+    q = scene.field("q", body)
+    moved = q.numpy()
+    shift = np.float32([1.0, 2.0, 3.0])
+    moved += shift
+    q.assign(moved)
+    flags = scene.field("flags", body)
+    alive = flags.numpy()
+    c = body.centrelines
+    dead_ring = c.clamp[0, c.clamp_start[0, 0]:c.clamp_start[0, 0] + c.clamp_count[0, 0]]
+    alive[0, dead_ring] = 0
+    flags.assign(alive)
+    history = [scene.q_prev, control.actions, control.sphere_q_prev, clipping.node, clipping.count]
+    saved = [a.numpy().copy() for a in history]
+    empty = wp.zeros(3, dtype=wp.bool, device=scene.device)
+    selected = wp.array([True, False, False], dtype=wp.bool, device=scene.device)
+    sim.solver.reset(sim.state, empty, flags=0)
+    np.testing.assert_array_equal(tracker.positions.numpy(), before)
+    np.testing.assert_array_equal(tracker.active_count.numpy(), counts)
+    for _ in range(2):
+        sim.solver.reset(sim.state, selected, flags=0)
+        # The other vessel has disjoint clamp particles; an entirely removed ring keeps its last position.
+        duct = int(np.flatnonzero(c.line == 1)[0])
+        np.testing.assert_allclose(tracker.positions.numpy()[0, duct], before[0, duct] + shift, atol=1e-6)
+        np.testing.assert_array_equal(tracker.positions.numpy()[0, 0], before[0, 0])
+        assert tracker.active_count.numpy()[0, 0] == 0
+        np.testing.assert_array_equal(tracker.positions.numpy()[1], before[1])
+        np.testing.assert_array_equal(tracker.active_count.numpy()[1], counts[1])
+        np.testing.assert_array_equal(q.numpy(), moved)
+        np.testing.assert_array_equal(flags.numpy(), alive)
+        for a, expected in zip(history, saved):
+            np.testing.assert_array_equal(a.numpy(), expected)
+
+
+def test_centreline_binding_uses_current_host_positions():
+    import newton
+    from i4h_host.composition import maps, read_case
+    from i4h_physics import author_case
+
+    cfg, loaders, systems = maps(read_case("chole_tet_med"))
+    authoring = author_case(cfg, loaders, systems, device="cpu", envs=1)
+    builder = newton.ModelBuilder()
+    builder.begin_world()
+    authoring.add_world(builder, 0)
+    builder.end_world()
+    authoring.complete(builder)
+    model = builder.finalize(device="cpu")
+    model.set_gravity(authoring.scene.gravity_vector)
+    state, control = model.state(), model.control()
+    state.particle_q.fill_(wp.vec3(2.0, 3.0, 4.0))
+    before = state.particle_q.numpy().copy()
+    scene, bound = authoring.bind(model, state, control)
+    tracker = next(s for s in bound if isinstance(s, Centreline))
+    np.testing.assert_array_equal(state.particle_q.numpy(), before)
+    np.testing.assert_array_equal(tracker.positions.numpy(), np.broadcast_to([2.0, 3.0, 4.0], tracker.positions.numpy().shape))
+    assert not np.array_equal(scene.q.numpy(), scene.q0.numpy())
 
 
 def test_clip_attaches_before_the_first_substep():
@@ -153,44 +267,3 @@ def test_clip_attaches_before_the_first_substep():
     control.actions.assign(actions)
     sim.step()  # the press right after the reset counts
     assert clipping.count.numpy().tolist() == [1, 0]
-
-
-def test_clip_mesh_kernel_places_a_torus_on_the_node():
-    """``place_clip_mesh`` on the CPU: an active slot is a ring around its node in the plane normal to the vessel tangent,
-    an inactive slot collapses to the node."""
-    from i4h_standalone.render.clips import place_clip_mesh, torus
-
-    dev = wp.get_device("cpu")
-    centre, tube, faces = torus()
-    V = len(centre)
-    assert faces.min() == 0 and faces.max() == V - 1 and len(faces) == 2 * V
-    positions = wp.array(np.float32([[[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.2, 0.0, 0.0]]]), dtype=wp.vec3, device=dev)  # (1, 3) along +x
-    node = wp.array(np.int32([[1, -1]]), dtype=wp.int32, device=dev)
-    active = wp.array(np.int32([[1, 0]]), dtype=wp.int32, device=dev)
-    line = wp.zeros(3, dtype=wp.int32, device=dev)
-    out, normals = (wp.zeros(2 * V, dtype=wp.vec3, device=dev) for _ in range(2))
-    wp.launch(place_clip_mesh, dim=2 * V,
-              inputs=[wp.array(centre, dtype=wp.vec3, device=dev), wp.array(tube, dtype=wp.vec3, device=dev), node, active, positions, line, 0, 0.1, 0.03],
-              outputs=[out, normals], device=dev)
-    p, n = out.numpy().reshape(2, V, 3), normals.numpy().reshape(2, V, 3)
-    np.testing.assert_allclose(p[0].mean(axis=0), [0.1, 0.0, 0.0], atol=1e-6)
-    d = np.linalg.norm(p[0] - [0.1, 0.0, 0.0], axis=1)
-    assert d.min() >= 0.07 - 1e-6 and d.max() <= 0.13 + 1e-6
-    assert np.abs(p[0][:, 0] - 0.1).max() <= 0.03 + 1e-6  # the ring plane is perpendicular to the tangent (x)
-    assert np.allclose(np.linalg.norm(n[0], axis=1), 1.0, atol=1e-6)
-    assert np.allclose(p[1], [0.0, 0.0, 0.0])  # slot 1 inactive: collapsed onto node max(-1, 0)
-
-
-def test_snapshot_carries_clip_slots_and_centreline_positions():  # the module skips without chole
-    from i4h_standalone.render.snapshots import Snapshot, Snapshots
-
-    sim = load_case("chole_tet_med", envs=2)
-    clipping, centreline = find(sim, Clipping), find(sim, Centreline)
-    live = Snapshot(sim)
-    node, active = live.clip[clipping]
-    assert node.ptr == clipping.node.ptr and active.ptr == clipping.active.ptr and live.centreline[centreline].ptr == centreline.positions.ptr
-    assert live.arrays.index(node) < live.arrays.index(active) < live.arrays.index(live.centreline[centreline])
-    ring = Snapshots(sim)
-    slot = ring.slots[0]
-    assert len(slot.arrays) == len(live.arrays) and all(a.shape == b.shape and a.ptr != b.ptr for a, b in zip(slot.arrays, live.arrays))
-    assert slot.clip[clipping][0].shape == clipping.node.shape and slot.centreline[centreline].shape == centreline.positions.shape
