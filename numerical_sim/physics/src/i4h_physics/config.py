@@ -173,13 +173,19 @@ def build_systems(scene: Scene, cfg: dict, *, constructors=None) -> list:
 
 
 def check_particles(scene: Scene, systems: list) -> None:
-    """Exactly one ``particles`` system integrates the main block: with none, the other systems' bodies never move;
-    with two, gravity and the velocity update run twice per substep. A case with no systems at all is a static
-    scene."""
+    """Integrate every main body exactly once, globally or through disjoint body systems.
+
+    A case with no systems at all is a static scene.
+    """
     from i4h_physics.systems.mechanics.particles import Particles
 
     ids = [s.id for s in systems if isinstance(s, Particles)]
-    if len(ids) > 1:
+    particles = [s for s in systems if isinstance(s, Particles)]
+    if len(ids) > 1 and any(s.body is None for s in particles):
         raise ValueError(f"the case has {len(ids)} particles systems {ids}; exactly one integrates the main block")
+    if particles and all(s.body is not None for s in particles):
+        names = [s.body.name for s in particles]
+        if len(names) != len(set(names)) or set(names) != {b.name for b in scene.main.bodies}:
+            raise ValueError("body-specific particles systems must integrate each main body exactly once")
     if not ids and systems and scene.main.width:
         raise ValueError("the case has systems but no particles system; add {type: particles} to integrate the bodies")

@@ -302,7 +302,7 @@ def _quat_between(t_from, t_to):  # pbd_cosserat.py:563-576
     return _quat_axis_angle(c / s, math.atan2(s, d))
 
 
-def tree_frames(positions, edges, root: int) -> np.ndarray:
+def tree_frames(positions, edges, root: int, dtype=np.float32) -> np.ndarray:
     """pbd_cosserat.py:579-616 (``_tree_frames``): per-segment frames parallel transported over a BFS spanning tree
     from the root's lowest incident segment; a symmetric fork gets mirror-symmetric branch frames."""
     P = np.asarray(positions, dtype=np.float64)
@@ -335,7 +335,7 @@ def tree_frames(positions, edges, root: int) -> np.ndarray:
     for e in range(len(edges)):  # a disconnected component gets its own seed (the loader rejects one anyway)
         if e not in visited:
             bfs(e)
-    return np.asarray(frames, dtype=np.float32)
+    return np.asarray(frames, dtype=dtype)
 
 
 def derive_bend_pairs(edges, root: int) -> np.ndarray:
@@ -390,7 +390,8 @@ def root_arc_lengths(positions, edges, root: int) -> np.ndarray:
 
 
 def add_centreline_tree(scene: Scene, name: str, positions, edges, radii, root: int, *, pinned_nodes=(), pinned_segments=(),
-                        mass: float = 0.01, inertia: float = 0.01, render_paths=None, open_root: bool = False, visual=None) -> Body:
+                        mass: float = 0.01, inertia: float = 0.01, render_paths=None, open_root: bool = False, visual=None,
+                        precise_rest_frames: bool = False) -> Body:
     """A body of ``P`` graph nodes with a ``CentrelineTree`` record. ``mass`` and ``inertia`` are per node and per
     segment (omniendo ``node_mass``, ``segment_inertia``); pinned nodes and segments get zero inverse mass. With
     ``open_root`` the root must be a degree-one endpoint (centerline_runtime.py:206-220)."""
@@ -411,7 +412,8 @@ def add_centreline_tree(scene: Scene, name: str, positions, edges, radii, root: 
         root_neighbor = int(e[1] if int(e[0]) == root else e[0])
     if render_paths is None:  # a chain or a tree given as edges only
         render_paths = render_paths_from_edges(edges, P)
-    frames = tree_frames(positions, edges, root)
+    # The workflow reference derives rest strain before rounding frames for the GPU.
+    frames = tree_frames(positions, edges, root, dtype=np.float64 if precise_rest_frames else np.float32)
     pairs = derive_bend_pairs(edges, root)
     controls, neighbors = spline_topology(edges, render_paths)
     rest_len = np.linalg.norm(positions[edges[:, 1]] - positions[edges[:, 0]], axis=1).astype(np.float32)

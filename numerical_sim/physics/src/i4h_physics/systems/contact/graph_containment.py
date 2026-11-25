@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 import warp as wp
 from i4h_physics.checks import check_bool, check_float, check_int
 from i4h_physics.scene import ACTIVE
@@ -64,6 +65,9 @@ class GraphContainment(System):
     newton_iterations: int = 4  # structural: Newton steps per spline seed
     two_way: bool = True  # structural: push the tree
     open_root: bool = True  # structural: no cap at the root (samples upstream of the root are free)
+
+    interior_deadband: float = 1.0  # live per env: fraction of free lumen radius without interior pull
+    interior_stiffness: float = 0.0  # live per env: wire-only pull; linear containment only
 
     structural = System.structural + ("iterations", "capacity", "candidates", "spline", "tangent_scale", "newton_iterations",
                                       "two_way", "open_root")
@@ -127,7 +131,14 @@ class GraphContainment(System):
         self.contact_depth = wp.zeros(E, dtype=wp.float32, device=dev)  # deepest gap of the last substep
         self.contact_count = wp.zeros(E, dtype=wp.int32, device=dev)  # samples pushed in the last substep
         self.overflow = wp.zeros(E, dtype=wp.int32, device=dev)  # 1 when a sample fell back to the exact scan this step
-        self._live("max_distance", "skin", 'target_response', 'source_max_delta', 'target_max_delta')
+        for name in ("interior_deadband", "interior_stiffness"):
+            value = np.asarray(getattr(self, name), dtype=float)
+            if not np.isfinite(value).all() or np.any((value < 0.0) | (value > 1.0)):
+                raise ValueError(f"graph_containment.{name} must lie in [0, 1]")
+        if self.spline and np.any(np.asarray(self.interior_stiffness) != 0.0):
+            raise ValueError("graph_containment interior pull requires spline=False")
+        self._live("max_distance", "skin", 'target_response', 'source_max_delta', 'target_max_delta',
+                   "interior_deadband", "interior_stiffness")
 
     def _roots(self):
         """The open root's node and neighbour (``-1`` when closed); validated against the tree record."""
@@ -145,6 +156,8 @@ class GraphContainment(System):
 
     def prepare(self, scene):
         super().prepare(scene)
+        if self.spline and np.any(self.interior_stiffness.numpy() != 0.0):
+            raise ValueError("graph_containment interior pull requires spline=False")
         self._roots()  # a structural change of open_root takes effect on recapture
         self.rebuild.fill_(1)  # the cache bound depends on the spline setting and the tangent scale
 
@@ -184,6 +197,8 @@ class GraphContainment(System):
             common += [self.S, self.root, self.root_neighbor, self.max_distance]
             if self.spline:
                 common += [self.tangent_scale, self.newton_iterations]
+            else:
+                common += [self.interior_deadband, self.interior_stiffness]
             common += [int(self.two_way), self.target_response, int(self.candidates), self.capacity, self.cand_idx, self.cand_count,
                        self.cand_overflow]
             wp.launch(project_spline if self.spline else project_linear, dim=(E, n), inputs=common,
@@ -450,6 +465,8 @@ def project_linear(
     root: wp.int32,
     root_neighbor: wp.int32,
     max_distance: wp.array(dtype=wp.float32),
+    interior_deadband: wp.array(dtype=wp.float32),
+    interior_stiffness: wp.array(dtype=wp.float32),
     two_way: wp.int32,
     target_response: wp.array(dtype=wp.float32),
     use_candidates: wp.int32,
@@ -479,6 +496,7 @@ def project_linear(
     if upstream_of_open_root(q_tree, env, root, root_neighbor, point):
         return
 
+    best_free_radius = float(0.0)
     best_gap = float(1.0e30)
     best_edge = int(-1)
     best_t = float(0.0)
@@ -523,12 +541,19 @@ def project_linear(
                 gradient_length = wp.length(gradient)
                 if gradient_length > 1.0e-8:
                     gradient = gradient / gradient_length
+                best_free_radius = wp.max(radius - source_radius, 0.0)
                 best_gap = gap
                 best_edge = e
                 best_t = t
                 best_gradient = gradient
 
-    if best_edge < 0 or best_gap <= 0.0 or best_gap > max_distance[env]:
+    if best_edge < 0 or best_gap > max_distance[env]:
+        return
+    pull = best_gap
+    contact = best_gap > 0.0
+    if not contact:
+        pull = wp.max(0.0, best_gap + (1.0 - interior_deadband[env]) * best_free_radius) * interior_stiffness[env]
+    if pull <= 0.0:
         return
     target_edge = edges[best_edge]
     v0 = base + target_edge[0]  # tree accumulator slots; the views take vessel_edge[.]
@@ -545,13 +570,13 @@ def project_linear(
     wv0 = inv_mass_tree[env, target_edge[0]]
     wv1 = inv_mass_tree[env, target_edge[1]]
     reciprocal = float(0.0)
-    if two_way != 0:
+    if two_way != 0 and contact:
         reciprocal = target_response[env]
     denominator = (wc0 * source_a_weight * source_a_weight + wc1 * source_b_weight * source_b_weight
                    + reciprocal * (wv0 * target_a_weight * target_a_weight + wv1 * target_b_weight * target_b_weight))
     if denominator <= 1.0e-12:
         return
-    magnitude = best_gap / denominator
+    magnitude = pull / denominator
     if wc0 > 0.0 and source_a_weight > 0.0:
         wp.atomic_add(cath_corr, ca, -best_gradient * magnitude * wc0 * source_a_weight)
         wp.atomic_add(cath_count, ca, source_a_weight)
@@ -564,8 +589,9 @@ def project_linear(
     if reciprocal > 0.0 and wv1 > 0.0 and target_b_weight > 0.0:
         wp.atomic_add(tree_corr, v1, best_gradient * magnitude * reciprocal * wv1 * target_b_weight)
         wp.atomic_add(tree_count, v1, target_b_weight)
-    wp.atomic_max(contact_depth, env, best_gap)
-    wp.atomic_add(contact_count, env, 1)
+    if contact:
+        wp.atomic_max(contact_depth, env, best_gap)
+        wp.atomic_add(contact_count, env, 1)
 
 
 # Ported from omniendo kernels_xcath_centerline.py:483-791 (project_packed_spline_centerline_containment). Edits: as

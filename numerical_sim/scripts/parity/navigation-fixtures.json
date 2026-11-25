@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "workflow_revision": "dfa5b83f",
+  "reference_revision": "50056196775fc0ed8cca03bf16144fe71d183ca7",
+  "numerical_base_revision": "caff73b1",
+  "rod": {
+    "length": 0.4,
+    "segments": 120,
+    "radius": 0.0005,
+    "density": 7800.0,
+    "young": 1000000000.0,
+    "poisson": 0.3,
+    "bend": 0.1,
+    "twist": 0.4,
+    "damping": 0.01,
+    "tip_length": 0.025,
+    "dt": 0.008333333333333333,
+    "substeps": 1
+  },
+  "control": {
+    "physics_hz": 120,
+    "decimation": 4,
+    "control_hz": 30,
+    "max_steps": 600
+  },
+  "wall": {
+    "node_mass": 1.0,
+    "segment_inertia": 1.0,
+    "bend_stiffness": 1.0,
+    "twist_stiffness": 1.0,
+    "stretch_stiffness": 1.0,
+    "root_locked": true,
+    "endpoints_locked": true,
+    "iterations": 4,
+    "linear_damping": 0.01,
+    "angular_damping": 0.01,
+    "gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "two_way": true,
+    "vessel_response": 0.5,
+    "interior_deadband": 0.5,
+    "interior_stiffness": 0.25,
+    "max_distance": 0.05,
+    "catheter_max_delta": 0.005,
+    "vessel_max_delta": 0.005,
+    "collision_iterations": 2,
+    "contact_coupling_iterations": 32,
+    "edge_samples": 3
+  },
+  "geometry": {
+    "start": [
+      0.0,
+      0.0,
+      0.5
+    ],
+    "curve_radius": 0.5,
+    "route_length": 0.9,
+    "route_spacing": 0.002,
+    "lumen_radius": 0.002,
+    "wall_spacing": 0.005,
+    "branch_at_arc": 0.45,
+    "branch_length": 0.15,
+    "branch_angle_rad": 0.7,
+    "initial_rest_curvature": "straight",
+    "initial_frames": "workflow_parallel_transport_node_tangents"
+  },
+  "gates": {
+    "tip_rms_over_length": 0.02,
+    "wall_displacement_relative_l2": 0.1,
+    "reaction_relative_l2": 0.1,
+    "new_wall_escapes": 0,
+    "wrong_branch_transitions": 0,
+    "arrival_positive": true,
+    "arrival_negative": false,
+    "zero_response_atol": 0.0,
+    "arrival_tolerance_m": 0.008,
+    "arrival_hold_control_steps": 15
+  },
+  "fixtures": [
+    {
+      "name": "curved_initialization",
+      "seconds": 0.5,
+      "drive": "route",
+      "rates": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "wall": false
+    },
+    {
+      "name": "route_insertion",
+      "seconds": 2.0,
+      "drive": "route",
+      "rates": [
+        0.05,
+        0.0,
+        0.0
+      ],
+      "wall": false
+    },
+    {
+      "name": "mounted_tangent_feed",
+      "seconds": 2.0,
+      "drive": "flange_tangent",
+      "rates": [
+        0.05,
+        0.3,
+        0.2
+      ],
+      "flange_velocity": [
+        0.0,
+        0.001,
+        0.0
+      ],
+      "wall": false
+    },
+    {
+      "name": "deformable_wall",
+      "seconds": 2.0,
+      "drive": "route",
+      "rates": [
+        0.05,
+        0.0,
+        0.4
+      ],
+      "wall": true
+    },
+    {
+      "name": "interior_pull",
+      "seconds": 0.5,
+      "drive": "route",
+      "rates": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_lateral_offset": 0.001,
+      "wall": true
+    },
+    {
+      "name": "arm_reaction",
+      "seconds": 2.0,
+      "drive": "flange_tangent",
+      "rates": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "gravity": [
+        0.0,
+        0.0,
+        -9.81
+      ],
+      "flange_velocity": [
+        0.0,
+        0.001,
+        0.0
+      ],
+      "wall": false
+    },
+    {
+      "name": "zero_response",
+      "seconds": 0.5,
+      "drive": "route",
+      "geometry": "straight",
+      "rates": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "wall": true
+    },
+    {
+      "name": "arrival_positive",
+      "seconds": 0.5,
+      "drive": "route",
+      "rates": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "wall": true,
+      "goal_at_initial_tip": true,
+      "geometry": "straight"
+    },
+    {
+      "name": "arrival_negative",
+      "seconds": 0.5,
+      "drive": "route",
+      "rates": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "wall": true,
+      "goal_at_initial_tip": false,
+      "geometry": "straight"
+    }
+  ],
+  "qualification_status": "inputs and thresholds frozen; matched-engine execution not yet qualified"
+}
