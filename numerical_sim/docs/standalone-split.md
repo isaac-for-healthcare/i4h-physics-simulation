@@ -40,10 +40,6 @@ Negative import checks retain the application module names to reject reverse dep
 they neither import nor install the application. Missing-asset errors describe `I4H_DATA`
 and the local `data=` case-loader argument.
 
-Frozen qualification reports retain their original bytes and test paths. The Markdown
-link checker resolves the two moved test links in `stage-c25.md` at the source baseline
-recorded above, rather than requiring those application tests in the current workspace.
-
 The application pins all six upstream distributions to published split commit
 `4532a216c25bd7e5fee49678b1c1359727fe523e` through Git subdirectory sources.
 The application owns its lockfile, setup instructions and validation evidence.

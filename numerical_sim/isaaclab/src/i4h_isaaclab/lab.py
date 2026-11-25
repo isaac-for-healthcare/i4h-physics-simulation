@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""The Isaac Lab revisions this package targets (see docs/stage-c30.md for candidate status), and a
+"""The Isaac Lab revisions this package targets and a
 check for the Lab APIs it relies on.
 
 Older Isaac Lab 3.0 checkouts lack some of them (``NewtonManager._invalidate_graph``, ``newton_builder_world_hook``,

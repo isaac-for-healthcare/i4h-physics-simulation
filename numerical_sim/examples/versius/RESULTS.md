@@ -192,7 +192,6 @@ Stage C numerical campaign was not rerun or reclassified.
 ```bash
 python3 examples/versius/run.py python -m pytest examples/versius/tests tests/runtime/test_component.py tests/runtime/test_manager_env.py tests/runtime/test_isaaclab_env.py tests/runtime/test_coupling.py tests/runtime/test_solver.py tests/runtime/test_lab_adapters.py tests/packages/test_storage.py tests/packages/test_scene_storage.py -q
 python3 examples/versius/run.py python examples/core_synthetic.py --device cpu
-python3 scripts/check_stage_c_inventory.py
 python3 scripts/check_private_reaches.py
 uv build --all-packages --out-dir .tmp_tests/versius/dist
 uv build --directory examples/versius --out-dir ../../.tmp_tests/versius/example-dist

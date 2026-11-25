@@ -1,5 +1,5 @@
 {
-  "status": "accepted by the user on 2026-11-12; final frozen campaign and timing campaign run in C4.4 (docs/stage-c44.md)",
+  "status": "accepted by the user on 2026-11-12; final frozen campaign and timing campaign run in C4.4",
   "host": "main",
   "python": "3.12.12",
   "newton": {
