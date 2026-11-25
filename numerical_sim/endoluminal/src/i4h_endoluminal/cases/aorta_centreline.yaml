@@ -38,6 +38,22 @@ assets:
     centreline:
       path: "${DATA}/vessels/aorta_centerline.json"
       root_position: [6.35, 0.0, 1.0]   # the end of the catheter track: right femoral end
+      regions:
+        schema_version: 1
+        default: unassigned
+        branches:
+          0: right_iliac_femoral
+          1: aortic_trunk
+          2: left_iliac_femoral
+          3: arch_outlets
+          4: arch_outlets
+          5: arch_outlets
+          6: arch_outlets
+          7: arch_outlets
+          8: arch_outlets
+          9: arch_outlets
+          10: arch_outlets
+          11: arch_outlets
       radius_scale: 1.0                 # VMTK maximum inscribed sphere radius, already inside the wall
       mass: 0.1
       inertia: 0.1
@@ -58,6 +74,9 @@ systems:
     tip_edges: 16
     guide_tip: true               # the track holds a bent tip straight until it leaves the track at the entry
     upper: [6.35, 1.0e9, 1.5]     # insertion stops at the end of the track
+  - type: rod_pbd_material
+    id: vessel_material
+    body: aorta
   - type: rod_pbd                 # the vessel tree, porcine_cta_centerline settings
     id: tree
     body: aorta
@@ -78,3 +97,24 @@ render:
   env: 0
   tip: {body: catheter, distance: 0.0}   # C: the view from the catheter tip; the eye at the tip, not inside the tube (as aorta_shell)
   camera: {position: [9.8, -9.0, 3.0], pitch: -14.8, yaw: 0.0, up: [0.0, 0.0, 1.0], near: 0.05, far: 100.0}   # looks at the aorta from -y
+
+ui:
+  title: Vessel stiffness
+  region_bodies: [aorta]
+  instructions: |
+    Select a territory to highlight and edit.
+    Numerical multipliers; calibration deferred.
+    Episode reset retains material edits.
+    Restore defaults resets all vessel regions
+    in the selected environments.
+  groups:
+    - title: Territory stiffness multipliers
+      knobs:
+        - [vessel_material, region_stretch]
+        - [vessel_material, region_bend]
+        - [vessel_material, region_twist]
+      limits:
+        region_stretch: [0.0, 1.0]
+        region_bend: [0.0, 10.0]
+        region_twist: [0.0, 10.0]
+  actions: [pause, step, reset_env, reset_all, restore_defaults, save, load, camera]
