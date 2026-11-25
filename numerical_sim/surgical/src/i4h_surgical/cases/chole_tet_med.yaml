@@ -334,7 +334,7 @@ render:                         # read by the app only; Isaac Lab and headless r
   headlight: {color: [1.0, 0.92, 0.78], intensity: 0.59}
   debug_spheres: false          # collision spheres of the drawn env (toggle with X)
   tip: {instrument: grasper, distance: 0.0}   # C: a laparoscope view along the grasper's shaft
-  xr:                           # --render xr: the scene in a headset (render/xr.py, docs/xr.md); the camera above anchors the head
+  xr:                           # --render xr: the scene in a headset (render/xr.py, https://github.com/isaac-for-healthcare/i4h-standalone-simulator); the camera above anchors the head
     world_units_per_meter: 1.0  # as omnisurg's chole XR examples
     runtime: {mode: managed, host_client: true}   # managed: CloudXR started here (isaacteleop) | external: runtime.directory or I4H_CLOUDXR_DIR | system
                                 # host_client: the web client served from this machine (https://<host>:48322/client/); host: the LAN IP the Quest uses (default guessed)

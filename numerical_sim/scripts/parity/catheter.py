@@ -14,7 +14,7 @@ torch and numpy; ``setup_reference.sh`` builds its venv on the old stack (warp 1
     $PY scripts/parity/catheter.py compare parity/reference.npz parity/ours.npz --report parity/report.json
 
 Each run also repeats every scenario at half the substep (``<scenario>@half``) for the refinement rows. ``compare``
-evaluates docs/component-contracts.md section 4, prints one PASS/FAIL row per bound plus informational rows, and exits
+evaluates physics/component-contracts.md section 4, prints one PASS/FAIL row per bound plus informational rows, and exits
 non-zero on a FAIL; it decides nothing by itself.
 
 Scenarios, all free-space (no vessel), the rod straight along +x from (0, 0, 0.5):
@@ -298,7 +298,7 @@ def tip_roll(frames):
 
 
 def compare(ref: dict, ours: dict) -> list[dict]:
-    """docs/component-contracts.md section 4: each parity metric within its bound; at half the substep each metric's
+    """physics/component-contracts.md section 4: each parity metric within its bound; at half the substep each metric's
     change at most half its bound (refinement). Plus informational rows (``pass`` None): each engine's own trajectory
     change at half the substep. Both engines damp velocity by ``1 - damping`` per substep, so halving the substep
     doubles the damping per second; a change there is the damping model's, shared by both."""

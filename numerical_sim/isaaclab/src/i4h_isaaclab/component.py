@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""i4h physics as a component of a host Isaac Lab scene (docs/component-contracts.md, F3).
+"""i4h physics as a component of a host Isaac Lab scene (physics/component-contracts.md, F3).
 
 The host decides what exists and what success means; the component computes how the deformables respond. A host env
 (a workflow's, with its own robots, tasks and recording) declares the physics with explicit parameters, no YAML and no

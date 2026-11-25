@@ -11,11 +11,12 @@ import i4h_isaaclab.tasks  # registers the preserved Gym task IDs
 
 ## Isaac Lab compatibility
 
-Isaac Lab is installed from source. The qualified stack is Newton
+Isaac Lab is installed from source. The historical Stage C stack used Newton
 `7f0c13af6e4dd75253709c31dc65c0edcaf22b44` (1.9.0.dev0), Warp 1.17.0,
 MuJoCo/MuJoCo-Warp 3.17.0, Lab main `4cfdfcfa52d7cb64eb83ab293b2fcfc92452aaf1`,
 and patched Lab 3.0 `e53cd288727a5ca3dae7187d1d415b4d32b67e11`; the exact pins are in
-`qualification/c30-{core,main,lab30}.json`.
+[historical qualification records](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/8020858babd4ad3c2d1cebff7c75bcb2f2bd904c/numerical_sim/qualification/).
+These records describe prior acceptance, not current verification.
 The package supplies main pure/coupled solver adapters and a narrow release 3.0
 manager bridge over the same authoring, binding and numerical core. Lab owns
 allocation, stepping and capture; component bindings own views and episode
@@ -27,11 +28,11 @@ restore. Restore last: write the host's own state, call the simulation's `forwar
 because Lab runs the solver's cache reset for worlds written through its asset API at the next forward or step.
 
 Patched 3.0 additionally needs the explicit
-[cloner compatibility delta](../docs/newton18-lab30-cloner.patch): Newton uses public
+[cloner compatibility delta](patches/newton18-lab30-cloner.patch): Newton uses public
 `surface_label` / `volume_label` and their corresponding private particle starts.
 The supplied checkout remains unchanged; qualification uses an isolated worktree
-based on e53cd288 with that patch. See [adapter evidence](../docs/stage-b-host.md)
-and [Stage B status](../docs/stage-b.md) for current checks and remaining gates.
+based on e53cd288 with that patch. See [adapter evidence](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/8020858babd4ad3c2d1cebff7c75bcb2f2bd904c/numerical_sim/docs/stage-b-host.md)
+and [Stage B status](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/8020858babd4ad3c2d1cebff7c75bcb2f2bd904c/numerical_sim/docs/stage-b.md) for historical checks and retained gates.
 Inside Lab use its `usd-exchange` provider; do not install a competing `usd-core`
 package over its `pxr` module.
 
@@ -88,10 +89,10 @@ the particles. Use `-Direct` for the tiled camera (`rgb`/`depth`), staggered
 episodes and session replay; the manager env has none of these.
 
 Isaac Lab's manager-based step calls `reset_buf.nonzero()` (a host sync) every step, which `I4hEnv` avoids with its mask
-reset. At 64 envs the measured difference is below 2% (`docs/performance.md`).
+reset. At 64 envs the measured difference is below 2% (`physics/performance.md`).
 
 Teleoperation devices are not configured by default; `i4h_isaaclab_standalone.devices.configure_teleop(cfg)`
-installs the `i4h` device (requires `i4h-standalone`).
+installs the `i4h` device (requires the [optional bridge](https://github.com/isaac-for-healthcare/i4h-standalone-simulator)).
 
 Production assets are supplied separately with `--data` or `I4H_DATA`; missing assets
 fail explicitly. No production geometry or native device binaries are packaged.
@@ -99,4 +100,4 @@ See the numerical workspace README and architecture document for setup and packa
 Licensed under Apache-2.0; see this package's LICENSE and NOTICE.
 
 Native Versius robot tasks and their scripted, PPO and teleoperation commands are described in
-[the Versius guide](../docs/versius.md). They use surgical contact-case YAMLs and the shared launchers.
+[the Versius guide](versius.md). They use surgical contact-case YAMLs and the shared launchers.

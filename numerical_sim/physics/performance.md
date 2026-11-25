@@ -95,7 +95,7 @@ on GPU 0 and `-Manager` on GPU 1 at the same time, one run each (branch commit `
 The manager env costs 0.5–2.1%. ReachTarget reaches about 10,000 env-steps/s at 1024 envs; GraspTarget stays near
 100–116 env-steps/s at every count (its step time grows with the env count), and used 15.7 GB of device memory at 1024.
 
-`--task I4h-ReachTarget-{Direct,Manager} --num_envs 64 --train 50 --seed 0` (the [ReachTarget example](reach-target-example.md)):
+`--task I4h-ReachTarget-{Direct,Manager} --num_envs 64 --train 50 --seed 0` (the [ReachTarget example](../isaaclab/reach-target-example.md)):
 0.58 and 0.59 s/iteration, the same logged mean reward at every iteration (0.00 for the first three, 0.94 by
 iteration 25, 0.93 at the end) and the same final losses (value 0.0001475, surrogate -0.003574, entropy 4.229). The
 two `model_49.pt` checkpoints are byte-identical (SHA256 `7ba558d6...672a83`).

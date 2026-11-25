@@ -2,13 +2,15 @@
 
 Isaac Sim–compatible simulation tools for modeling anatomy and healthcare robotics, powered by NVIDIA [Newton](https://github.com/newton-physics/newton), [Warp](https://github.com/NVIDIA/warp), and generative video models.
 
-This repository holds numerical simulators under [`numerical_sim/`](./numerical_sim), a generative simulator under [`neural_sim/`](./neural_sim), and the deprecated catheter solver under [`physics_simulation/`](./physics_simulation). Use them to prototype endoluminal and laparoscopic procedures, train robotics policies, and generate synthetic surgical video.
+This repository holds numerical simulators under [`numerical_sim/`](numerical_sim), a generative simulator under [`neural_sim/`](./neural_sim), and the deprecated catheter solver under [`physics_simulation/`](./physics_simulation). Use them to prototype endoluminal and laparoscopic procedures, train robotics policies, and generate synthetic surgical video.
 
 ## Available Components
 
 ### Numerical Simulation
 
-**Status:** Available in [`numerical_sim/`](./numerical_sim) as six Python packages, version 0.9.0, sharing one lockfile.
+Start with the [documentation index](numerical_sim/DOCUMENTATION.md).
+
+**Status:** Available in [`numerical_sim/`](numerical_sim) as six Python packages, version 0.9.0, sharing one lockfile.
 
 | Package | Import | Provides |
 | ------- | ------ | -------- |
@@ -29,14 +31,14 @@ Available in-tree today:
 - Isaac Lab tasks `I4h-TwoWorlds-Direct`, `I4h-Aorta-Direct`, `I4h-ReachTarget-Direct`, `I4h-GraspTarget-Direct` and `I4h-Chole-Direct`
 
 Interactive viewers, device backends, capture and XR moved out of this repository.
-See [package ownership and migration](numerical_sim/docs/standalone-split.md).
+See [package ownership and migration](numerical_sim/DOCUMENTATION.md).
 
 Not available yet:
 
 - Bronchoscope and other non-catheter endoluminal devices
 - Airway and colon cases
 
-Production assets (meshes, textures, centrelines and USD) are included under `numerical_sim/data/` and licensed under Apache-2.0, except MIT-licensed dVRK instruments. `scripts/fetch_assets.py` can also install them from a copy you supply and checks each file against [`docs/asset-manifest.json`](./numerical_sim/docs/asset-manifest.json); see [numerical_sim/data/README.md](./numerical_sim/data/README.md).
+Production assets (meshes, textures, centrelines and USD) are included under `numerical_sim/data/` and licensed under Apache-2.0, except MIT-licensed dVRK instruments. `scripts/fetch_assets.py` can also install them from a copy you supply and checks each file against [`data/asset-manifest.json`](numerical_sim/data/asset-manifest.json); see [numerical_sim/data/README.md](numerical_sim/data/README.md).
 
 ```bash
 cd numerical_sim
@@ -44,11 +46,11 @@ uv sync --locked --group dev
 uv run python examples/core_synthetic.py --device cpu
 ```
 
-To embed i4h physics in an Isaac Lab scene, see the [component contracts](./numerical_sim/docs/component-contracts.md) and the [Isaac Lab compatibility notes](./numerical_sim/isaaclab/README.md#isaac-lab-compatibility).
+To embed i4h physics in an Isaac Lab scene, see the [component contracts](numerical_sim/physics/component-contracts.md) and the [Isaac Lab compatibility notes](numerical_sim/isaaclab/README.md#isaac-lab-compatibility).
 
 ### Endoluminal Catheter Solver (deprecated)
 
-**Status:** Deprecated. The solver at [`physics_simulation/endoluminal/catheter-vasculature-solver`](./physics_simulation/endoluminal/catheter-vasculature-solver) will be replaced by the numerical simulator in [`numerical_sim/`](./numerical_sim) (`i4h-endoluminal`) in an upcoming release. Until then it remains available here, and the i4h-workflows catheter scenes still install it.
+**Status:** Deprecated. The solver at [`physics_simulation/endoluminal/catheter-vasculature-solver`](./physics_simulation/endoluminal/catheter-vasculature-solver) will be replaced by the numerical simulator in [`numerical_sim/`](numerical_sim) (`i4h-endoluminal`) in an upcoming release. Until then it remains available here, and the i4h-workflows catheter scenes still install it.
 
 **What it provides:** A Newton-based endoluminal solver (catheter and related devices) using Cosserat rod / XPBD soft-body physics on NVIDIA Warp and Newton.
 
@@ -90,7 +92,7 @@ Full setup, configs, and system requirements: [Cosmos-H-Dreams README](https://g
 ```text
 numerical_sim/            # Six Warp / Newton numerical and host packages
 ├── physics/  surgical/  endoluminal/  assessment/  isaaclab/  host/
-├── docs/                 # Architecture, component contracts, XR, performance, examples
+├── DOCUMENTATION.md      # Documentation index, architecture and migration
 ├── examples/  scripts/  tests/
 └── data/                 # Apache-2.0 production assets
 neural_sim/
@@ -117,7 +119,7 @@ physics_simulation/
 
 2. Pick a component:
 
-   - **Numerical sim (surgical and endoluminal):** follow [numerical_sim/README.md](./numerical_sim/README.md)
+   - **Numerical sim (surgical and endoluminal):** follow [numerical_sim/README.md](numerical_sim/README.md)
    - **Endoluminal catheter solver (deprecated):** follow [physics_simulation/endoluminal/catheter-vasculature-solver/README.md](./physics_simulation/endoluminal/catheter-vasculature-solver/README.md)
    - **Generative sim:** follow the [Cosmos-H-Dreams README](https://github.com/isaac-for-healthcare/Cosmos-H-Dreams/blob/main/README.md)
 
@@ -131,10 +133,10 @@ Shared / typical prerequisites (exact versions depend on the component):
 | Python | `numerical_sim`: `>=3.12,<3.13` (development pins 3.12.12); Cosmos-H-Dreams: 3.12+; the catheter solver supports 3.10+ |
 | GPU | NVIDIA GPU; Cosmos-H-Dreams recommends ≥12 GB VRAM. `numerical_sim` also steps on CPU for its examples and package tests |
 | Driver / CUDA | Cosmos-H-Dreams: driver **R580+** (CUDA 13.x). Newton / Warp stacks need a CUDA-capable driver matching the installed toolkit |
-| Simulation stack | `numerical_sim` pins Warp 1.17.0 and Newton 1.6.1. Its Isaac Lab tasks target Isaac Lab `v3.0.0` (`e3f7d9f`) |
+| Simulation stack | `numerical_sim` pins Warp 1.17.0 and Newton `7f0c13af` (1.9.0.dev0). See [Isaac Lab compatibility](numerical_sim/isaaclab/README.md#isaac-lab-compatibility) for host revisions |
 | Container | Docker + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for the generative sim image |
 
-Dependencies are declared in [`numerical_sim/pyproject.toml`](./numerical_sim/pyproject.toml) (with its `uv.lock`) and the catheter solver's [`pyproject.toml`](./physics_simulation/endoluminal/catheter-vasculature-solver/pyproject.toml).
+Dependencies are declared in [`numerical_sim/pyproject.toml`](numerical_sim/pyproject.toml) (with its `uv.lock`) and the catheter solver's [`pyproject.toml`](./physics_simulation/endoluminal/catheter-vasculature-solver/pyproject.toml).
 
 ## Security
 
