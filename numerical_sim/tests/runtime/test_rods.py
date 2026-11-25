@@ -552,6 +552,33 @@ def test_aorta_captured_matches_uncaptured():
 
 
 @needs_vessels
+@pytest.mark.parametrize("graph", [False, True])
+def test_capped_aorta_continuation_preserves_query_and_render_mesh(graph):
+    sim = load_case("aorta_static", envs=2)
+    sim.cuda_graph = graph
+    scene, cont = sim.scene, find(sim, RodContainment)
+    mesh = scene.static_meshes[0]
+    points, indices = mesh.points.copy(), mesh.indices.copy()
+    query = cont.wp_mesh.id
+    assert len(cont.capped_ends) == 7 and query != scene.static_wp_mesh(cont.mesh).id
+    rates = np.float32([[1.0, 0.0, 0.0], [0.85, 0.0, 0.0]])
+    run_rates(sim, 30, rates)
+    saved = scene.model.state(), scene.model.control()
+    sim.physics.save(*saved)
+    run_rates(sim, 10, rates)
+    expected = scene.q.numpy().copy()
+    counts = cont.contact_count.numpy().copy()
+    sim.reset([0])
+    sim.physics.restore(*saved)
+    run_rates(sim, 10, rates)
+    np.testing.assert_allclose(scene.q.numpy(), expected, atol=1e-6, rtol=1e-6)
+    np.testing.assert_array_equal(cont.contact_count.numpy(), counts)
+    np.testing.assert_array_equal(mesh.points, points)
+    np.testing.assert_array_equal(mesh.indices, indices)
+    assert cont.wp_mesh.id == query
+
+
+@needs_vessels
 def test_rod_pbd_runs_the_aorta():
     cfg = read_case("aorta_static")
     cfg["sim"]["iterations"] = 4  # Jacobi needs several sweeps per substep to carry the root motion down 192 nodes
