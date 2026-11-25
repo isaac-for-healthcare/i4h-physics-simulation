@@ -23,7 +23,7 @@ its known failures were not patched or enabled to obtain a passing result.
 ## Results
 
 | Check | Result |
-|---|---|
+| --- | --- |
 | Complete `tests/runtime tests/packages` | 1207 passed, 23 skipped, **2 failed**, 81 warnings, 1217.77 s |
 | Final command/material/guide/contact/parity compatibility group | 78 passed |
 | Registry expectation plus body-integrator and positional-constructor follow-up | 20 passed |
