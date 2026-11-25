@@ -6,9 +6,9 @@
 # cycle, held it in a new shape: NVBug 6940614.) Fully inserted, the tip stops in the arch (x ~ 12.5); the arch
 # branches, which a longer catheter reaches, are out of reach. The tree was extracted from Mesh_004 with VMTK
 # (i4h-validation/aorta_centreline/aorta_to_centreline.py): 12 branches, 8 open ends, 5 mesh-unit (~5 mm) sampling,
-# positions in the mesh prim's local frame. The root is the right femoral end, where the catheter track ends; the
-# other vessel ends are pinned (arch branches and left femoral stay tethered). Z-up; 1 scene unit ~ 10 cm (mesh in
-# mm, scale 0.01).
+# positions in the mesh prim's local frame, stored as i4h-digital-twin centreline arrays (region ID = branch).
+# The root is the right femoral end, where the catheter track ends; the other vessel ends are pinned (arch
+# branches and left femoral stay tethered). Z-up; 1 scene unit ~ 10 cm (mesh in mm, scale 0.01).
 sim:
   device: cuda:0
   dt: 0.016666667
@@ -36,24 +36,8 @@ assets:
     rotation_euler_degrees: [-76.375273, 78.437867, 0.0]
     visual: {color: [0.6, 0.6, 0.6], cull: back}   # inward-facing: culling the back hides the outside
     centreline:
-      path: "${DATA}/vessels/aorta_centerline.json"
+      path: "${DATA}/vessels/aorta_centreline"   # patient-twin arrays; its vessel_regions.yaml gives the four regions
       root_position: [6.35, 0.0, 1.0]   # the end of the catheter track: right femoral end
-      regions:
-        schema_version: 1
-        default: unassigned
-        branches:
-          0: right_iliac_femoral
-          1: aortic_trunk
-          2: left_iliac_femoral
-          3: arch_outlets
-          4: arch_outlets
-          5: arch_outlets
-          6: arch_outlets
-          7: arch_outlets
-          8: arch_outlets
-          9: arch_outlets
-          10: arch_outlets
-          11: arch_outlets
       radius_scale: 1.0                 # VMTK maximum inscribed sphere radius, already inside the wall
       mass: 0.1
       inertia: 0.1

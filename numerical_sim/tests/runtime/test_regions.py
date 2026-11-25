@@ -9,6 +9,7 @@ import copy
 import numpy as np
 import pytest
 import warp as wp
+import yaml
 from i4h_endoluminal.loaders.centreline import add_centreline_tree, build_tree
 from i4h_endoluminal.loaders.rod import add_rod
 from i4h_endoluminal.regions import instrument_regions, vessel_regions
@@ -326,21 +327,32 @@ def test_vessel_sidecar_young_moduli_parse_and_validate():
             vessel_regions({'schema_version': 1, 'branches': {0: 'aorta'}, 'young_modulus_kpa': bad}, {0})
 
 
-def test_centreline_sidecar_moduli_reach_membership(tmp_path):
-    import json
+def test_bundle_sidecar_moduli_reach_membership(tmp_path):
+    from i4h_endoluminal.loaders.centreline import add_centreline_from_bundle
 
-    from i4h_endoluminal.loaders.centreline import add_centreline_from_json
+    folder = tmp_path / "twin"
+    folder.mkdir()
+    np.save(folder / "centerline_points.npy", np.array([[0, 0, 0], [1, 0, 0], [2, 0, 0]], np.float64))
+    np.save(folder / "centerline_edges.npy", np.array([[0, 1], [1, 2]]))
+    np.save(folder / "centerline_radii.npy", np.full(3, .1, np.float32))
+    np.save(folder / "centerline_regions.npy", np.array([0, 1], np.int32))
+    # A bundle lists every exported vessel, including one (2) without centreline edges.
+    (folder / "vessel_regions.yaml").write_text(yaml.safe_dump({
+        'schema_version': 1, 'default': 'unassigned', 'branches': {0: 'aorta', 1: 'iliac', 2: 'femoral'},
+        'young_modulus_kpa': {'aorta': 400, 'iliac': 800, 'femoral': 800}}))
 
-    def sample(x):
-        return {'position': [x, 0, 0], 'radius_min': .1, 'radius_max': .1}
+    def tree(**kwargs):
+        return add_centreline_from_bundle(Scene('cuda:0', 1, (0, 0, 0)), 'vessel', folder, scale=1, rotation=np.eye(3),
+                                          translation=np.zeros(3), root_position=[0, 0, 0], **kwargs)
 
-    path = tmp_path / 'tree.json'
-    path.write_text(json.dumps({'branches': [{'branch_id': 0, 'samples': [sample(0), sample(1)]},
-                                             {'branch_id': 1, 'samples': [sample(1), sample(2)]}]}))
-    regions = {'schema_version': 1, 'branches': {0: 'aorta', 1: 'iliac'}, 'young_modulus_kpa': {'aorta': 400, 'iliac': 800}}
-    body = add_centreline_from_json(Scene('cuda:0', 1, (0, 0, 0)), 'vessel', path, scale=1, rotation=np.eye(3),
-                                    translation=np.zeros(3), root_position=[0, 0, 0], regions=regions)
-    assert body.regions.young_modulus_kpa == {'aorta': 400.0, 'iliac': 800.0}
+    body = tree()
+    assert body.regions.names == ('unassigned', 'aorta', 'iliac', 'femoral')
+    np.testing.assert_array_equal(body.regions.edge, [1, 2])
+    assert body.regions.young_modulus_kpa == {'aorta': 400.0, 'iliac': 800.0, 'femoral': 800.0}
+    override = tree(regions={'schema_version': 1, 'branches': {0: 'trunk', 1: 'trunk'}})  # a case may regroup
+    assert override.regions.names == ('unassigned', 'trunk') and override.regions.young_modulus_kpa == {}
+    with pytest.raises(ValueError, match='unknown branch'):
+        tree(regions={'schema_version': 1, 'branches': {7: 'a'}})
 
 
 def modulus_sim(moduli, reference):
