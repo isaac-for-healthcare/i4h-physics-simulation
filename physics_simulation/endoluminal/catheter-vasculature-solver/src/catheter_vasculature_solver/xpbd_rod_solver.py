@@ -4207,6 +4207,16 @@ class XPBDRodSolver:
         return self._bws.velocities if self._bws is not None else self._ws.velocities
 
     @property
+    def orientation_array(self) -> "wp.array":
+        """Live Warp view of particle orientations (xyzw), flattened like :attr:`position_array`."""
+        return self._bws.orientations if self._bws is not None else self._ws.orientations
+
+    @property
+    def has_pending_control(self) -> bool:
+        """Whether a proximal rate or pose command is latched for the next :meth:`step`."""
+        return self._pending_control is not None
+
+    @property
     def orientations(self) -> torch.Tensor:
         """Current particle orientations xyzw as a PyTorch tensor.
 

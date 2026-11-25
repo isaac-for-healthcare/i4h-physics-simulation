@@ -32,11 +32,14 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         2. Apply the lagged catheter reaction  (two_way only)
         3. Run Newton collision pipeline (shared contacts)
         4. Step MJWarp rigid solver     (state_0 → state_1)
-        5. Step the catheter particles   (state_0 → state_1)
-        6. Harvest the catheter reaction      (two_way only)
+        5. Hold the rod root on the drive mount  (drive_root_sync only)
+        6. Step the catheter particles   (state_0 → state_1)
+        7. Harvest the catheter reaction      (two_way only)
 
-    Steps 2 and 6 form the relaxed lagged fixed point that Newton's own
-    coupled-solver framework uses for proxy coupling; see
+    Steps 2, 5 and 7 follow the ``LAGGED`` proxy mode of Newton's own
+    coupled-solver framework with a single pass per substep, so relaxation
+    filters the reaction across substeps rather than converging an iteration;
+    see
     :mod:`~catheter_vasculature_solver.isaaclab_integration.proxy_coupling` for
     where this follows it and where it departs.
 
@@ -49,6 +52,7 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
     _rigid_solver: Any = None
     _rod_solver: Any = None
     _coupler: Any = None
+    _follower: Any = None
     _coupling_mode: str = "one_way"
     _coupled_cfg: CoupledMJWarpXPBDRodSolverCfg | None = None
     _rod_solver_cfg: XPBDRodSolverCfg | None = None
@@ -129,24 +133,17 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         return index
 
     @classmethod
-    def _build_coupler(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg):
-        """Build the drive-reaction coupler for ``coupling_mode='two_way'``.
+    def _resolve_drive_bodies(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg, missing: str):
+        """Return the per-env drive-body index and the replicated global indices.
 
-        The reaction has to land on a body, so a two-way scene must identify the
-        one holding the catheter's proximal end, by name or by index. That index
-        is given per env and replicated here, which assumes Newton replicated
-        the bodies uniformly across envs.
+        The drive body is given per env, by name or by index, and replicated
+        here, which assumes Newton replicated the bodies uniformly across envs.
+        ``missing`` is the error raised when the scene names no body.
         """
         drive_index = solver_cfg.drive_body_index
         drive_name = getattr(solver_cfg, "drive_body_name", None)
         if drive_index is None and drive_name is None:
-            raise ValueError(
-                "coupling_mode='two_way' needs drive_body_name or drive_body_index: the "
-                "catheter's reaction is transmitted through whichever rigid body holds its "
-                "proximal end, and there is nothing to push on until that body is named. Use "
-                "'one_way' for a scene where rigid bodies drive the catheter without feeling "
-                "it back."
-            )
+            raise ValueError(missing)
         if drive_index is not None and drive_name is not None:
             raise ValueError(
                 f"drive_body_name={drive_name!r} and drive_body_index={drive_index} are both "
@@ -179,15 +176,36 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
                 f"Rod particle range holds {particle_range.count} particles across {num_envs} "
                 "envs, which is not a whole number per rod."
             )
+        drive_bodies = [int(drive_index) + env * bodies_per_env for env in range(num_envs)]
+        return int(drive_index), bodies_per_env, drive_bodies
+
+    @classmethod
+    def _build_coupler(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg):
+        """Build the drive-reaction coupler for ``coupling_mode='two_way'``.
+
+        The reaction has to land on a body, so a two-way scene must identify the
+        one holding the catheter's proximal end, by name or by index.
+        """
+        drive_index, bodies_per_env, drive_bodies = cls._resolve_drive_bodies(
+            model,
+            solver_cfg,
+            "coupling_mode='two_way' needs drive_body_name or drive_body_index: the "
+            "catheter's reaction is transmitted through whichever rigid body holds its "
+            "proximal end, and there is nothing to push on until that body is named. Use "
+            "'one_way' for a scene where rigid bodies drive the catheter without feeling "
+            "it back.",
+        )
+        particle_range = NewtonXPBDRodManager._require_particle_range()
+        num_envs = int(particle_range.num_envs)
 
         from .proxy_coupling import DriveReactionCoupler, debug_log_interval
 
         coupler = DriveReactionCoupler(
-            body_count=body_count,
+            body_count=int(model.body_count),
             num_envs=num_envs,
             root_offset=int(particle_range.offset),
             root_stride=int(particle_range.count) // num_envs,
-            drive_bodies=[int(drive_index) + env * bodies_per_env for env in range(num_envs)],
+            drive_bodies=drive_bodies,
             mount_local=[tuple(solver_cfg.drive_mount_local)] * num_envs,
             body_com=model.body_com,
             relaxation=float(solver_cfg.drive_reaction_relaxation),
@@ -207,6 +225,29 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         return coupler
 
     @classmethod
+    def _build_follower(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg):
+        """Build the root follower for ``drive_root_sync``, in either coupling mode."""
+        _, _, drive_bodies = cls._resolve_drive_bodies(
+            model,
+            solver_cfg,
+            "drive_root_sync needs drive_body_name or drive_body_index: the catheter's root "
+            "is held on whichever rigid body grips its proximal end, and there is nothing "
+            "to follow until that body is named.",
+        )
+        particle_range = NewtonXPBDRodManager._require_particle_range()
+        num_envs = int(particle_range.num_envs)
+
+        from .proxy_coupling import DriveRootFollower
+
+        return DriveRootFollower(
+            num_envs=num_envs,
+            root_stride=int(particle_range.count) // num_envs,
+            drive_bodies=drive_bodies,
+            mount_local=[tuple(solver_cfg.drive_mount_local)] * num_envs,
+            device=getattr(model, "device", None),
+        )
+
+    @classmethod
     def _build_solver(cls, model: "Model", solver_cfg: CoupledMJWarpXPBDRodSolverCfg) -> None:
         NewtonXPBDRodManager._reject_cuda_graph_capture(getattr(cls, "_cfg", None))
         cls._coupled_cfg = solver_cfg
@@ -217,6 +258,9 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         cls._rod_solver = NewtonXPBDRodManager.build_nested_solver(model, solver_cfg.rod_solver_cfg)
         cls._coupler = (
             cls._build_coupler(model, solver_cfg) if cls._coupling_mode == "two_way" else None
+        )
+        cls._follower = (
+            cls._build_follower(model, solver_cfg) if getattr(solver_cfg, "drive_root_sync", False) else None
         )
 
         # Expose the rod solver as the primary handle for diagnostics / Fabric
@@ -230,6 +274,7 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         NewtonManager._rigid_solver = cls._rigid_solver  # type: ignore[attr-defined]
         NewtonManager._rod_solver = cls._rod_solver  # type: ignore[attr-defined]
         NewtonManager._coupler = cls._coupler  # type: ignore[attr-defined]
+        NewtonManager._follower = cls._follower  # type: ignore[attr-defined]
         NewtonManager._coupling_mode = cls._coupling_mode  # type: ignore[attr-defined]
 
     @classmethod
@@ -302,6 +347,10 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         contacts = cls._run_collision_pipeline(state_0, state_1, control) or contacts
 
         rigid.step(state_0, state_1, control, contacts, substep_dt)
+
+        follower = cls._follower or getattr(NewtonManager, "_follower", None)
+        if follower is not None:
+            follower.sync(state_0, state_1, rod.rod)
         # MJWarp writes bodies and joints but leaves output particles untouched.
         # Read the current particles, then publish only the rod's particle slice
         # into the output, preserving the rigid solver's body and joint results.
@@ -365,6 +414,9 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         coupler = cls._coupler or getattr(NewtonManager, "_coupler", None)
         if coupler is not None:
             coupler.reset(world_mask=world_mask)
+        follower = cls._follower or getattr(NewtonManager, "_follower", None)
+        if follower is not None:
+            follower.reset(world_mask=world_mask)
 
     @classmethod
     def _reset_solver_internals(cls, world_mask) -> None:
@@ -377,13 +429,14 @@ class NewtonCoupledMJWarpXPBDRodManager(NewtonManager):
         cls._rigid_solver = None
         cls._rod_solver = None
         cls._coupler = None
+        cls._follower = None
         cls._coupled_cfg = None
         cls._rod_solver_cfg = None
         cls._drive_body_label = None
         cls._coupling_debug_interval = None
         cls._coupling_debug_steps = 0
         NewtonXPBDRodManager._solver_specific_clear()
-        for attr in ("_rigid_solver", "_rod_solver", "_coupler", "_coupling_mode"):
+        for attr in ("_rigid_solver", "_rod_solver", "_coupler", "_follower", "_coupling_mode"):
             if hasattr(NewtonManager, attr):
                 setattr(NewtonManager, attr, None)
 

@@ -121,10 +121,17 @@ class CoupledMJWarpXPBDRodSolverCfg(NewtonSolverCfg):
     drive_mount_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
     # Blend weight against the previously harvested reaction, matching
-    # ``proxy_relaxation`` in Newton's coupled framework. Below 1 under-relaxes
-    # the lagged fixed point, which is the usual cure for a drive point that
-    # rings once the catheter stiffens against a vessel wall.
+    # ``proxy_relaxation`` in Newton's coupled framework. There is one pass per
+    # substep, so below 1 this low-pass filters the reaction across substeps
+    # rather than relaxing an iteration: it damps a ringing drive point at the
+    # cost of lagging the force further.
     drive_reaction_relaxation: float = 1.0
+
+    # Hold the catheter's root on drive_mount_local of the drive body inside
+    # every substep, between the rigid and rod solves, instead of leaving it on
+    # the path a task commands. Requires a drive body in either coupling mode,
+    # and the task must then command the body rather than the rod's root.
+    drive_root_sync: bool = False
 
     # Soft contact material for particle–shape pairs (tune like Franka soft-lift)
     soft_contact_ke: float = 5.0e3

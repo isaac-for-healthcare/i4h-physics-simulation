@@ -11,6 +11,22 @@ harvest the destination's reaction, then blend that reaction against the
 previous iterate before feeding it back. This module carries that recipe onto
 the Newton revision this package pins, which predates the framework.
 
+:class:`DriveRootFollower` is the pose synchronisation: it puts the rod's root
+on the drive mount inside every substep. :class:`DriveReactionCoupler` is the
+harvest and the blend. Three parts of the upstream recipe are not carried over:
+
+* There is no rewind. Upstream re-steps the source from the start of the step
+  on each iteration, so removing the previous iterate's feedback leaves the
+  destination solving from the free motion. With a single pass the rigid solver
+  keeps the lagged reaction in the body's state, and rewinding it out of the
+  pose the rod sees makes the coupling unstable; see :class:`DriveRootFollower`.
+* The proxy has no inertia. The root keeps zero inverse mass, so the rod sees
+  its holder as infinitely heavy within a substep. A finite root mass would
+  also expose the root to the vessel containment, track guidance and wall
+  friction kernels, which identify the root by its zero inverse mass.
+* Each substep makes one pass, so ``relaxation`` filters the reaction across
+  substeps rather than relaxing an iteration, and there is no Aitken update.
+
 What is harvested differs from upstream. Upstream reads a proxy *body*'s
 momentum change, which works because their sub-solvers move the proxy during
 their own solve.
@@ -152,31 +168,7 @@ def resolve_drive_body_index(labels, name: str, bodies_per_env: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# 1. Gather the drive point
-# ---------------------------------------------------------------------------
-
-
-@wp.kernel
-def gather_drive_positions_kernel(
-    particle_q: wp.array(dtype=wp.vec3),
-    root_offset: int,
-    root_stride: int,
-    out_root_q: wp.array(dtype=wp.vec3),
-):
-    """Pick each rod's proximal particle position out of Newton's flat array.
-
-    Args:
-        particle_q: Newton's flat particle position array.
-        root_offset: Index of the first rod's proximal particle.
-        root_stride: Particle count per rod, i.e. the per-env stride.
-        out_root_q: Per-env positions written by this kernel.
-    """
-    env = wp.tid()
-    out_root_q[env] = particle_q[root_offset + env * root_stride]
-
-
-# ---------------------------------------------------------------------------
-# 2. Harvest the reaction as a body wrench
+# 1. Harvest the reaction as a body wrench
 # ---------------------------------------------------------------------------
 
 
@@ -284,7 +276,7 @@ def _reset_env_reactions(
 
 
 # ---------------------------------------------------------------------------
-# 3. Relaxation blend against the previous iterate
+# 2. Relaxation blend against the previous substep's reaction
 # ---------------------------------------------------------------------------
 
 
@@ -314,7 +306,7 @@ def blend_coupling_forces_kernel(
 
 
 # ---------------------------------------------------------------------------
-# 4. Inject the lagged feedback into the rigid solver
+# 3. Inject the lagged feedback into the rigid solver
 # ---------------------------------------------------------------------------
 
 
@@ -336,16 +328,20 @@ class DriveReactionCoupler:
     including when several rods share a holder. One instance spans every env,
     because Newton keeps all bodies and particles in single flat arrays.
 
-    The call order over a substep mirrors upstream's ``LAGGED`` proxy mode::
+    The call order over a substep mirrors upstream's ``LAGGED`` proxy mode with
+    one pass::
 
-        apply(state_0)          # feedback harvested one substep ago
+        apply(state_0)                  # feedback harvested one substep ago
         ... rigid solve ...
+        follower.sync(...)              # root onto the solved mount, if following
         ... rod solve ...
-        harvest(state, rod)     # reaction the rod just transmitted
+        harvest(state, rod)             # reaction the rod just transmitted
 
     There is no pre-step snapshot, unlike upstream: the reaction comes from the
     rod's constraint state after its solve rather than from a velocity
     difference across it, and the rod supplies its own substep scaling.
+    Because there is one pass per substep, ``relaxation`` below 1 low-pass
+    filters the reaction across substeps; it does not relax an iteration.
 
     Args:
         body_count: Number of bodies in the Newton model.
@@ -546,14 +542,202 @@ class DriveReactionCoupler:
         self._publish_env_reactions()
 
 
+# ---------------------------------------------------------------------------
+# 4. Hold the root on the drive mount
+# ---------------------------------------------------------------------------
+
+
+@wp.kernel
+def _follow_drive_mount_kernel(
+    body_q: wp.array(dtype=wp.transform),
+    body_q_begin: wp.array(dtype=wp.transform),
+    drive_body: wp.array(dtype=wp.int32),
+    mount_local: wp.array(dtype=wp.vec3),
+    rod_orientations: wp.array(dtype=wp.quat),
+    root_stride: int,
+    bound: wp.array(dtype=wp.int32),
+    root_rotation_local: wp.array(dtype=wp.quat),
+    out_positions: wp.array(dtype=wp.vec3),
+    out_orientations: wp.array(dtype=wp.quat),
+):
+    """Place each rod's root on its drive mount at the pose the rigid solve reached.
+
+    The root's material frame keeps the rotation it had relative to the body
+    when the env was bound, captured against the body's pose at the start of
+    the substep, so a mount does not impose the body's own axes on the wire.
+    """
+    env = wp.tid()
+    body = drive_body[env]
+    root = env * root_stride
+    rotation = wp.transform_get_rotation(body_q[body])
+
+    if bound[env] == 0:
+        begin_rotation = wp.transform_get_rotation(body_q_begin[body])
+        root_rotation_local[env] = wp.quat_inverse(begin_rotation) * rod_orientations[root]
+        bound[env] = 1
+
+    out_positions[env] = wp.transform_point(body_q[body], mount_local[env])
+    out_orientations[env] = wp.normalize(rotation * root_rotation_local[env])
+
+
+@wp.kernel
+def _unbind_envs_kernel(env_ids: wp.array(dtype=wp.int32), bound: wp.array(dtype=wp.int32)):
+    bound[env_ids[wp.tid()]] = 0
+
+
+class DriveRootFollower:
+    """Hold each rod's proximal end on the body that grips it, inside the substep.
+
+    :class:`DriveReactionCoupler` lets the body feel the rod; this is the other
+    half of the loop, the rod being held where the body is. It runs between the
+    rigid and rod solves of every substep, so the root follows the body with no
+    lag, and it reads the body pose from the rigid solver's output rather than
+    from whatever a task commanded once per environment step.
+
+    The root is placed at ``mount_local`` on the body, the same grip point the
+    coupler uses for the moment arm, so the force and the lever it acts through
+    describe one mount.
+
+    The root goes where the rigid solve put the body, lagged reaction included,
+    and is not rewound to the body's free pose. The rigid solver keeps that
+    reaction in the body's velocity, so a root placed as though it had not been
+    applied lets the rod respond to the holder's position one substep late. In a
+    holder-against-spring model that extra delay diverges from
+    ``k·dt²/M ≈ 0.1``, while the root on the solved pose is a staggered
+    symplectic Euler step, stable up to ``k·dt²/M < 4``.
+
+    The follower owns the root while it is active. A rate or pose command latched
+    on the rod by anything else would silently lose to it, so :meth:`sync` refuses
+    to run over one; tasks command the drive body instead.
+
+    Args:
+        num_envs: Number of rods.
+        root_stride: Particles per rod in the rod solver's own arrays.
+        drive_bodies: Per-env body index holding each rod; all non-negative.
+        mount_local: Per-env grip point in the drive body's frame. Defaults to
+            the body origin.
+        device: Warp device for the persistent buffers.
+    """
+
+    def __init__(
+        self,
+        *,
+        num_envs: int,
+        root_stride: int,
+        drive_bodies,
+        mount_local=None,
+        device=None,
+    ) -> None:
+        if num_envs <= 0:
+            raise ValueError(f"num_envs must be positive, got {num_envs}")
+        if root_stride <= 0:
+            raise ValueError(f"root_stride must be positive, got {root_stride}")
+
+        drive = [int(value) for value in drive_bodies]
+        if len(drive) != num_envs:
+            raise ValueError(f"drive_bodies has {len(drive)} entries but num_envs is {num_envs}")
+        if any(body < 0 for body in drive):
+            raise ValueError(
+                f"drive_bodies {drive} include a negative index; the root has to follow a body"
+            )
+
+        mounts = [(0.0, 0.0, 0.0)] * num_envs if mount_local is None else [tuple(m) for m in mount_local]
+        if len(mounts) != num_envs:
+            raise ValueError(f"mount_local has {len(mounts)} entries but num_envs is {num_envs}")
+        for mount in mounts:
+            if len(mount) != 3:
+                raise ValueError(f"each mount_local entry must be a 3-vector, got {mount!r}")
+
+        self.num_envs = int(num_envs)
+        self.root_stride = int(root_stride)
+        self._device = device
+
+        self._drive_bodies = wp.array(drive, dtype=wp.int32, device=device)
+        self._mount_local = wp.array(mounts, dtype=wp.vec3, device=device)
+        self._bound = wp.zeros(self.num_envs, dtype=wp.int32, device=device)
+        self._root_rotation_local = wp.zeros(self.num_envs, dtype=wp.quat, device=device)
+        self._root_positions = wp.zeros(self.num_envs, dtype=wp.vec3, device=device)
+        self._root_orientations = wp.zeros(self.num_envs, dtype=wp.quat, device=device)
+        self._reset_env_ids = wp.empty(self.num_envs, dtype=wp.int32, device=device)
+        self._reset_env_ids_host = wp.empty(
+            self.num_envs, dtype=wp.int32, device="cpu", pinned=wp.get_device(device).is_cuda,
+        )
+
+    @property
+    def root_positions(self):
+        """Per-env root positions placed by the most recent :meth:`sync`."""
+        return self._root_positions
+
+    @property
+    def root_orientations(self):
+        """Per-env root orientations (xyzw) placed by the most recent :meth:`sync`."""
+        return self._root_orientations
+
+    def sync(self, state_in, state_out, rod_solver) -> None:
+        """Latch each root onto its mount for the rod step that follows.
+
+        Call after the rigid solve and before the rod solve of the same substep.
+
+        Args:
+            state_in: State the rigid solve started from; its body poses anchor
+                the root's rotation when an env is first bound.
+            state_out: State the rigid solve wrote; the body pose the root follows.
+            rod_solver: The :class:`~catheter_vasculature_solver.XPBDRodSolver`
+                about to step.
+
+        Raises:
+            RuntimeError: If the rod already has a command latched, which this
+                would silently override.
+        """
+        if rod_solver.has_pending_control:
+            raise RuntimeError(
+                "drive_root_sync holds the catheter's root on its drive body, but a rate or "
+                "pose command is already latched on the rod and would be silently overridden. "
+                "Command the drive body instead, or turn drive_root_sync off."
+            )
+        wp.launch(
+            _follow_drive_mount_kernel,
+            dim=self.num_envs,
+            inputs=[
+                state_out.body_q,
+                state_in.body_q,
+                self._drive_bodies,
+                self._mount_local,
+                rod_solver.orientation_array,
+                self.root_stride,
+                self._bound,
+                self._root_rotation_local,
+                self._root_positions,
+                self._root_orientations,
+            ],
+            device=self._device,
+        )
+        rod_solver.set_root_pose_gpu(self._root_positions, self._root_orientations)
+
+    def reset(self, world_mask=None) -> None:
+        """Re-bind the selected worlds' root rotation at their next sync; ``None`` re-binds all."""
+        env_ids = env_ids_from_world_mask(world_mask, self.num_envs)
+        if env_ids is None:
+            self._bound.zero_()
+            return
+        if len(env_ids) == 0:
+            return
+        self._reset_env_ids_host.numpy()[:len(env_ids)] = env_ids
+        wp.copy(self._reset_env_ids, self._reset_env_ids_host, count=len(env_ids))
+        wp.launch(
+            _unbind_envs_kernel, dim=len(env_ids), inputs=[self._reset_env_ids, self._bound],
+            device=self._device,
+        )
+
+
 __all__ = [
     "DEBUG_ENV_VAR",
     "DEFAULT_DEBUG_INTERVAL",
     "DriveReactionCoupler",
+    "DriveRootFollower",
     "apply_coupling_forces_kernel",
     "blend_coupling_forces_kernel",
     "debug_log_interval",
-    "gather_drive_positions_kernel",
     "harvest_drive_reaction_kernel",
     "resolve_drive_body_index",
     "stash_coupling_forces_kernel",
