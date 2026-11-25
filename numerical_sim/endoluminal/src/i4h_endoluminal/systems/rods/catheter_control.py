@@ -69,7 +69,8 @@ class CatheterControl(System):
     # polyline turns by the angle: sin(angle / (2 tip_edges - 1)) per edge, the workflow's tip_bend_rest_component)
 
     root_mode: str = "track"  # structural: track or externally commanded component-frame pose
-    track_path: object = None  # immutable component-frame polyline; None retains the straight guide
+    track_path: object = None  # immutable component-frame polyline; None retains the straight guide. With a path, the
+    # live track_length is ignored and the path does not follow a rigid mount pose (it is fixed in component coordinates)
     distal_free_nodes: int | None = None  # independent of tip steering; None retains tip_edges default
 
     target_mode: str = "rate"  # rate integration, or absolute_targets from Control
@@ -158,7 +159,8 @@ class CatheterControl(System):
         Torch producers use their current stream; Warp producers use the current
         Warp stream on this device. Callers using other Warp streams must order
         them before this call. Device inputs must be float32 on the scene device.
-        The quaternion must be finite and nonzero; the kernel normalizes it.
+        The quaternion must be finite and nonzero; the kernel normalizes it. NumPy inputs are validated;
+        Torch and Warp inputs are not (no device sync), so a zero or non-finite quaternion gives NaN frames.
         """
         if self.root_mode != "external_pose":
             raise ValueError("write_root_poses requires root_mode='external_pose'")
