@@ -146,6 +146,22 @@ Notes:
 - `drive_proxy_mass=True` (with `drive_root_sync` and at least two iterations) makes the root a proxy of the holder, as Newton's proxies do: it carries the drive link's mass times `drive_proxy_mass_scale` and starts each substep with the holder's rewound free velocity, while containment, track guidance and friction still treat it as held. With two iterations it converges at any stiffness; only translation is a proxy.
 - Containment (static mesh and deforming centerline), track guidance and per-env reset all run on the batched path, so `num_envs > 1` simulates the same physics as `num_envs = 1`. A deforming vessel must be built with a matching `num_envs` so each env owns its own wall; `CathRodSolver` raises on a mismatch rather than letting envs share one.
 
+Outside Isaac Lab, with `pip install -e ".[newton-coupled]"` (Newton 1.8 or newer, which needs a newer Warp than Isaac Lab pins), `build_coupled_rod_solver` in `catheter_vasculature_solver.newton_coupled_rod` couples the rod through Newton's own `SolverCoupledProxy` from `newton.solvers.experimental.coupled`. The rigid entry owns the bodies, joints and shapes, and the rod entry owns the rod's particles. Each drive body becomes a proxy in the rod's view, carrying the rigid solver's articulated effective mass. Newton runs the iterations and the fixed or Aitken relaxation. The rod places its root on the proxy and reports its proximal reaction as the harvested wrench:
+
+```python
+from newton.solvers import SolverMuJoCo
+from catheter_vasculature_solver.newton_coupled_rod import ROD_ENTRY, build_coupled_rod_solver
+
+solver = build_coupled_rod_solver(
+    model, rod, particle_range,
+    rigid_solver=lambda view: SolverMuJoCo(view),
+    drive_bodies=[flange_body], mount_local=[(0.0, 0.0, 0.05)],
+    iterations=2, relaxation_mode="aitken",
+)
+solver.step(state_0, state_1, control, contacts, dt)
+rod_solver = solver.solver(ROD_ENTRY)
+```
+
 On the pinned Isaac Lab `ffff603` revision, the scene's reset callback must explicitly call the active manager's `reset_rod(world_mask=...)` after authoring any rigid-body reset and before stepping again. Pass one mask entry per environment, rather than a list of environment IDs: `[False, True, False]` resets only environment 1. `None` resets all environments; an all-zero mask changes nothing.
 
 Use `NewtonXPBDRodManager.reset_rod(...)` for rod-only scenes and `NewtonCoupledMJWarpXPBDRodManager.reset_rod(...)` for coupled scenes. Both publish only the selected rod particles and preserve other environments' queued rate or pose commands. The coupled entry point also clears only selected feedback history and resets rigid-solver internals when that solver exposes a reset method, preserving scene-authored body and joint state with `flags=0`. Newer Isaac Lab revisions invoke the managers' `_reset_solver_internals` hooks automatically, so their normal reset path needs no additional explicit call.
