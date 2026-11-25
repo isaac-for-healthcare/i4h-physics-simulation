@@ -196,7 +196,6 @@ def test_body_particle_integrators_cover_each_main_body_once():
 
 def test_existing_positional_particle_parameters_keep_their_meaning():
     import numpy as np
-
     from i4h_physics import Scene
     from i4h_physics.systems.mechanics.particles import Particles
 
