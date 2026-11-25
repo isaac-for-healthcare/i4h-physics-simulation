@@ -1,4 +1,4 @@
-exclude: ^(neural_sim/cosmos_h_dreams/|numerical_sim/data/)
+exclude: ^(neural_sim/cosmos3_h_dreams/|numerical_sim/data/)
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit

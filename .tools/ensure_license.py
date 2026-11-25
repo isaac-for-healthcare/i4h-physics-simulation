@@ -24,7 +24,7 @@ SKIP_DIR_NAMES = {
     "assets",
     "tools",
     "_deps",
-    "cosmos_h_dreams",
+    "cosmos3_h_dreams",
 }
 
 COPYRIGHT_MARKER = "Copyright"
