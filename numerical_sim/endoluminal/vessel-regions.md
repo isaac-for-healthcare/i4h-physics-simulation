@@ -1,4 +1,4 @@
-# Vessel regions and stiffness editing
+# Vessel regions and material properties
 
 `aorta_centreline` ships four coarse groups: right iliac/femoral (branch 0),
 aortic trunk (1), left iliac/femoral (2), and arch outlets (3–11). The configured
@@ -76,19 +76,17 @@ were tuned for, so that region keeps them:
 This linear mapping is a first-order default, not a calibration: it ignores wall
 thickness and radius (see `radius_weighting`).
 
-Region multipliers persist across episode reset. Overrides use the `regions`
-override section:
+The existing physics API edits regional tables between steps:
 
-```yaml
-regions:
-  aorta:
-    vessel_material:
-      aortic_trunk:
-        bend: 0.5
+```python
+body = sim.scene.body("aorta")
+body.region_properties.edit({"bend": 0.5}, "aortic_trunk", envs=[0])
+sim.reset([0])  # episode reset preserves regional material edits
+body.region_properties.restore(envs=[0])  # restore every region's initial values
 ```
 
-Scalar values apply to all environments; per-environment lists are also supported.
-The lower-level physics API keeps its existing bounds. The aorta case's base solver
-coefficients are stretch 1, bend 0.1 and twist 0.1. Vascular templates remain neutral,
-uncalibrated presets and do not rename region membership. Panel editing and limits
-belong to the standalone application and are not specified here.
+Omitting `envs` applies a material edit or restoration to every environment.
+Restoration uses each region's initial value: 1, or the Young's-modulus ratio
+for bend and twist. The physics API accepts multipliers in [0, 10].
+`tests/runtime/test_regions.py` covers eager and captured edits, environment
+isolation, masked episode reset and restoration of modulus-derived defaults.
