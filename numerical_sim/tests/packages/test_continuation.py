@@ -497,3 +497,52 @@ def test_catheter_cases_resume(device, captured, case, steps, rate, contact):
     s, c = m.state(), m.control()
     fresh = [(runtime(cfg, a, m, captured, state=s, control=c), s, c)]
     assert resume(sim, fresh, advance, state, control, 12) is None
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+def test_portable_world_rows_are_independent_and_validate_before_writing(device):
+    _, _, sim, _, state, control = rods(device)
+    c = sim.physics.solver.continuation
+    poison(71, state, control)
+    saved = c.export_worlds([2, 0])
+    before = snapshot(state, control)
+    invalid = {k: v.copy() for k, v in saved.items()}
+    last = next(reversed(invalid))
+    invalid[last] = invalid[last].astype(np.float64)
+    with pytest.raises(ValueError, match="shape/dtype"):
+        c.import_worlds(invalid, [0, 2])
+    assert snapshot(state, control) == before
+    c.import_worlds(saved, [0, 2])
+    swapped = c.export_worlds([0, 2])
+    for key in saved:
+        assert swapped[key].tobytes() == saved[key].tobytes(), key
+
+
+def test_portable_snapshot_replays_in_a_fresh_single_world_runtime():
+    from i4h_host.composition import load_case
+
+    def build(envs):
+        return load_case({
+            "sim": {"device": "cpu", "envs": envs, "dt": 1/120, "gravity": [0, 0, 0]},
+            "assets": {"catheter": {"type": "rod", "start": [0, 0, 0], "direction": [1, 0, 0],
+                                    "count": 9, "segment_length": .01, "radius": .0005, "mass": .001}},
+            "systems": [{"type": "particles"}, {"type": "rod_direct", "id": "rod", "body": "catheter"},
+                        {"type": "catheter_control", "rod": "rod", "track_length": 0, "tip_edges": 2,
+                         "track_path": [[0, 0, 0], [.1, 0, 0]], "distal_free_nodes": 5}],
+        })
+
+    original, replay = build(3), build(1)
+    control = next(s for s in original.systems if s.id == "catheter_control")
+    control.actions.assign(np.array([[.01, .2, .3]] * 3, np.float32))
+    for _ in range(3):
+        original.step()
+    saved = original.physics.solver.continuation.export_worlds([2])
+    replay.physics.solver.continuation.import_worlds(saved)
+    actual = replay.physics.solver.continuation.export_worlds()
+    for key in saved:
+        assert actual[key].tobytes() == saved[key].tobytes(), key
+    for _ in range(3):
+        original.step()
+        replay.step()
+        np.testing.assert_array_equal(original.scene.field("q", original.scene.body("catheter")).numpy()[2],
+                                      replay.scene.field("q", replay.scene.body("catheter")).numpy()[0])

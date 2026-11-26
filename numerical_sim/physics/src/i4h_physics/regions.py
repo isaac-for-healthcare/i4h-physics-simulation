@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Immutable material membership and persistent region tables, separate from control products."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import warp as wp
@@ -13,6 +13,7 @@ class RegionMembership:
     names: tuple[str, ...]
     edge: np.ndarray
     sources: tuple = ()  # source branch IDs per welded edge; empty for artificial stitching
+    young_modulus_kpa: dict = field(default_factory=dict)  # region name -> wall modulus, for initial multipliers
 
 
 @dataclass
@@ -26,7 +27,7 @@ class RodControls:
 class RegionProperties:
     def __init__(self, membership, edge, tables, defaults, rest_len=None, rest_darboux=None):
         self.membership, self.edge, self.tables = membership, edge, tables
-        self.defaults = defaults.copy()
+        self.defaults = {name: np.array(values, dtype=np.float32) for name, values in defaults.items()}  # per region
         self.rest_len, self.rest_darboux = rest_len, rest_darboux
 
     def validate(self, values):
@@ -71,8 +72,8 @@ class RegionProperties:
                 wp.copy(self.tables[name], source, dest_offset=offset, src_offset=offset, count=1)
 
     def restore(self, envs=None):
-        for region in self.membership.names:
-            self.edit(self.defaults, region, envs)
+        for index, region in enumerate(self.membership.names):
+            self.edit({name: values[index] for name, values in self.defaults.items()}, region, envs)
 
 
 def material_system(sim, sid):

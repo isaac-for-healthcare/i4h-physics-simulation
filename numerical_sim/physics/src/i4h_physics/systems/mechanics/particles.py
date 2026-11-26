@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import warp as wp
+from i4h_physics.checks import check_bool
 from i4h_physics.scene import ACTIVE
 from i4h_physics.systems.base import System
 
@@ -24,29 +25,43 @@ class Particles(System):
     damping: float = 0.97  # live, per env
     max_velocity: float = 1000.0  # live, per env; bounds the predicted velocity and the substep displacement
 
+    body: object = None  # None retains the whole main block; otherwise one body
+    gravity_scale: float = 1.0  # live per env, e.g. a neutrally buoyant wall
+    damping_at_finalize: bool = False  # apply damping to the projected velocity
+
+    structural = System.structural + ("body", "damping_at_finalize")
+
     def __post_init__(self):
+        self.body = None if self.body is None else self.scene.body(self.body)
+        if self.body is not None and self.body.pool:
+            raise ValueError("particles.body must belong to the main block")
+        self.damping_at_finalize = check_bool("particles.damping_at_finalize", self.damping_at_finalize)
+        self.freeze("body", "damping_at_finalize")
+        self._live("gravity_scale")
         self._live("damping")
         self._live("max_velocity")
 
 
     def substep_start(self, scene, dt, s, substeps):
-        if scene.main.width:  # the whole main block in one launch (fluid pools are the fluid system's, in their own block)
-            f = scene.block_field
+        count = scene.main.width if self.body is None else self.body.count
+        if count:  # the whole main block in one launch (fluid pools are the fluid system's, in their own block)
+            f = scene.block_field if self.body is None else lambda name: scene.field(name, self.body)
             wp.launch(
                 predict,
-                dim=(scene.envs, scene.main.width),
-                inputs=[f("qd"), f("inv_mass"), f("flags"), scene.gravity, self.damping, self.max_velocity, dt],
+                dim=(scene.envs, count),
+                inputs=[f("qd"), f("inv_mass"), f("flags"), scene.gravity, self.gravity_scale, self.damping, int(self.damping_at_finalize), self.max_velocity, dt],
                 outputs=[f("q"), f("q_prev")],
                 device=scene.device,
             )
 
     def substep_end(self, scene, dt):
-        if scene.main.width:
-            f = scene.block_field
+        count = scene.main.width if self.body is None else self.body.count
+        if count:
+            f = scene.block_field if self.body is None else lambda name: scene.field(name, self.body)
             wp.launch(
                 finalize,
-                dim=(scene.envs, scene.main.width),
-                inputs=[f("q_prev"), f("inv_mass"), f("flags"), self.max_velocity, dt],
+                dim=(scene.envs, count),
+                inputs=[f("q_prev"), f("inv_mass"), f("flags"), self.damping, int(self.damping_at_finalize), self.max_velocity, dt],
                 outputs=[f("q"), f("qd")],
                 device=scene.device,
             )
@@ -64,7 +79,9 @@ def predict(
     inv_mass: wp.array2d(dtype=wp.float32),
     flags: wp.array2d(dtype=wp.int32),
     gravity: wp.array(dtype=wp.vec3),
+    gravity_scale: wp.array(dtype=wp.float32),
     damping: wp.array(dtype=wp.float32),
+    damping_at_finalize: wp.int32,
     max_velocity: wp.array(dtype=wp.float32),
     dt: wp.float32,
     q: wp.array2d(dtype=wp.vec3),
@@ -76,7 +93,10 @@ def predict(
     if (flags[env, i] & ACTIVE) == 0 or inv_mass[env, i] <= 0.0:
         return
 
-    v1 = (qd[env, i] + gravity[env] * dt) * damping[env]
+    factor = float(1.0)
+    if damping_at_finalize == 0:
+        factor = damping[env]
+    v1 = (qd[env, i] + gravity[env] * gravity_scale[env] * dt) * factor
     v_max = max_velocity[env]
     v1_mag = wp.length(v1)
     if v1_mag > v_max:
@@ -94,6 +114,8 @@ def finalize(
     q_prev: wp.array2d(dtype=wp.vec3),
     inv_mass: wp.array2d(dtype=wp.float32),
     flags: wp.array2d(dtype=wp.int32),
+    damping: wp.array(dtype=wp.float32),
+    damping_at_finalize: wp.int32,
     max_velocity: wp.array(dtype=wp.float32),
     dt: wp.float32,
     q: wp.array2d(dtype=wp.vec3),
@@ -110,4 +132,7 @@ def finalize(
     if max_delta > 0.0 and distance > max_delta:
         displacement = displacement * (max_delta / distance)
         q[env, i] = q_prev[env, i] + displacement
-    qd[env, i] = displacement / dt
+    velocity = displacement / dt
+    if damping_at_finalize != 0:
+        velocity *= damping[env]
+    qd[env, i] = velocity

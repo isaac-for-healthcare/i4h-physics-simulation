@@ -578,3 +578,54 @@ def test_catheter_host_named_view_lifetime_without_optional_recording(tmp_path):
         SimulationContext.clear_instance()
     with pytest.raises(RuntimeError, match="invalidated"):
         component.command_views("control")
+
+
+@pytest.mark.parametrize("device,captured", MODES)
+@pytest.mark.parametrize("backend", ["direct", "pbd"])
+def test_external_commands_rebind_independent_state_and_control(device, captured, backend):
+    cfg = dict(sim=dict(device=device, envs=2, gravity=[0, 0, 0]),
+               assets=dict(wire=dict(type="test_chain")),
+               systems=[dict(type="particles"), dict(type=f"rod_{backend}", id="rod", body="wire"),
+                        dict(type="catheter_control", id="drive", rod="rod", track_length=0,
+                             root_mode="external_pose", target_mode="absolute", tip_edges=2,
+                             track_path=[[0, 0, .2], [.1, 0, .2], [.1, .1, .2]])])
+    a = author_case(cfg, loaders=dict(test_chain=chain), systems=SYSTEMS)
+    builder = newton.ModelBuilder()
+    for e in range(2):
+        builder.begin_world(gravity=(0, 0, 0))
+        a.add_world(builder, e)
+        builder.end_world()
+    a.complete(builder)
+    model = builder.finalize(device=device)
+    model.particle_grid = None
+    first, systems = runtime(a, model, captured)
+    drive = systems['drive']
+    positions, rotations = drive.root_positions.numpy(), drive.root_rotations.numpy()
+    positions[:, 1] = [.001, .002]
+    drive.write_root_poses(positions, rotations)
+    drive.absolute_targets.assign(np.float32([[.1, .2, .3], [.2, .3, -.1]]))
+    first.step()
+    saved = model.state(), model.control()
+    first.physics.save(*saved)
+    expected = snapshot(first.scene)
+    for state, control in ((saved[0], model.control()), (model.state(), saved[1]), saved):
+        first.physics.save(*saved)
+        rebound, bound = runtime(a, model, captured, state, control)
+        ctl = bound['drive']
+        record = rebound.scene.endoluminal_domains['drive']
+        for key in ('root_positions', 'root_rotations', 'absolute_targets'):
+            field = record.fields[key]
+            assert field.owner is Owner.CONTROL
+            assert getattr(ctl, key).ptr == getattr(control.i4h, field.name).ptr
+        for key in ('root_start_positions', 'root_start_rotations', 'guide_path'):
+            field = record.fields[key]
+            assert field.owner is Owner.MODEL
+            assert getattr(ctl, key).ptr == getattr(model.i4h, field.name).ptr
+        if control is saved[1]:
+            np.testing.assert_array_equal(ctl.root_positions.numpy(), positions)
+        else:
+            np.testing.assert_array_equal(ctl.root_positions.numpy(), ctl.root_start_positions.numpy())
+        if state is saved[0] and control is saved[1]:
+            assert snapshot(rebound.scene) == expected
+        rebound.step()
+        assert np.isfinite(rebound.scene.q.numpy()).all()

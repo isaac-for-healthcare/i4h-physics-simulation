@@ -9,6 +9,7 @@ import copy
 import numpy as np
 import pytest
 import warp as wp
+import yaml
 from i4h_endoluminal.loaders.centreline import add_centreline_tree, build_tree
 from i4h_endoluminal.loaders.rod import add_rod
 from i4h_endoluminal.regions import instrument_regions, vessel_regions
@@ -313,3 +314,76 @@ def test_explicit_material_validation_before_capture():
     body.rod_material.bend_multiplier = wp.ones((2, 1), dtype=float, device=scene.device)
     with pytest.raises(RuntimeError, match='replaced'):
         sim.prepare()
+
+
+def test_vessel_sidecar_young_moduli_parse_and_validate():
+    sidecar = {'schema_version': 1, 'branches': {0: 'aorta', 1: 'iliac'}, 'young_modulus_kpa': {'aorta': 400, 'iliac': 800.0}}
+    names, mapping, moduli = vessel_regions(sidecar, {0, 1, 2})
+    assert names == ('unassigned', 'aorta', 'iliac') and mapping == {0: 1, 1: 2, 2: 0}
+    assert moduli == {'aorta': 400.0, 'iliac': 800.0}
+    assert vessel_regions({'schema_version': 1, 'branches': {0: 'aorta'}}, {0})[2] == {}
+    for bad in ({'other': 1}, {'aorta': 0}, {'aorta': True}, {'aorta': float('nan')}, {'aorta': '400'}, [400]):
+        with pytest.raises(ValueError, match='young_modulus_kpa'):
+            vessel_regions({'schema_version': 1, 'branches': {0: 'aorta'}, 'young_modulus_kpa': bad}, {0})
+
+
+def test_bundle_sidecar_moduli_reach_membership(tmp_path):
+    from i4h_endoluminal.loaders.centreline import add_centreline_from_bundle
+
+    folder = tmp_path / "twin"
+    folder.mkdir()
+    np.save(folder / "centerline_points.npy", np.array([[0, 0, 0], [1, 0, 0], [2, 0, 0]], np.float64))
+    np.save(folder / "centerline_edges.npy", np.array([[0, 1], [1, 2]]))
+    np.save(folder / "centerline_radii.npy", np.full(3, .1, np.float32))
+    np.save(folder / "centerline_regions.npy", np.array([0, 1], np.int32))
+    # A bundle lists every exported vessel, including one (2) without centreline edges.
+    (folder / "vessel_regions.yaml").write_text(yaml.safe_dump({
+        'schema_version': 1, 'default': 'unassigned', 'branches': {0: 'aorta', 1: 'iliac', 2: 'femoral'},
+        'young_modulus_kpa': {'aorta': 400, 'iliac': 800, 'femoral': 800}}))
+
+    def tree(**kwargs):
+        return add_centreline_from_bundle(Scene('cuda:0', 1, (0, 0, 0)), 'vessel', folder, scale=1, rotation=np.eye(3),
+                                          translation=np.zeros(3), root_position=[0, 0, 0], **kwargs)
+
+    body = tree()
+    assert body.regions.names == ('unassigned', 'aorta', 'iliac', 'femoral')
+    np.testing.assert_array_equal(body.regions.edge, [1, 2])
+    assert body.regions.young_modulus_kpa == {'aorta': 400.0, 'iliac': 800.0, 'femoral': 800.0}
+    override = tree(regions={'schema_version': 1, 'branches': {0: 'trunk', 1: 'trunk'}})  # a case may regroup
+    assert override.regions.names == ('unassigned', 'trunk') and override.regions.young_modulus_kpa == {}
+    with pytest.raises(ValueError, match='unknown branch'):
+        tree(regions={'schema_version': 1, 'branches': {7: 'a'}})
+
+
+def modulus_sim(moduli, reference):
+    scene = Scene('cuda:0', 2, (0, 0, 0))
+    body = add_centreline_tree(scene, 'vessel', [[0, 0, 0], [1, 0, 0], [2, 0, 0]], [[0, 1], [1, 2]], [1, 1, 1], 0)
+    body.regions = RegionMembership(('unassigned', 'aorta', 'vein'), np.array([1, 2], np.int32), young_modulus_kpa=moduli)
+    declare_rod_pbd_material(scene, 'vessel', system_id='material', reference_young_modulus_kpa=reference)
+    declare_rod_pbd(scene, 'vessel', system_id='pbd')
+    scene.allocate()
+    material = RodPbdMaterial(scene, body='vessel', id='material', reference_young_modulus_kpa=reference)
+    rod = RodPbd(scene, body='vessel', id='pbd')
+    return Stepper.create(scene, [Particles(scene), material, rod], dt=.01), rod, body
+
+
+def test_reference_modulus_sets_initial_and_restored_bend_twist():
+    sim, rod, body = modulus_sim({'aorta': 400, 'vein': 20}, 400)
+    props = body.region_properties
+    expected = np.array([[1, 1, .05]] * 2, np.float32)  # unassigned has no modulus and keeps 1.
+    for name in ('bend', 'twist'):
+        np.testing.assert_allclose(props.tables[name].numpy(), expected)
+    np.testing.assert_array_equal(props.tables['stretch'].numpy(), 1)
+    sim.step()
+    np.testing.assert_allclose(rod.effective_bend.numpy(), 2 * .05 / 1.05, rtol=1e-6)  # harmonic across the junction
+    props.edit({'bend': 3, 'twist': 2}, 'vein', [1])
+    props.restore()
+    np.testing.assert_allclose(props.tables['bend'].numpy(), expected)
+    np.testing.assert_allclose(props.tables['twist'].numpy(), expected)
+
+    _, _, plain = modulus_sim({'aorta': 400, 'vein': 20}, None)  # no reference: PR defaults
+    assert (plain.region_properties.tables['bend'].numpy() == 1).all()
+    with pytest.raises(ValueError, match='exceeds the multiplier limit'):
+        modulus_sim({'aorta': 400, 'vein': 20}, 30)
+    with pytest.raises(ValueError, match='positive'):
+        modulus_sim({'aorta': 400}, 0)

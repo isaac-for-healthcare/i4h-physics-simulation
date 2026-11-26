@@ -1,11 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""M9a part 2: centreline trees (JSON loader, welding and stitching, spline topology, tree frames and bend pairs, the
+"""M9a part 2: centreline trees (patient-twin bundle loader, welding and stitching, spline topology, tree frames and bend pairs, the
 Y junction on rod_pbd from omniendo tests/test_pbd_branching.py), then lumen containment and the aorta centreline case."""
 
-
-import json
 
 import numpy as np
 import pytest
@@ -16,7 +14,7 @@ from i4h_endoluminal.loaders.centreline import (
     add_centreline_tree,
     build_tree,
     derive_bend_pairs,
-    load_centreline_json,
+    load_centreline_bundle,
     spline_topology,
     tree_frames,
 )
@@ -28,28 +26,37 @@ from i4h_physics.systems.mechanics.particles import Particles
 from i4h_physics.systems.rods.rod_pbd import RodPbd
 
 
-def branch(points, rmin, rmax):
-    return {"samples": [{"position": list(map(float, p)), "radius_min": float(a), "radius_max": float(b)}
-                        for p, a, b in zip(points, rmin, rmax)]}
+def write_bundle(folder, polylines, regions=None, sidecar=None):
+    """i4h-digital-twin centreline arrays: each polyline's points joined by consecutive edges."""
+    points, radii, edges = [], [], []
+    for line, radius in polylines:
+        base = len(points)
+        points.extend(line)
+        radii.extend(radius)
+        edges.extend((base + i, base + i + 1) for i in range(len(line) - 1))
+    folder.mkdir()
+    np.save(folder / "centerline_points.npy", np.asarray(points, np.float64))
+    np.save(folder / "centerline_edges.npy", np.asarray(edges, np.int64))
+    np.save(folder / "centerline_radii.npy", np.asarray(radii, np.float32))
+    if regions is not None:
+        np.save(folder / "centerline_regions.npy", np.asarray(regions, np.int32))
+    if sidecar is not None:
+        (folder / "vessel_regions.yaml").write_text(yaml.safe_dump(sidecar))
+    return folder
 
 
-def test_json_weld_stitch_and_radii(tmp_path):
-    """Two branches meeting within the weld epsilon share a node; a third 2 cm away is stitched; sentinel radii
-    (zero, negative) are repaired from their neighbours; the root is the node nearest the given position."""
-    trunk = np.array([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.2, 0.0, 0.0], [0.3, 0.0, 0.0], [0.4, 0.0, 0.0]])
-    side = np.array([[0.4, 1.0e-7, 0.0], [0.4, 0.1, 0.0], [0.4, 0.2, 0.0], [0.4, 0.3, 0.0]])  # welds onto the trunk's end
-    loose = np.array([[0.2, -0.02, 0.0], [0.2, -0.12, 0.0], [0.2, -0.22, 0.0]])  # 2 cm gap: stitched
-    data = {"branches": [branch(trunk, [0.0, 0.05, 0.05, 0.05, 0.05], [0.07] * 5),
-                         branch(side, [0.04] * 4, [0.06, -1.0, 0.06, 0.06]),
-                         {"branch_id": 7, "samples": [{"position": [9, 9, 9], "radius_min": 1, "radius_max": 1}]},  # one sample: skipped
-                         branch(loose, [0.03] * 3, [0.05] * 3)]}
-    path = tmp_path / "c.json"
-    path.write_text(json.dumps(data))
-    starts, ends, smin, emin, smax, emax = load_centreline_json(path)
-    assert len(starts) == 4 + 3 + 2 and (smin > 0).all() and (emax > 0).all()  # sentinels repaired
-    assert smin[0] == 0.05  # the trunk's zero start radius took its neighbour's value
-    pos, edges, radii, paths, root = build_tree(starts, ends, 0.5 * (smin + smax), 0.5 * (emin + emax), stitch_threshold=0.03,
-                                                root_position=[0.02, 0.0, 0.0])
+def test_bundle_weld_stitch_and_radii(tmp_path):
+    """Two polylines meeting within the weld epsilon share a node; a third 2 cm away is stitched; the root is the
+    node nearest the given position. A ``patient_twin.yaml`` path reads its directory."""
+    trunk = [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.2, 0.0, 0.0], [0.3, 0.0, 0.0], [0.4, 0.0, 0.0]]
+    side = [[0.4, 1.0e-7, 0.0], [0.4, 0.1, 0.0], [0.4, 0.2, 0.0], [0.4, 0.3, 0.0]]  # welds onto the trunk's end
+    loose = [[0.2, -0.02, 0.0], [0.2, -0.12, 0.0], [0.2, -0.22, 0.0]]  # 2 cm gap: stitched
+    folder = write_bundle(tmp_path / "twin", [(trunk, [0.06] * 5), (side, [0.05] * 4), (loose, [0.04] * 3)])
+    (folder / "patient_twin.yaml").write_text("schema_version: 2\n")
+    starts, ends, sr, er, sources, sidecar = load_centreline_bundle(folder / "patient_twin.yaml")
+    assert len(starts) == 4 + 3 + 2 and sources == [0] * 9 and sidecar is None
+    assert starts.dtype == sr.dtype == np.float64 and sr[0] == pytest.approx(0.06)
+    pos, edges, radii, paths, root = build_tree(starts, ends, sr, er, stitch_threshold=0.03, root_position=[0.02, 0.0, 0.0])
     assert len(pos) == 5 + 3 + 3 and len(edges) == 4 + 3 + 2 + 1 and root == 0
     assert (radii > 0).all() and radii[4] == pytest.approx(0.055, abs=1e-6)  # mean of the trunk end (0.06) and side start (0.05)
     degree = np.bincount(edges.reshape(-1), minlength=len(pos))
@@ -57,12 +64,54 @@ def test_json_weld_stitch_and_radii(tmp_path):
     controls, neighbors = spline_topology(edges, paths)
     assert (controls[:, 1:3].min(axis=1) == edges.min(axis=1)).all() and (neighbors == -1).sum() == 2 * len(paths)
     with pytest.raises(ValueError, match="disconnected"):
-        build_tree(starts, ends, 0.5 * (smin + smax), 0.5 * (emin + emax), stitch_threshold=0.01)
+        build_tree(starts, ends, sr, er, stitch_threshold=0.01)
     scene = Scene("cuda:0", 1)
     with pytest.raises(ValueError, match="degree-one root"):
         add_centreline_tree(scene, "t", pos, edges, radii, root=2, open_root=True)
     body = add_centreline_tree(scene, "t", pos, edges, radii, root, pinned_nodes=[root], pinned_segments=[0], open_root=True)
     assert body.tree.root_neighbor == 1 and body.tree.root_arc[0, 4] == pytest.approx(0.4, abs=1e-5)
+
+
+def test_bundle_regions_and_validation(tmp_path):
+    line = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+    sidecar = {"schema_version": 1, "branches": {0: "aorta", 1: "iliac", 2: "femoral"}}
+    folder = write_bundle(tmp_path / "ok", [(line, [0.1] * 3)], regions=[0, 1], sidecar=sidecar)
+    *_, sources, found = load_centreline_bundle(folder)
+    assert sources == [0, 1] and found == folder / "vessel_regions.yaml"
+    missing = write_bundle(tmp_path / "missing", [(line, [0.1] * 3)])
+    (missing / "centerline_radii.npy").unlink()
+    with pytest.raises(FileNotFoundError, match="centerline_radii"):
+        load_centreline_bundle(missing)
+    bad = {"radii": ([(line, [0.1, 0.0, 0.1])], None, "positive radius"),
+           "regions": ([(line, [0.1] * 3)], [0], "one integer region ID per edge")}
+    for name, (lines, regions, match) in bad.items():
+        with pytest.raises(ValueError, match=match):
+            load_centreline_bundle(write_bundle(tmp_path / name, lines, regions=regions))
+    folder = write_bundle(tmp_path / "edges", [(line, [0.1] * 3)])
+    np.save(folder / "centerline_edges.npy", np.array([[0, 3]]))
+    with pytest.raises(ValueError, match="point indices"):
+        load_centreline_bundle(folder)
+
+
+def test_vessel_mesh_prim_transform(tmp_path):
+    """An i4h-digital-twin anatomy prim carries its placement as a transform; ``prim_transform`` applies it."""
+    pxr = pytest.importorskip("pxr")
+    from i4h_endoluminal.loaders.vessel_mesh import read_usd_mesh
+
+    stage = pxr.Usd.Stage.CreateNew(str(tmp_path / "anatomy.usda"))
+    pxr.UsdGeom.Xform.Define(stage, "/HumanBody").AddTranslateOp().Set(pxr.Gf.Vec3d(0, 0, 5))
+    mesh = pxr.UsdGeom.Mesh.Define(stage, "/HumanBody/aorta")
+    mesh.CreatePointsAttr([(0, 0, 0), (1, 0, 0), (0, 1, 0)])
+    mesh.CreateFaceVertexCountsAttr([3])
+    mesh.CreateFaceVertexIndicesAttr([0, 1, 2])
+    rotate = pxr.Gf.Matrix4d().SetRotate(pxr.Gf.Rotation(pxr.Gf.Vec3d(0, 0, 1), 90)) * pxr.Gf.Matrix4d().SetTranslate((10, 0, 0))
+    mesh.AddTransformOp().Set(rotate)
+    stage.Save()
+    local, tris = read_usd_mesh(tmp_path / "anatomy.usda", "/HumanBody/aorta")
+    world, _ = read_usd_mesh(tmp_path / "anatomy.usda", "/HumanBody/aorta", prim_transform=True)
+    np.testing.assert_allclose(local, [[0, 0, 0], [1, 0, 0], [0, 1, 0]])
+    np.testing.assert_allclose(world, [[10, 0, 5], [10, 1, 5], [9, 0, 5]], atol=1e-6)
+    assert tris.tolist() == [[0, 1, 2]]
 
 
 def build_y(per_branch=12, seg_len=0.05):
@@ -685,3 +734,41 @@ def test_control_layout_loader(tmp_path):
         load_control_layout(layout, 100, "colon")
     with pytest.raises(ValueError, match="vessel"):
         load_control_layout(layout, 128, "aorta")
+
+
+def test_interior_pull_moves_only_the_source_and_reports_no_contact():
+    scene, source, target = lumen_scene(((0.5, 0.10, 0.0),), VESSEL2, ((0, 1),), (0.2, 0.2),
+                                         tree_inv_mass=(1.0, 1.0), envs=2)
+    lc = GraphContainment(scene, body="c", centreline="v", iterations=1, spline=False, two_way=True,
+                          open_root=False, candidates=False, source_max_delta=10.0, target_max_delta=10.0,
+                          interior_deadband=0.5, interior_stiffness=0.25)
+    wp.copy(scene.q_prev, scene.q)
+    original = scene.field("q", target).numpy().copy()
+    lc.iteration(scene, 1 / 120, 0, 1)
+    # Free radius 0.15, deadband 0.075: only the excess 0.025 is pulled.
+    np.testing.assert_allclose(scene.field("q", source).numpy()[:, 0, 1], 0.1 - 0.025 * 0.25, atol=1e-7)
+    np.testing.assert_array_equal(scene.field("q", target).numpy(), original)
+    np.testing.assert_array_equal(lc.contact_count.numpy(), np.zeros(2))
+    np.testing.assert_array_equal(lc.contact_depth.numpy(), np.zeros(2))
+
+
+@pytest.mark.parametrize('envs', [1, 2, 16])
+def test_colored_wall_capture_isolation_and_reset(envs):
+    outputs = []
+    for captured in (False, True):
+        sim, scene, body, rod, _ = y_sim(envs=envs, gravity=(0, 0, -1), sweeps=4,
+                                        scheme='colored', pre_sweeps=4, limit_motion=True, max_delta=.005)
+        sim.cuda_graph = captured
+        sim.prepare()
+        pinned = scene.field('q', body).numpy()[:, 0].copy()
+        for _ in range(12):
+            sim.step()
+        points = scene.field('q', body).numpy()
+        assert np.isfinite(points).all()
+        np.testing.assert_array_equal(points[:, 0], pinned)
+        np.testing.assert_allclose(points, np.repeat(points[:1], envs, axis=0), atol=1e-6)
+        outputs.append(points.copy())
+        sim.reset([0])
+        if envs > 1:
+            np.testing.assert_array_equal(scene.field('q', body).numpy()[1:], points[1:])
+    np.testing.assert_allclose(outputs[0], outputs[1], atol=1e-6)

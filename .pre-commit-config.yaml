@@ -31,12 +31,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
-      # Dependency patches and the historical stage A-C3 qualification reports are evidence:
-      # manifests and the allocation inventory hash them, so fixers must not rewrite them.
+      # The retained third-party patch must remain byte-identical.
       - id: trailing-whitespace
-        exclude: ^numerical_sim/docs/(.*\.patch|(newton18-qualification|stage-b[^/]*|stage-c|stage-c-field-contracts|stage-c-scratch-audit|stage-c21-[^/]*|stage-c2[2-5]|stage-c3-plan|stage-c3[0-3]|warp117-hashgrid-capture)\.md)$
+        exclude: ^numerical_sim/isaaclab/patches/.*\.patch$
       - id: end-of-file-fixer
-        exclude: ^numerical_sim/docs/(.*\.patch|(newton18-qualification|stage-b[^/]*|stage-c|stage-c-field-contracts|stage-c-scratch-audit|stage-c21-[^/]*|stage-c2[2-5]|stage-c3-plan|stage-c3[0-3]|warp117-hashgrid-capture)\.md)$
+        exclude: ^numerical_sim/isaaclab/patches/.*\.patch$
       - id: check-yaml
       - id: check-added-large-files
         exclude: ^numerical_sim/data/
@@ -46,5 +45,3 @@ repos:
       - id: markdownlint
         args: [--fix, --config, .markdownlint.yaml]
         files: ^.*\.md$
-        # Historical qualification reports stay byte-identical; new reports must pass.
-        exclude: ^numerical_sim/docs/(newton18-qualification|stage-b[^/]*|stage-c|stage-c-field-contracts|stage-c-scratch-audit|stage-c21-[^/]*|stage-c2[2-5]|stage-c3-plan|stage-c3[0-3]|warp117-hashgrid-capture)\.md$
