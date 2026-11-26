@@ -26,6 +26,7 @@ def region_membership(body, edges):
 class RodPbdMaterial(System):
     body: str
     radius_weighting: bool = False
+    reference_young_modulus_kpa: float | None = None  # read at declaration: initial regional bend/twist
 
     structural = System.structural + ('radius_weighting',)
 

@@ -10,8 +10,8 @@ from i4h_physics.regions import RegionMembership
 
 def region_sidecar(value, kind):
     data = value if isinstance(value, dict) else yaml.safe_load(Path(value).read_text())
-    key = 'branches' if kind == 'vessel' else 'regions'
-    if not isinstance(data, dict) or set(data) - {'schema_version', 'default', key} or data.get('schema_version') != 1:
+    keys = {'branches', 'young_modulus_kpa'} if kind == 'vessel' else {'regions'}
+    if not isinstance(data, dict) or set(data) - {'schema_version', 'default', *keys} or data.get('schema_version') != 1:
         raise ValueError('regions: expected schema_version: 1 and a valid region mapping')
     default = data.get('default', 'unassigned')
     if not isinstance(default, str) or not default.strip():
@@ -44,6 +44,7 @@ def instrument_regions(value, lengths):
 
 
 def vessel_regions(value, known):
+    """Region names, branch ID -> region index, and the optional region -> Young's modulus (kPa)."""
     data, default = region_sidecar(value, 'vessel')
     mapping = data.get('branches', {})
     if not isinstance(mapping, dict) or set(mapping) - set(known):
@@ -51,4 +52,9 @@ def vessel_regions(value, known):
     if any(not isinstance(n, str) or not n.strip() for n in mapping.values()):
         raise ValueError('regions: region names must be nonempty strings')
     names = tuple(dict.fromkeys([default, *mapping.values()]))
-    return names, {b: names.index(mapping.get(b, default)) for b in known}
+    moduli = data.get('young_modulus_kpa', {})
+    if not isinstance(moduli, dict) or set(moduli) - set(names):
+        raise ValueError('regions.young_modulus_kpa: unknown region names')
+    if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not np.isfinite(v) or v <= 0 for v in moduli.values()):
+        raise ValueError('regions.young_modulus_kpa: values must be positive finite numbers')
+    return names, {b: names.index(mapping.get(b, default)) for b in known}, {n: float(v) for n, v in moduli.items()}

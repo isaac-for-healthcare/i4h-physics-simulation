@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""F1: i4h particles inside a host Newton model that holds other particles, and env frames (docs/component-contracts.md
+"""F1: i4h particles inside a host Newton model that holds other particles, and env frames (physics/component-contracts.md
 sections 1-2). CPU, generated assets."""
 
 import numpy as np

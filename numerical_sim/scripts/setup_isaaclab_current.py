@@ -8,7 +8,7 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--seed-env', type=Path, required=True, help='qualified Python 3.12 environment, including patched Warp')
+    parser.add_argument('--seed-env', type=Path, required=True, help='Python 3.12 seed environment with pinned Warp and host dependencies')
     parser.add_argument('--lab', type=Path, required=True, help='external Isaac Lab source checkout')
     parser.add_argument('--newton', type=Path, required=True, help='external Newton source checkout')
     args = parser.parse_args()

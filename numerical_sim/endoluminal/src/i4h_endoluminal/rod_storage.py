@@ -7,7 +7,7 @@ from functools import partial
 import numpy as np
 import warp as wp
 from i4h_physics.rod_storage import Record, alias, bind_record, body_signature
-from i4h_physics.storage import Owner, defer_declaration
+from i4h_physics.storage import Owner, defer_declaration, scene_record
 
 CATHETER_LIVE = ("track_length", "track_stiffness", "max_delta", "rates", "lower", "upper")
 
@@ -39,6 +39,21 @@ def publish_catheter_control(scene, declarations, system_id, *, rod, settings):
         if key in ("rates", "lower", "upper") and np.asarray(value).shape != (3,):
             raise ValueError(f"catheter_control.{key} must have 3 entries")
         r.live(key, value)
+    r.root_mode = settings.get("root_mode", "track")
+    if r.root_mode not in ("track", "external_pose"):
+        raise ValueError("catheter_control.root_mode must be track or external_pose")
+    path = np.empty((0, 3), np.float32)
+    if settings.get("track_path") is not None:
+        path = np.asarray(settings["track_path"], np.float32)
+        if path.ndim != 2 or path.shape[1] != 3 or len(path) < 2 or not np.isfinite(path).all():
+            raise ValueError("catheter_control.track_path must have finite shape (N>=2, 3)")
+        if np.any(np.linalg.norm(np.diff(path, axis=0), axis=1) <= 1.0e-9):
+            raise ValueError("catheter_control.track_path has coincident consecutive points")
+    r.path_signature = path.shape, path.tobytes()
+    configured = {entry[0] for entry in (scene_record(scene).mounts or ((), False))[0]}
+    if r.root_mode == "external_pose" and body.name in configured:
+        raise ValueError("external_pose root and rigid mount cannot both own a catheter")
+    r.add("guide_path", Owner.MODEL, wp.vec3, path if len(path) else np.zeros((1, 3), np.float32))
     m = body.rod
     for key, dtype, data in (
         ("track_start", wp.vec3, m.start),
@@ -48,6 +63,11 @@ def publish_catheter_control(scene, declarations, system_id, *, rod, settings):
         r.add(key, Owner.MODEL, dtype, data, nodes=np.zeros(1, np.int32), group="track")
     E = scene.envs
     r.add("actions", Owner.CONTROL, wp.float32, np.zeros((E, 3), np.float32), runtime=True, width=3, group="world")
+    v = body.variant_of_env
+    for key, dtype, values in (("positions", wp.vec3, m.start[v]), ("rotations", wp.quat, m.frames[v, 0])):
+        r.add("root_start_" + key, Owner.MODEL, dtype, values, runtime=True, group="world")
+        r.add("root_" + key, Owner.CONTROL, dtype, values, runtime=True, group="world")
+    r.add("absolute_targets", Owner.CONTROL, wp.vec3, np.zeros((E, 3), np.float32), runtime=True, group="world")
     r.add("targets", Owner.STATE, wp.vec3, np.zeros((E, 3), np.float32), runtime=True, group="world")
     r.add(
         "root",
@@ -152,6 +172,10 @@ def bind_endoluminal(system, kind):
         raise ValueError("incompatible endoluminal storage declaration")
     if kind == "catheter_control" and r.rod != system.rod.id:
         raise ValueError("catheter rod declaration changed")
+    if kind == "catheter_control":
+        path = np.empty((0, 3), np.float32) if system.track_path is None else np.asarray(system.track_path, np.float32)
+        if system.root_mode != r.root_mode or (path.shape, path.tobytes()) != r.path_signature:
+            raise ValueError("catheter root mode or guide changed; reconstruct the model")
     validate_layout(scene, r)
     bind_record(system, r)
     alias(scene, system, "centreline" if kind == "control_layout" else "body", body)

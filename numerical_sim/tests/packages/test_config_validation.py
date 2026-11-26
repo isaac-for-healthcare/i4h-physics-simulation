@@ -81,7 +81,7 @@ def test_every_live_array_is_registered():
 
     sim = load_case(case([{"type": "particles"}, {"type": "rod_direct", "body": "rod"}]))
     particles = next(s for s in sim.systems if isinstance(s, Particles))
-    assert set(particles._live_layouts) == {"damping", "max_velocity"}
+    assert set(particles._live_layouts) == {"damping", "max_velocity", "gravity_scale"}
 
 
 
@@ -179,3 +179,27 @@ def test_env_rows_copy_one_env_only(monkeypatch):
     for env in range(scene.envs):
         newton_model.add_env_particles(Builder(), scene, env, custom_attributes={})
     assert copied == [W] * 4 * scene.envs, copied
+
+
+def test_body_particle_integrators_cover_each_main_body_once():
+    cfg = case([{"type": "particles", "id": "first", "body": "rod"},
+                {"type": "particles", "id": "second", "body": "other", "gravity_scale": 0.0}])
+    cfg["assets"]["other"] = dict(ROD)
+    load_case(cfg)
+    cfg["systems"].pop()
+    with pytest.raises(ValueError, match="each main body exactly once"):
+        load_case(cfg)
+    cfg["systems"].append({"type": "particles", "id": "duplicate", "body": "rod"})
+    with pytest.raises(ValueError, match="each main body exactly once"):
+        load_case(cfg)
+
+
+def test_existing_positional_particle_parameters_keep_their_meaning():
+    import numpy as np
+    from i4h_physics import Scene
+    from i4h_physics.systems.mechanics.particles import Particles
+
+    particles = Particles(Scene("cpu", 2), 0.5, 7.0)
+    np.testing.assert_array_equal(particles.damping.numpy(), [0.5, 0.5])
+    np.testing.assert_array_equal(particles.max_velocity.numpy(), [7.0, 7.0])
+    np.testing.assert_array_equal(particles.gravity_scale.numpy(), [1.0, 1.0])

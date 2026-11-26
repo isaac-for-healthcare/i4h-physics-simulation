@@ -11,7 +11,7 @@ import warp as wp
 from i4h_physics.storage import Domain, Field, Owner, defer_declaration, scene_record
 
 DIRECT_LIVE = ("young", "torsion", "bend", "twist", "angular_damping")
-PBD_LIVE = ("stretch", "bend", "twist", "angular_damping")
+PBD_LIVE = ("stretch", "bend", "twist", "angular_damping", "max_delta")
 DIRECT_REGIONS = dict(
     young_multiplier=1.0,
     torsion_multiplier=1.0,
@@ -34,7 +34,15 @@ def geometry(body, backend):
         frames, inv_mass = m.frames, m.inv_mass_q
         if backend == "pbd":
             frames, inv_mass = frames[:, :-1].copy(), inv_mass[:, :-1].copy()
-        rd = m.rest_darboux if backend == "direct" else np.stack([rest_darboux_quats(f, pair) for f in frames])
+        rd = m.rest_darboux
+        if backend == "pbd":
+            # Chain Darboux stores the vector part of the short relative quaternion.
+            # Startup frames are placement only; material curvature is independent.
+            vectors = m.rest_darboux[:, :len(pair)]
+            norm2 = np.sum(vectors.astype(np.float64) ** 2, axis=-1)
+            if not np.isfinite(norm2).all() or np.any(norm2 > 1.0):
+                raise ValueError("rod rest_curvature must have vector norm <= 1")
+            rd = np.concatenate((vectors, np.sqrt(np.maximum(0.0, 1.0 - norm2))[..., None]), axis=-1).astype(np.float32)
     elif body.tree is not None and backend == "pbd":
         m = body.tree
         if m.frames.shape[0] != 1:
@@ -298,6 +306,11 @@ def publish_rod(scene, declarations, system_id, *, body, backend, settings, expe
         declarations.initializer(partial(initialize_inertia, scene_ref=ref(scene), record=r))
     else:
         r.add("unit_twist", Owner.MODEL, wp.float32, np.ones((E, shared.K), np.float32), runtime=True)
+        from i4h_physics.systems.rods.rod_pbd import greedy_colors
+        geo = geometry(body, backend)
+        segments, pairs = geo["seg"][1][0], geo["pair"][1][0]
+        r.add("stretch_colors", Owner.MODEL, wp.int32, greedy_colors(segments), nodes=nodes)
+        r.add("bend_colors", Owner.MODEL, wp.int32, greedy_colors(pairs), nodes=segments[pairs[:, 0], 0], group="bend_colors")
     shared.solver = system_id
     declarations.register_package(records=((scene, "rod_domains", {system_id: r}),))
     return r
@@ -370,13 +383,29 @@ def declare_rod_direct_material(scene, body, *, system_id="rod_direct_material")
     defer_declaration(scene, system_id, publish_material, dict(body=body, backend="direct", settings={}))
 
 
-def declare_rod_pbd_material(scene, body, *, system_id="rod_pbd_material", radius_weighting=False):
-    defer_declaration(
-        scene,
-        system_id,
-        publish_material,
-        dict(body=body, backend="pbd", settings=dict(radius_weighting=radius_weighting)),
-    )
+def declare_rod_pbd_material(scene, body, *, system_id="rod_pbd_material", radius_weighting=False,
+                             reference_young_modulus_kpa=None):
+    settings = dict(radius_weighting=radius_weighting, reference_young_modulus_kpa=reference_young_modulus_kpa)
+    defer_declaration(scene, system_id, publish_material, dict(body=body, backend="pbd", settings=settings))
+
+
+def region_defaults(membership, backend, reference_young_modulus_kpa=None):
+    """Initial and restored per-region multipliers. With a reference modulus, a PBD region with a
+    ``young_modulus_kpa`` starts bend and twist at its modulus over the reference; stretch stays 1."""
+    base = DIRECT_REGIONS if backend == "direct" else PBD_REGIONS
+    defaults = {key: np.full(len(membership.names), value, np.float32) for key, value in base.items()}
+    if reference_young_modulus_kpa is None:
+        return defaults
+    reference = float(reference_young_modulus_kpa)
+    if backend != "pbd" or not np.isfinite(reference) or reference <= 0:
+        raise ValueError("rod material: reference_young_modulus_kpa must be a positive PBD setting")
+    for index, name in enumerate(membership.names):
+        if name in membership.young_modulus_kpa:
+            ratio = membership.young_modulus_kpa[name] / reference
+            if ratio > 10:
+                raise ValueError(f"rod material: region {name!r} modulus ratio {ratio:g} exceeds the multiplier limit 10")
+            defaults["bend"][index] = defaults["twist"][index] = ratio
+    return defaults
 
 
 def publish_material(scene, declarations, system_id, *, body, backend, settings, solver_specs=None):
@@ -399,14 +428,14 @@ def publish_material(scene, declarations, system_id, *, body, backend, settings,
     r = Record(scene, declarations, system_id, body)
     r.backend, r.shared = backend, shared
     r.signature = body_signature(body, backend)
-    r.defaults = DIRECT_REGIONS.copy() if backend == "direct" else PBD_REGIONS.copy()
+    r.defaults = region_defaults(membership, backend, settings.get("reference_young_modulus_kpa"))
     r.add("edge", Owner.MODEL, wp.int32, membership.edge)
     for key, value in r.defaults.items():
         r.add(
             "region_" + key,
             Owner.MODEL,
             wp.float32,
-            np.full((scene.envs, len(membership.names)), value, np.float32),
+            np.tile(value, (scene.envs, 1)),
             runtime=True,
             group="regions_runtime",
         )

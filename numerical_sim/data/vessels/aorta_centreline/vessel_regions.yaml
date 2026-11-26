@@ -1,0 +1,15 @@
+schema_version: 1
+default: unassigned
+branches:
+  0: right_iliac_femoral
+  1: aortic_trunk
+  2: left_iliac_femoral
+  3: arch_outlets
+  4: arch_outlets
+  5: arch_outlets
+  6: arch_outlets
+  7: arch_outlets
+  8: arch_outlets
+  9: arch_outlets
+  10: arch_outlets
+  11: arch_outlets

@@ -184,7 +184,7 @@ def select_envs(dst: wp.array, env_ids=None, mask=None, *, debug: bool = False) 
         if env_ids is not None:
             raise ValueError("pass env_ids or mask, not both")
         if type(mask).__module__.split(".")[0] == "torch":
-            _warp_after_torch(mask, dev)
+            warp_after_torch(mask, dev)
             mask = wp.from_torch(mask, dtype=wp.bool)
         if not isinstance(mask, wp.array) or mask.dtype is not wp.bool or mask.shape != (E,) or mask.device != dev:
             raise ValueError(f"mask must be a ({E},) bool array on {dev}")
@@ -221,7 +221,7 @@ def _int32_ids(env_ids, device, envs: int, debug: bool = False) -> wp.array:
         if debug:  # the original values, before the int32 cast can wrap them
             _check_range(env_ids.reshape(-1).cpu().numpy(), envs)
         t = env_ids.to(device=wp.device_to_torch(device), dtype=torch.int32).reshape(-1)
-        _warp_after_torch(t, device)  # after the cast: an event recorded before it would let Warp read unwritten ids
+        warp_after_torch(t, device)  # after the cast: an event recorded before it would let Warp read unwritten ids
         return wp.from_torch(t, dtype=wp.int32)
     ids = np.arange(envs)[env_ids] if isinstance(env_ids, slice) else np.asarray(env_ids).reshape(-1)
     if ids.size and not np.issubdtype(ids.dtype, np.integer):
@@ -238,7 +238,7 @@ def _check_range(ids: np.ndarray, envs: int) -> None:
 _ordering: dict = {}  # Warp stream handle -> (torch's view of it, a reusable event): nothing created per reset
 
 
-def _warp_after_torch(t, device) -> None:
+def warp_after_torch(t, device) -> None:
     """Warp's current stream on ``device`` waits for torch's current stream; ``t`` lives until Warp's stream used it."""
     if not t.is_cuda:
         return

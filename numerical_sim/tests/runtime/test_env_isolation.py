@@ -110,29 +110,40 @@ def test_rod_case_batched_matches_single(name):
 
 
 def phased_tool_actions(phases):
-    """Every tool sweeps through the tissue on its own per-env phase and closes its jaws from step 6; no energy or
-    fire (burning and cutting are chaotic)."""
-    from i4h_isaaclab.views import action_bounds, controls
+    """Sweep the loaded tips around their nearest tissue surface, closing jaws from step 6.
+
+    Parked tool roots are outside the tissue. A sweep around those roots depended on
+    the old instrument meshes' tip offsets and left phases effectively unactuated.
+    Resolve the contact centres once from the production geometry, before stepping;
+    every independent run then receives the same open-loop physical trajectory.
+    """
+    centres = None
 
     def act(sim, step):
-        ctrl = controls(sim)
-        low, high = action_bounds(sim, 0.5)
-        mid, half = (low + high) / 2.0, (high - low) / 2.0
-        t = step / 60.0
-        rows = []
-        for ph in phases:
-            u = np.zeros(mid.shape[0], np.float32)
-            for k in range(0, mid.shape[0] - 9, 10):  # instrument_control columns: position, quaternion, grip, energy, fire
-                u[k : k + 3] = 0.8 * np.sin(4.0 * t + np.arange(3) + ph)
-                u[k + 7] = 1.0 if step >= 6 else -1.0
-                u[k + 8] = u[k + 9] = -1.0
-            rows.append(mid + half * u)
-        physical = np.asarray(rows, np.float32)
-        offset = 0
-        for s in ctrl:
-            width = int(np.prod(s.actions.shape[1:]))
-            s.actions.assign(physical[:, offset : offset + width].reshape(s.actions.shape))
-            offset += width
+        nonlocal centres
+        control = next(s for s in sim.systems if isinstance(s, InstrumentControl))
+        if centres is None:
+            from i4h_surgical.loaders.instrument_usd import CHAIN_FIXED
+
+            surface = next(s for s in sim.systems if type(s).__name__ == "Surface")
+            q = sim.scene.field("q", surface.body).numpy()[0]
+            surface_ids = np.unique(surface.tris.numpy())
+            spheres = control.sphere_q.numpy()[0]
+            owners = control.sphere_instrument.numpy()
+            centres = control.rest.copy()
+            for k in range(control.count):
+                tips = np.flatnonzero((owners == k) & (control.host_sphere_chain == CHAIN_FIXED))
+                if not len(tips):  # suction has only a shaft; keep its parked pose
+                    continue
+                tip = spheres[tips].mean(axis=0)
+                nearest = surface_ids[np.argmin(np.linalg.norm(q[surface_ids] - tip, axis=1))]
+                centres[k] += q[nearest] - tip
+        actions = control.actions.numpy()
+        for env, phase in enumerate(phases):
+            actions[env, :, :3] = centres + 0.05 * np.sin(4.0 * step / 60.0 + np.arange(3) + phase)
+            actions[env, :, 7] = 1.0 if step >= 6 else 0.0
+            actions[env, :, 8:] = 0.0
+        control.actions.assign(actions)
     return act
 
 
@@ -177,3 +188,24 @@ def test_chole_batched_matches_single(record_property):
         assert sample["others"] > 5.0e-3, "the per-env phases must make the envs differ, or the check tests nothing"
         assert not sample["integer_mismatches"], f"trial {sample['trial']} env {sample['env']}: {sample['integer_mismatches']}"
     assert passed >= 2, f"only {passed}/3 isolation trials met the unchanged 0.2 limit: {samples}"
+
+
+@needs_chole
+@pytest.mark.parametrize("graph", [False, True])
+def test_chole_isolation_trajectory_makes_contact(graph):
+    """Every phase must actuate the production tissue well before the oracle ends."""
+    case = deterministic(read_case("chole_tet_med"), spacer_before="tissue")
+    sim = load_case(case, envs=3)
+    sim.cuda_graph = graph
+    sim.prepare()
+    act = phased_tool_actions((0.0, 1.7, 3.1))
+    for step in range(8):
+        act(sim, step)
+        sim.step()
+    contact = next(s for s in sim.systems if type(s).__name__ == "InstrumentContact")
+    assert (contact.record_count.numpy().sum(axis=1) > 0).all()
+    tissue = sim.scene.field("q", sim.scene.body("tissue")).numpy()
+    assert np.isfinite(tissue).all()
+    for env in range(3):
+        for other in range(env):
+            assert np.abs(tissue[env] - tissue[other]).max() > 5.0e-3
