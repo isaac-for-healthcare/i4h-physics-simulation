@@ -230,6 +230,8 @@ These bounds are fixed before any candidate is evaluated. `L` is the catheter le
 - `numba` requires `numpy>=1.22,<2.5`;
 - `cmeel-boost` requires `numpy>=2.3,<2.4`.
 
+On aarch64, both the Isaac Lab venv and the workspace venv also report that `nvidia-cusparselt-cu13` "was built for a different platform", and every `uv sync` and `uv run` reinstalls that package. torch pins `nvidia-cusparselt-cu13==0.8.1` (this workspace's `uv.lock`; Isaac Lab v3.0.0's lockfile has `0.8.0`), and the aarch64 wheels of both releases declare `Tag: py3-none-manylinux2014_sbsa` in their `WHEEL` file, which uv does not match to aarch64. `0.8.1.post1` (2026-10-21) ships the same files with the `manylinux2014_aarch64` tag, but `==0.8.1` excludes a post-release. The message goes away once torch pins `0.8.1.post1` or a later correctly tagged release.
+
 ## 6. Spike record (2026-10-06, Lab 6864dd1, Newton 1.6.1)
 
 A 2-world model, each world with a revolute pendulum and 5 particles, 50 steps at 1/240 s:
