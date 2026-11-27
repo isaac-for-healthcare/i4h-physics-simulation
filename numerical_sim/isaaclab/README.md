@@ -11,6 +11,25 @@ import i4h_isaaclab.tasks  # registers the preserved Gym task IDs
 
 ## Isaac Lab compatibility
 
+The current numerical dependencies are Newton `b70ad54cfcaf7570907d3a3aad6c60acc7443c33`
+(1.9.0.dev0), Warp 1.17.0, and, for coupling, MuJoCo Core / MuJoCo-Warp 4.0.1.
+The current host integration uses Isaac Lab `release/3.0.0` at
+`39394453ceaac256349ad822e675a93485373667` with Isaac Sim 6.2 and Torch 2.11.0.
+It requires the Newton 1.9 VBD, deformable-group, actuator, metadata/cloner and
+contact-observable compatibility patches maintained by
+[Workflows setup](https://github.com/isaac-for-healthcare/i4h-workflows/blob/d93c9cc5e4f5c29f2c800da378bc3110b05cb29e/third_party/setup.sh).
+Setup also handles upgrading the earlier optional-observable patch. Use the patched
+Lab environment prepared by that setup, not an unpatched checkout at the same SHA.
+Record the Workflows SHA, Lab SHA and applied patch diff with every qualification;
+a revision number alone does not identify the patched runtime.
+
+Install these packages into that Lab environment without replacing its host
+dependencies or adding `usd-core`; Lab supplies `pxr` through `usd-exchange`.
+The workspace lockfile is for the independent numerical environment and does not
+replace the Lab environment's dependency contract. The installed-wheel setup in
+`scripts/setup_direct_qualification.py` checks the exact host revision, patch set
+and dependency origins before creating an isolated qualification environment.
+
 Isaac Lab is installed from source. The historical Stage C stack used Newton
 `7f0c13af6e4dd75253709c31dc65c0edcaf22b44` (1.9.0.dev0), Warp 1.17.0,
 MuJoCo/MuJoCo-Warp 3.17.0, Lab main `4cfdfcfa52d7cb64eb83ab293b2fcfc92452aaf1`,
@@ -27,7 +46,7 @@ Control to and from another pair of the host's Model. Rigid body state, host tim
 restore. Restore last: write the host's own state, call the simulation's `forward()`, then restore the i4h rows,
 because Lab runs the solver's cache reset for worlds written through its asset API at the next forward or step.
 
-Patched 3.0 additionally needs the explicit
+The historical patched 3.0 stack additionally needed the explicit
 [cloner compatibility delta](patches/newton18-lab30-cloner.patch): Newton uses public
 `surface_label` / `volume_label` and their corresponding private particle starts.
 The supplied checkout remains unchanged; qualification uses an isolated worktree

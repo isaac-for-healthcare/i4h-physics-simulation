@@ -44,7 +44,7 @@ see `physics/component-contracts.md` for what that covers.
 There is no `i4h_sim` compatibility package. Assessment is constructed and advanced by the host after each completed physics sample, before rewards or terminations. Episode reset explicitly resets both physical state and the assessment object. Constructor maps are passed explicitly; systems may receive ordinary sidecars from factories without registration or a sidecar lifecycle framework.
 
 Build members with `uv build --all-packages`. Use Python `>=3.12,<3.13`; development
-continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton at revision `7f0c13af` (1.9.0.dev0, pinned in `physics/pyproject.toml`); coupling uses MuJoCo and MuJoCo-Warp 3.17.0.
+continues to pin Python 3.12.12 in the environment. Keep Warp 1.17.0 and Newton at revision `b70ad54` (1.9.0.dev0, pinned in `physics/pyproject.toml`); coupling uses MuJoCo Core and MuJoCo-Warp 4.0.1. See [Isaac Lab compatibility](isaaclab/README.md#isaac-lab-compatibility) for the host revision and required patches.
 
 Camera observations are owned by Isaac Lab and require neither standalone nor the bridge.
 Shared helpers live in `i4h_host`; neither host depends on the other. See

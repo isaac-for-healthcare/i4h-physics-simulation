@@ -1,8 +1,8 @@
 # i4h-physics
 
 Version 0.9.0, import `i4h_physics`, Python `>=3.12,<3.13`.
-Dependencies: Warp 1.17.0, Newton at revision `7f0c13af` (1.9.0.dev0, pinned in `physics/pyproject.toml`), NumPy and PyYAML. Install locally with `uv pip install ./numerical_sim/physics`
-or use the workspace lockfile for development. The `coupled` extra pins MuJoCo and MuJoCo-Warp 3.17.0.
+Dependencies: Warp 1.17.0, Newton at revision `b70ad54` (1.9.0.dev0, pinned in `physics/pyproject.toml`), NumPy and PyYAML. The `coupled` extra adds MuJoCo Core and MuJoCo-Warp 4.0.1. Install locally with `uv pip install ./numerical_sim/physics`
+or use the workspace lockfile for development.
 
 The historical Stage B CUDA stack used the [Warp 1.17.0 capture correction](https://github.com/isaac-for-healthcare/i4h-physics-simulation/blob/44c62f1ae44241cb034f3ef194558c04c47a1572/numerical_sim/docs/warp117-hashgrid-capture.md).
 Normal setup uses stock Warp 1.17.0. The historical patched wheel was local to that
