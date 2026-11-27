@@ -9,10 +9,10 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12,<3.13"
-dependencies = ["warp-lang==1.17.0", "newton @ git+https://github.com/newton-physics/newton.git@7f0c13af6e4dd75253709c31dc65c0edcaf22b44", "numpy>=1.23", "pyyaml>=6.0"]
+dependencies = ["warp-lang==1.17.0", "newton @ git+https://github.com/newton-physics/newton.git@b70ad54cfcaf7570907d3a3aad6c60acc7443c33", "numpy>=1.23", "pyyaml>=6.0"]
 
 [project.optional-dependencies]
-coupled = ["mujoco==3.17.0", "mujoco-warp==3.17.0"]
+coupled = ["mujoco-core==4.0.1", "mujoco-warp==4.0.1"]
 vtu = ["meshio>=5.3,<6"]
 
 [tool.setuptools.packages.find]

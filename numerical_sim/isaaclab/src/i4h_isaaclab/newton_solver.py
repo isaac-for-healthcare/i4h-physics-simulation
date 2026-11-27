@@ -98,8 +98,6 @@ class I4hNewtonSolver(NewtonSolver):
 
     def build(self, model, mode, env_template=None):
         context(self.cfg)
-        if model.get_requested_contact_attributes():
-            raise ValueError("pure i4h does not support native force-contact sensors or CONTACT_F")
         return I4hSolver(model)
 
     def applies_body_forces(self):

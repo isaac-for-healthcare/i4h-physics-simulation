@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Camera observation for every env: Newton's ``SensorTiledCamera`` (a Warp ray tracer) over a render model
+"""Camera observation for every env: Newton's ``SensorCamera`` (a Warp ray tracer) over a render model
 derived from the scene, plus our own shading of the tissue pixels. A renderer in the sense of AGENTS.md: it
 reads ``Scene`` arrays and system products between steps, never inside the step graph, and owns its own capture.
 
@@ -50,7 +50,7 @@ import numpy as np
 import warp as wp
 from i4h_host.appearance import appearance
 from i4h_physics.scene import ACTIVE
-from newton.sensors import SensorTiledCamera
+from newton.sensors import SensorCamera
 
 try:
     from i4h_surgical.systems.instruments.instrument_control import InstrumentControl
@@ -250,6 +250,7 @@ class TiledCamera:
         model.particle_radius = self.radii
         model.particle_count = N + M
         model.tri_indices = self.tris if self.F_total else None
+        model.tri_count = E * self.F_total
         model.tet_indices = None
         self.state = newton.State()
         self.state.particle_q = self.points
@@ -268,22 +269,27 @@ class TiledCamera:
             self.mesh = wp.Mesh(points=scene.q, indices=self.tris_flat, groups=row_env, bvh_constructor="sah")
 
         # --- the sensor, its camera, light and outputs -------------------------------------------------------------------
-        config = SensorTiledCamera.RenderConfig(enable_global_world=False, enable_shadows=False, enable_particles=self.has_particles,
-                                                enable_textures=True, render_order=SensorTiledCamera.RenderOrder.TILED)
-        self.sensor = SensorTiledCamera(model, default_render_config=config, load_textures=True)
+        config = SensorCamera.RenderConfig(enable_global_world=False, enable_shadows=False, enable_particles=self.has_particles,
+                                                enable_textures=True, render_order=SensorCamera.RenderOrder.TILED)
+        self.sensor = SensorCamera(model, default_render_config=config, load_textures=True)
         position, right, up, forward = cam.basis()
         rotation = np.stack([right, up, -forward], axis=1).astype(np.float64)  # Newton's camera looks down -Z, +Y up
         q = matrix_to_quat(rotation)
         xf = np.tile(np.concatenate([position, q]).astype(np.float32), (1, E, 1))
         self.camera_transforms = wp.array(xf, dtype=wp.transformf, device=dev)  # (1 camera, E worlds)
-        self.rays = self.sensor.utils.compute_camera_rays_pinhole(self.width, self.height, camera_fovs=math.radians(self.fov))
-        self.sensor.utils.create_default_light(enable_shadows=False, direction=wp.vec3f(*forward))  # a headlight
-        self.color = self.sensor.utils.create_color_image_output(self.width, self.height, 1)  # (E, 1, H, W) uint32
-        self.depth4 = self.sensor.utils.create_depth_image_output(self.width, self.height, 1)
-        self.shape4 = self.sensor.utils.create_shape_index_image_output(self.width, self.height, 1)
-        self.rgb = self.sensor.utils.to_rgba_from_color(self.color)  # zero-copy uint8 view (E, H, W, 4)
-        self.depth = self.depth4.reshape((E, self.height, self.width))
-        self.shape_index = self.shape4.reshape((E, self.height, self.width))
+        self.view_transforms = self.camera_transforms.reshape((E,))
+        self.camera_rays = SensorCamera.compute_camera_rays_pinhole(
+            self.width, self.height, fov=math.radians(self.fov), device=dev)
+        self.rays = self.camera_rays.reshape((1, self.height, self.width, 2))
+        self.sensor.create_default_light(enable_shadows=False, direction=wp.vec3f(*forward))  # a headlight
+        self.color3 = self.sensor.allocate_image_color(E, self.width, self.height)
+        self.depth = self.sensor.allocate_image_depth(E, self.width, self.height)
+        self.shape_index = self.sensor.allocate_image_shape_index(E, self.width, self.height)
+        # Keep the shading kernels' camera axis as zero-copy views of the per-view outputs.
+        self.color = self.color3.reshape((E, 1, self.height, self.width))
+        self.depth4 = self.depth.reshape((E, 1, self.height, self.width))
+        self.shape4 = self.shape_index.reshape((E, 1, self.height, self.width))
+        self.rgb = SensorCamera.Utils.to_rgba_from_color(self.color3)
         self.rgb_t = wp.to_torch(self.rgb)
         self.depth_t = wp.to_torch(self.depth)
 
@@ -344,8 +350,8 @@ class TiledCamera:
             self.model.bvh_refit_shapes(self.state)
         if self.has_particles:
             self.model.bvh_refit_particles(self.state)
-        self.sensor.update(self.state, self.camera_transforms, self.rays, color_image=self.color, depth_image=self.depth4,
-                           shape_index_image=self.shape4)
+        self.sensor.update(self.state, self.view_transforms, self.camera_rays, color_image=self.color3,
+                           depth_image=self.depth, shape_index_image=self.shape_index)
         dims, dev = (self.scene.envs, self.height, self.width), self.scene.device
         if self.mesh is not None:
             self.mesh.refit()
@@ -385,7 +391,7 @@ class TiledCamera:
 
     def sheet(self, worlds_per_row: int | None = None) -> np.ndarray:
         """All envs' last frames tiled into one ``(rows * H, cols * W, 4)`` uint8 image (host)."""
-        tiled = self.sensor.utils.flatten_color_image_to_rgba(self.color, worlds_per_row=worlds_per_row)
+        tiled = SensorCamera.Utils.flatten_color_image_to_rgba(self.color3, views_per_row=worlds_per_row)
         wp.synchronize_device(self.scene.device)
         return tiled.numpy()
 

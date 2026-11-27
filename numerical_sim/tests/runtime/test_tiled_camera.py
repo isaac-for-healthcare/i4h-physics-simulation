@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""M7 camera: Newton's SensorTiledCamera over a scene-derived render model. Content is checked through
+"""M7 camera: Newton's SensorCamera over a scene-derived render model. Content is checked through
 the shape-index image (tissue = triangle hits, instruments = shape ids, fluid and rods = particle hits) and depth
 ranges against the scene's own positions; env isolation and masked resets through frame comparisons."""
 

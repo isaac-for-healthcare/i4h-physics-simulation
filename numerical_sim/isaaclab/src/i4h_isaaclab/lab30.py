@@ -6,8 +6,12 @@ All authoring, binding, restoration and numerical loops are shared with main.
 Only this module accesses release manager class state.
 """
 
+from copy import copy
+
+import warp as wp
 from i4h_isaaclab.newton_manager import context
 from i4h_physics.coupling import CoupledSolver
+from i4h_physics.observables import KINDS, identities
 from i4h_physics.sim import I4hSolver
 from isaaclab.physics import PhysicsEvent, PhysicsManager
 from isaaclab.sim import SimulationContext
@@ -56,6 +60,8 @@ def _rigid():
 
 class NewtonI4hLab30Manager(NewtonManager):
     contact_sensors = False
+    _output_key = None
+    _combined_output = None
 
     @classmethod
     def _register_builder_attributes(cls, builder):
@@ -82,8 +88,6 @@ class NewtonI4hLab30Manager(NewtonManager):
         core = I4hSolver(model)
         rigid = solver_cfg.rigid_solver_cfg
         if rigid is None:
-            if model.get_requested_contact_attributes():
-                raise ValueError("pure i4h does not support native force-contact sensors or CONTACT_F")
             solver = core
         else:
             solver = CoupledSolver(model, rigid.class_type._create_solver(model, rigid), core,
@@ -109,13 +113,32 @@ class NewtonI4hLab30Manager(NewtonManager):
     def _step_solver(cls, state_0, state_1, control, contacts, substep_dt):
         binding = context(_cfg()).binding
         contacts = binding.contacts if contacts is None else contacts
-        cls._solver.step(state_0, state_1, control, contacts, substep_dt, observables=binding.observables)
+        output = cls._combined_output
+        cls._solver.step(state_0, state_1, control, contacts, substep_dt, observables=output)
+        if (output is not None and cls._contact_observables is not None
+                and binding.observables is not None and binding.observables.contact_f is not None):
+            wp.copy(binding.observables.contact_f, output.contact_f)
+            wp.copy(binding.observables.rigid.contact_f, output.contact_f)
         context(_cfg()).physics_step()  # outer substeps are one, even with decimation > 1
 
     @classmethod
     def step(cls):
         owner = context(_cfg())
         owner.check_prepared()
+        output, sensor_output = owner.binding.observables, cls._contact_observables
+        key = (output, sensor_output)
+        if cls._output_key != key:
+            cls._output_key = key
+            cls._combined_output = sensor_output if output is None else output
+            if output is not None and sensor_output is not None:
+                combined = copy(sensor_output)
+                combined._kinds = sensor_output.kinds | output.kinds
+                combined.ours = output.ours
+                combined.row_keys = output.row_keys
+                for kind in KINDS:
+                    setattr(combined, kind, getattr(output, kind))
+                combined.identities = identities(combined)
+                cls._combined_output = combined
         super().step()
         owner.sync_views()
 
@@ -126,6 +149,8 @@ class NewtonI4hLab30Manager(NewtonManager):
 
     @classmethod
     def _solver_specific_clear(cls):
+        cls._output_key = None
+        cls._combined_output = None
         cfg = getattr(PhysicsManager._cfg, "solver_cfg", None)
         owner = getattr(cfg, "__i4h_context", None)
         if owner is not None:
