@@ -141,7 +141,26 @@ Notes:
 - Substeps multiply: `NewtonCfg.num_substeps` times `XPBDRodSolverCfg.num_substeps`. Leave the rod's at `1` unless you want both.
 - The rod's device must match the Newton model's; the wrapper raises if they differ.
 - `coupling_mode="two_way"` requires `drive_body_name` or `drive_body_index` and feeds the rod's lagged proximal reaction into that body.
+- `drive_root_sync=True` holds the rod's root on `drive_mount_local` of that body inside every substep, between the rigid and rod solves, so the root follows the solved body pose without lag. Command the body, not the root: the solver raises if a task also latches a root command on the rod. With one coupling iteration this is a staggered explicit step, stable while `k·dt²/M < 4` for rod stiffness `k` against holder mass `M`.
+- `drive_coupling_iterations > 1` (two-way only) re-solves each substep from its start with an updated reaction, as Newton's `Config.iterations`, so the holder's force and the rod's vessel contacts are solved together. `drive_relaxation_mode="aitken"` adapts the relaxation between iterations within `drive_relaxation_min`/`drive_relaxation_max`. Each iteration saves and restores the rod's full state, vessel included.
+- `drive_proxy_mass=True` (with `drive_root_sync` and at least two iterations) makes the root a proxy of the holder, as Newton's proxies do: it carries the drive link's mass times `drive_proxy_mass_scale` and starts each substep with the holder's rewound free velocity, while containment, track guidance and friction still treat it as held. With two iterations it converges at any stiffness; only translation is a proxy.
 - Containment (static mesh and deforming centerline), track guidance and per-env reset all run on the batched path, so `num_envs > 1` simulates the same physics as `num_envs = 1`. A deforming vessel must be built with a matching `num_envs` so each env owns its own wall; `CathRodSolver` raises on a mismatch rather than letting envs share one.
+
+Outside Isaac Lab, with `pip install -e ".[newton-coupled]"` (Newton 1.8 or newer, which needs a newer Warp than Isaac Lab pins), `build_coupled_rod_solver` in `catheter_vasculature_solver.newton_coupled_rod` couples the rod through Newton's own `SolverCoupledProxy` from `newton.solvers.experimental.coupled`. The rigid entry owns the bodies, joints and shapes, and the rod entry owns the rod's particles. Each drive body becomes a proxy in the rod's view, carrying the rigid solver's articulated effective mass. Newton runs the iterations and the fixed or Aitken relaxation. The rod places its root on the proxy and reports its proximal reaction as the harvested wrench:
+
+```python
+from newton.solvers import SolverMuJoCo
+from catheter_vasculature_solver.newton_coupled_rod import ROD_ENTRY, build_coupled_rod_solver
+
+solver = build_coupled_rod_solver(
+    model, rod, particle_range,
+    rigid_solver=lambda view: SolverMuJoCo(view),
+    drive_bodies=[flange_body], mount_local=[(0.0, 0.0, 0.05)],
+    iterations=2, relaxation_mode="aitken",
+)
+solver.step(state_0, state_1, control, contacts, dt)
+rod_solver = solver.solver(ROD_ENTRY)
+```
 
 On the pinned Isaac Lab `ffff603` revision, the scene's reset callback must explicitly call the active manager's `reset_rod(world_mask=...)` after authoring any rigid-body reset and before stepping again. Pass one mask entry per environment, rather than a list of environment IDs: `[False, True, False]` resets only environment 1. `None` resets all environments; an all-zero mask changes nothing.
 

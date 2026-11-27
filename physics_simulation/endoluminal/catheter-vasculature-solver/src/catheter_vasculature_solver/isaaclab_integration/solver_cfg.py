@@ -121,10 +121,42 @@ class CoupledMJWarpXPBDRodSolverCfg(NewtonSolverCfg):
     drive_mount_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
     # Blend weight against the previously harvested reaction, matching
-    # ``proxy_relaxation`` in Newton's coupled framework. Below 1 under-relaxes
-    # the lagged fixed point, which is the usual cure for a drive point that
-    # rings once the catheter stiffens against a vessel wall.
+    # ``proxy_relaxation`` in Newton's coupled framework. With one coupling
+    # iteration, below 1 this low-pass filters the reaction across substeps: it
+    # damps a ringing drive point at the cost of lagging the force further.
+    # With several, it relaxes the iteration, and with "aitken" it is the first
+    # iteration's weight.
     drive_reaction_relaxation: float = 1.0
+
+    # "fixed" keeps drive_reaction_relaxation; "aitken" adapts it between
+    # coupling iterations of a substep within [min, max], as Newton's
+    # proxy_relaxation="aitken". Only differs from "fixed" with iterations > 1.
+    drive_relaxation_mode: Literal["fixed", "aitken"] = "fixed"
+    drive_relaxation_min: float = 0.05
+    drive_relaxation_max: float = 1.0
+
+    # Times each substep's rigid and rod solves are re-run from the substep's
+    # start with an updated guess of the catheter's reaction, as Newton's
+    # Config.iterations. Converged, the holder's force and the rod's vessel
+    # contacts are solved together rather than a substep apart, including the
+    # holder's articulation and drive gains. 1 is the single lagged pass; more
+    # need two_way and cost a full rod save and restore per iteration.
+    drive_coupling_iterations: int = 1
+
+    # Hold the catheter's root on drive_mount_local of the drive body inside
+    # every substep, between the rigid and rod solves, instead of leaving it on
+    # the path a task commands. Requires a drive body in either coupling mode,
+    # and the task must then command the body rather than the rod's root.
+    drive_root_sync: bool = False
+
+    # With drive_root_sync, let the root stand in for the holder, as Newton's
+    # proxies do: it carries the drive link's mass times
+    # drive_proxy_mass_scale and starts each substep moving with the holder's
+    # free (rewound) velocity. Vessel containment, track guidance and friction
+    # still treat it as held. Needs two_way and drive_coupling_iterations >= 2:
+    # with a single pass the rewind is inconsistent and the coupling diverges.
+    drive_proxy_mass: bool = False
+    drive_proxy_mass_scale: float = 1.0
 
     # Soft contact material for particle–shape pairs (tune like Franka soft-lift)
     soft_contact_ke: float = 5.0e3
