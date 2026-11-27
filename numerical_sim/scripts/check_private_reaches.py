@@ -20,6 +20,7 @@ ALLOWED = {'Newton WORLD row count on the pinned and current-stack assessment re
                                                                                     '_attribute_frequency_count',
                                                                                     '_normalize_attribute_reference'},
                                              'isaaclab/src/i4h_isaaclab/newton_solver.py': {'_kinds'}},
+ 'Newton Observables kind union for host sensor and component outputs': {'isaaclab/src/i4h_isaaclab/lab30.py': {'_kinds'}},
  'Warp internals: array lifetime reference and dtype layout': {'physics/src/i4h_physics/commands.py': {'_ref'},
                                                                'physics/src/i4h_physics/continuation.py': {'_ref'},
                                                                'physics/src/i4h_physics/rod_storage.py': {'_shape_'},

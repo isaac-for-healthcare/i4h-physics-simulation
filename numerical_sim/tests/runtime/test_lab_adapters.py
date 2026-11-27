@@ -111,14 +111,11 @@ def test_replaced_captured_buffer_is_rejected_before_replay(make):
 
 
 def test_pure_rejects_force_contact_request(make):
-    def request(builder, world, position, rotation):
-        builder.request_contact_attributes("force")
-    with newton_builder_world_hook(request), pytest.raises(ValueError, match="force-contact sensors"):
-        make()
+    with pytest.raises(ValueError, match="does not support"):
+        make(observables=(SolverBase.ObservableKind.CONTACT_F,))
 
 
 def rigid_contact_world(builder, world, position, rotation):
-    builder.request_contact_attributes("force")
     builder.add_ground_plane()
     body = builder.add_link(xform=wp.transform((float(world), 2.0, 0.04), wp.quat_identity()), mass=1.0)
     builder.add_shape_box(body, hx=0.05, hy=0.05, hz=0.05)
@@ -145,7 +142,7 @@ def test_coupled_native_forces_and_observable_ownership(make):
     assert np.isfinite(output.contact_f.numpy()).all() and np.abs(output.contact_f.numpy()).max() > 0
     np.testing.assert_array_equal(output.contact_f.numpy(), output.rigid.contact_f.numpy())
     solver.update_contacts(contacts, binding.state)
-    assert np.abs(contacts.force.numpy()).max() > 0, "native rigid force export is real"
+    assert int(contacts.rigid_contact_count.numpy()[0]) > 0, "native contact geometry is exported"
     with pytest.raises(TypeError, match="instance of Observables"):
         solver.rigid.step(binding.state, binding.state, binding.control, contacts, binding.dt, observables=output)
     with pytest.raises(ValueError, match="solver instance"):

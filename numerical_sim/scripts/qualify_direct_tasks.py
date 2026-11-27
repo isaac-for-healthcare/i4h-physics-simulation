@@ -50,14 +50,14 @@ def main():
             ["git", "diff", "--binary"], cwd=source)).hexdigest(),
         "test_sha256": hashlib.sha256(test.read_bytes()).hexdigest(),
         "dependencies": {name: importlib.metadata.version(name) for name in
-                         ("warp-lang", "torch", "newton", "mujoco", "mujoco-warp", "rsl-rl-lib")},
+                         ("warp-lang", "torch", "newton", "mujoco-core", "mujoco-warp", "rsl-rl-lib")},
         "cells": [],
     }
     assert manifest["dependencies"]["warp-lang"] == "1.17.0"
     newton = importlib.metadata.distribution("newton")
     manifest["newton_origin"] = json.loads(newton.read_text("direct_url.json"))
     assert manifest["newton_origin"]["vcs_info"]["commit_id"] == (
-        "d31603ff5e8389d1d6b2a5daef6ea2cb074c26ff")
+        "b70ad54cfcaf7570907d3a3aad6c60acc7443c33")
     manifest["qualification_source_sha256"] = {
         str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (test, Path(__file__).resolve(), root / "scripts/setup_direct_qualification.py")}
